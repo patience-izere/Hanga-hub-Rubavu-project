@@ -1,0 +1,308 @@
+/* Global Reset */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f0f0f0;
+    color: #333;
+    overflow-x: hidden;
+}
+
+/* Navigation Bar */
+nav {
+    background-color: #333;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+nav ul {
+    list-style: none;
+    display: flex;
+    justify-content: flex-start;
+}
+
+nav ul li {
+    margin-right: 20px;
+}
+
+nav ul li a {
+    color: #fff;
+    text-decoration: none;
+    font-weight: bold;
+    transition: color 0.3s;
+}
+
+nav ul li a:hover {
+    color: #4CAF50; /* Green hover effect */
+    text-decoration: underline;
+}
+
+/* Profile Container in the Navbar */
+
+.profile-container {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+}
+
+.profile-container .profile-holder {
+    display: flex;
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 5px 10px;
+    border-radius: 50px;
+}
+
+.profile-container .circle-image {
+    width: 35px; /* Adjusted to a smaller size */
+    height: 35px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.profile-container .profile-details {
+    margin-left: 10px;
+    display: none; /* Hide details by default */
+}
+
+.profile-container:hover .profile-details {
+    display: block; /* Show profile details on hover */
+}
+
+.profile-container .profile-details h3 {
+    margin: 0;
+    font-size: 0.9em;
+    font-weight: bold;
+}
+
+.profile-container .profile-details p {
+    margin: 0;
+    font-size: 0.75em;
+}
+
+.sign-out {
+    display: none;
+    position: absolute;
+    top: 50px;
+    right: 0;
+    background-color: white;
+    border: 1px solid #ccc;
+    padding: 10px;
+    z-index: 1000;
+    border-radius: 4px;
+    width: 120px;
+}
+
+.profile-container:hover .sign-out {
+    display: block;
+}
+
+/* Main Content */
+.content {
+    padding: 20px;
+}
+
+/* Lab Page Layout */
+.lab-container {
+    display: flex;
+    height: calc(100vh - 70px);
+    gap: 20px;
+    background: linear-gradient(135deg, #ffffff 50%, #f0f0f0 50%);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+/* Left Panel: Tools Database */
+.left-panel {
+    flex: 0.2;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    overflow-y: auto;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s;
+}
+
+.left-panel h2 {
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.tools-list {
+    list-style: none;
+}
+
+.tools-list li {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: #eaeaea;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+.tools-list li:hover {
+    background-color: #4CAF50;
+    transform: scale(1.05);
+}
+
+.tool-icon {
+    width: 30px;
+    height: 30px;
+    margin-right: 10px;
+}
+
+/* Middle Panel: 3D Scene */
+.middle-panel {
+    flex: 1;
+    background-color: #fff;
+    padding: 0;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    position: relative;
+    transition: all 0.5s;
+}
+
+#canvas-container {
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    background-color: #000; /* Set a black background for VR preview */
+}
+
+/* Hover effect for middle-panel */
+.middle-panel:hover {
+    transform: scale(1.01);
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Right Panel: Controls */
+.right-panel {
+    flex: 0.2;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    overflow-y: auto;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.right-panel h2 {
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.controls-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.controls-buttons button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    border-radius: 4px;
+    background-color: #4CAF50;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+.controls-buttons button i {
+    margin-right: 8px;
+}
+
+.controls-buttons button:hover {
+    background-color: #45a049;
+    transform: scale(1.05);
+}
+
+/* Live Chat Container */
+.live-chat-container {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s;
+}
+
+.live-chat-container:hover {
+    transform: scale(1.02);
+}
+
+#chat-box {
+    display: flex;
+    flex-direction: column;
+    height: 60vh;
+}
+
+#messages {
+    flex: 1;
+    border: 1px solid #ccc;
+    padding: 10px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    background-color: #fafafa;
+}
+
+#message-input {
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+
+#send-button {
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    border-radius: 4px;
+    background-color: #008CBA;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+#send-button:hover {
+    background-color: #007bb5;
+    transform: scale(1.05);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .lab-container {
+        flex-direction: column;
+    }
+
+    .left-panel, .middle-panel, .right-panel {
+        flex: none;
+        width: 100%;
+        height: auto;
+    }
+
+    .controls-buttons {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .controls-buttons button {
+        flex: 1 1 45%;
+        margin: 5px;
+    }
+}

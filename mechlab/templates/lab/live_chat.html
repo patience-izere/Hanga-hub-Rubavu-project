@@ -1,0 +1,52 @@
+<!-- lab/templates/lab/live_chat.html -->
+
+{% extends 'lab/base.html' %}
+
+{% block title %}Live Chat{% endblock %}
+
+{% block content %}
+    <section id="live-chat">
+        <h2>Live Chat</h2>
+        <div id="chat-box">
+            <div id="messages"></div>
+            <form id="chat-form">
+                <input type="text" id="message-input" placeholder="Type your message..." autocomplete="off" required>
+                <button type="submit">Send</button>
+            </form>
+        </div>
+    </section>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        const chatSocket = new WebSocket(
+            'ws://' + window.location.host + '/ws/live-chat/'
+        );
+
+        chatSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            const message = data['message'];
+            const messages = document.getElementById('messages');
+            const msgDiv = document.createElement('div');
+            msgDiv.textContent = message;
+            messages.appendChild(msgDiv);
+            messages.scrollTop = messages.scrollHeight;
+        };
+
+        chatSocket.onclose = function(e) {
+            console.error('Chat socket closed unexpectedly');
+        };
+
+        document.getElementById('chat-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            if (message !== '') {
+                chatSocket.send(JSON.stringify({
+                    'message': 'You: ' + message
+                }));
+                input.value = '';
+            }
+        });
+    </script>
+{% endblock %}

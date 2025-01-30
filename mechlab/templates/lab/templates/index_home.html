@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to OPedu</title>
+    <!--<link rel="stylesheet" href="mechlab\staticfiles\lab\css\index_home2.css"> -->
+    <style>
+        /* General Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f4f8;
+    color: #333;
+}
+
+header {
+    background-color: #414428;
+    color: white;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    max-width: 1200px;
+    width: 100%;
+}
+
+.company-logo {
+    
+    width: 100px;
+    margin-right: 20px;
+    border-radius:100px
+}
+
+.header-text h1 {
+    font-size: 2.5rem;
+}
+
+.header-text p {
+    font-size: 1.2rem;
+}
+
+main {
+    display: flex;
+    max-width: 1200px;
+    margin: 40px auto;
+}
+
+.sidebar {
+    width: 200px;
+    background-color: #414428;
+    padding: 20px;
+    color: white;
+}
+
+.sidebar ul {
+    list-style: none;
+}
+
+.sidebar ul li {
+    margin: 20px 0;
+}
+
+.sidebar ul li a {
+    color: white;
+    text-decoration: none;
+    font-size: 1.1rem;
+}
+
+.sidebar ul li a:hover {
+    text-decoration: underline;
+}
+
+.content {
+    flex-grow: 1;
+    background-color: white;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.vr-scene img {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.buttons {
+    margin-top: 20px;
+}
+
+.buttons button {
+    padding: 10px 20px;
+    margin: 10px;
+    font-size: 1rem;
+    background-color: #0d3b66;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.buttons button:hover {
+    background-color: #145c9e;
+}
+
+footer {
+    background-color: #414428;
+    color: white;
+    text-align: center;
+    padding: 20px;
+    margin-top: 40px;
+}
+
+footer a {
+    color: #1fa1f2;
+    text-decoration: none;
+}
+
+footer a:hover {
+    text-decoration: underline;
+}
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+}
+.content {
+    height: 100vh; /* or use the position fixed method */
+    width: 100vw;
+}
+
+</style>
+</head>
+<body>
+    {% load static %}
+
+    <header>
+        <div class="header-content">
+            <img src="{% static 'lab/img/opedu_logo.png' %}" alt="OPedu logo" class="company-logo">
+            <div class="header-text" >
+                <style> 
+                    .center {
+                        padding: 70px 0;
+                        border: 3px solid green;
+                        text-align: center;
+                      }
+                    </style>
+                <h1>Immersive VR Learning</h1>
+                <p>Experience hands-on learning through virtual reality right from your browser.</p>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="sidebar">
+            <nav>
+                <ul>
+                    <li><a href="#">Home</a></li>
+                    <li><a href="lab">VR Experiences</a></li>
+                    <li><a href="#">Learn</a></li>
+                    <li><a href="#">About Us</a></li>
+                </ul>
+            </nav>
+        </div>
+        <div class="content">
+            <div class="vr-scene">
+
+                <a href=lab/lab>
+                    <img src="{% static 'lab/img/vr-scene-placeholder.jpg' %}" alt="3D VR Scene"  >
+                </a>
+            <br>
+            <br>
+            <br>
+            <br>
+
+
+            <p>
+                This platform is a web based application that deliver hands on learning <br>
+                experience through virtual reality learning across your browser.
+            </p>
+                {% comment %} 
+                <a href=lab/lab>
+                    <button class='overlay-button'>Enter VR</button>
+                </a>
+
+                
+                <button class='overlay-button'>Explore</button> {% endcomment %}
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; OPedu | Follow us on 
+            <a href="#">Twitter</a>, 
+            <a href="#">Facebook</a>, 
+            <a href="#">Instagram</a>
+        </p>
+    </footer>
+</body>
+</html>
