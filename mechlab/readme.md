@@ -1,3 +1,5 @@
+[![CI](https://github.com/patience-izere/Hanga-hub-Rubavu-project/actions/workflows/ci.yml/badge.svg)](https://github.com/patience-izere/Hanga-hub-Rubavu-project/actions/workflows/ci.yml)
+
 this is the project directory structure for the virtual mechanical lab to beused for capacity building 
 
 the project will be presented in hanga hubs project.
