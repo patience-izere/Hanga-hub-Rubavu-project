@@ -20,12 +20,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-m_dhaov)qcp9i#yu^=95m39fd3gdy1e^zax+0v^9*$-+*er=!f'
+import os
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Read secret key and debug mode from environment for safety. Provide safe
+# development defaults so the project runs out-of-the-box.
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-please-change-this-secret')
 
-ALLOWED_HOSTS = []
+# DEBUG should be False in production. Set DJANGO_DEBUG='True' for local dev.
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+
+# Comma-separated list in DJANGO_ALLOWED_HOSTS, e.g. "example.com,localhost"
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if os.environ.get('DJANGO_ALLOWED_HOSTS') else []
 
 
 # Application definition
@@ -82,29 +87,45 @@ CHANNEL_LAYERS = {
     },
 }
 
+# If you deploy to production (multiple workers/processes) use Redis as the
+# channel layer backend. Example (requires `channels_redis`):
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             'hosts': [os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')],
+#         },
+#     },
+# }
+
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
+# Default to a local SQLite database for development. If you want to use a
+# different database (Postgres, MySQL, MongoDB via djongo, etc.) replace this
+# block or set up environment-specific settings.
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
 
-""" DATABASES = {
+# Example MongoDB/djongo configuration (leave commented unless you're using it)
+"""
+DATABASES = {
     'default': {
         'ENGINE': 'djongo',
         'NAME': 'hanga',  # Your database name in MongoDB Atlas
         'CLIENT': {
-            'host': 'mongodb+srv://peshobeat:<Mariemadona@1>@hanga.x5bra.mongodb.net/hanga?retryWrites=true&w=majority',
-            'username': '<peshobeat>',
-            'password': '<Mariemadona@1>',
+            'host': 'mongodb+srv://<username>:<password>@cluster-url/hanga?retryWrites=true&w=majority',
+            'username': '<username>',
+            'password': '<password>',
             'authSource': 'admin',  # Optional, depending on your setup
         }
     }
 }
- """
+"""
 # Password validation
 # https://docs.djangoproject.com/en/3.2/ref/settings/#auth-password-validators
 

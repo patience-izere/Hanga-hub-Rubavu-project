@@ -1,0 +1,11 @@
+Django==3.2.25
+djangorestframework==3.12.4
+channels==3.0.5
+# channels-redis is optional — required if you use Redis for channel layers in production
+channels-redis==3.4.1
+daphne==3.0.2
+python-dotenv==1.0.0
+# Image support for ImageField
+Pillow==9.5.0
+# Optional / production
+gunicorn==20.1.0
