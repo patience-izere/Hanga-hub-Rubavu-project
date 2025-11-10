@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.11]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies (Pillow build deps)
+        run: sudo apt-get update && sudo apt-get install -y libjpeg-dev zlib1g-dev libpng-dev
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r mechlab/requirements.txt
+
+      - name: Run migrations
+        working-directory: mechlab
+        run: python manage.py migrate
+
+      - name: Run Django checks
+        working-directory: mechlab
+        run: python manage.py check
+
+      - name: Run tests
+        working-directory: mechlab
+        run: python manage.py test --verbosity=2
