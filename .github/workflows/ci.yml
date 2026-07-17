@@ -5,8 +5,28 @@ on:
   pull_request:
 
 jobs:
-  test:
+  backend:
     runs-on: ubuntu-latest
+    env:
+      DJANGO_DEBUG: "true"
+      DJANGO_USE_SQLITE: "false"
+      DJANGO_SECRET_KEY: "ci-only-secret-key"
+      DJANGO_ALLOWED_HOSTS: "testserver,localhost,127.0.0.1"
+      DATABASE_URL: postgresql://opedu:opedu-ci-password@localhost:5432/opedu
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: opedu
+          POSTGRES_USER: opedu
+          POSTGRES_PASSWORD: opedu-ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U opedu -d opedu"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     strategy:
       matrix:
         python-version: [3.11]
@@ -16,7 +36,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -26,7 +46,22 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r mechlab/requirements.txt
+          pip install -r mechlab/requirements-dev.lock
+
+      - name: Lint and format check
+        run: |
+          python -m ruff check mechlab tools
+          python -m ruff format --check mechlab tools
+
+      - name: Check migrations
+        working-directory: mechlab
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Validate OpenAPI schema
+        working-directory: mechlab
+        run: |
+          python manage.py spectacular --file ../openapi/schema.generated.yml --validate --fail-on-warn
+          diff -u ../openapi/schema.yml ../openapi/schema.generated.yml
 
       - name: Run migrations
         working-directory: mechlab
@@ -37,5 +72,52 @@ jobs:
         run: python manage.py check
 
       - name: Run tests
-        working-directory: mechlab
-        run: python manage.py test --verbosity=2
+        run: pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Formatting
+        run: npm run format:check
+
+      - name: Check generated API types
+        run: |
+          npm run api:types
+          git diff --exit-code -- src/api/generated/schema.d.ts
+
+      - name: Test
+        run: npm test
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end role routes
+        run: npm run test:e2e
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate production web image
+        run: |
+          docker build --target production -t opedu-frontend-ci .
+          docker run --rm --add-host backend:127.0.0.1 opedu-frontend-ci nginx -t

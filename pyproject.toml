@@ -1,0 +1,13 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["mechlab/.venv", "mechlab/lab/migrations"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "mechlab.settings"
+pythonpath = ["mechlab"]
+python_files = ["test_*.py", "tests.py"]
+addopts = "--strict-markers --disable-warnings"

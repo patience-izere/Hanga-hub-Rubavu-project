@@ -1,8 +1,3 @@
-# lab/routing.py
+"""WebSocket routes remain empty until scoped, moderated support is implemented."""
 
-from django.urls import re_path
-from . import consumers
-
-websocket_urlpatterns = [
-    re_path(r'ws/live-chat/$', consumers.LiveChatConsumer.as_asgi()),
-]
+websocket_urlpatterns = []
