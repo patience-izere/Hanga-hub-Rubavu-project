@@ -1,4 +1,6 @@
-from django.shortcuts import render
+from django.conf import settings
+from django.shortcuts import redirect
+
 
 def home(request):
-    return render(request, 'lab/templates/index_home.html')
+    return redirect(f"{settings.FRONTEND_URL.rstrip('/')}/")

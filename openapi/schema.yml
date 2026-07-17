@@ -1,0 +1,1295 @@
+openapi: 3.0.3
+info:
+  title: OPedu API
+  version: 1.0.0
+  description: School-scoped technical learning, simulation, and evidence API.
+paths:
+  /api/v1/assignments/:
+    get:
+      operationId: api_v1_assignments_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAssignmentList'
+          description: ''
+  /api/v1/assignments/{id}/:
+    get:
+      operationId: api_v1_assignments_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this assignment.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assignment'
+          description: ''
+  /api/v1/assignments/{id}/start/:
+    post:
+      operationId: api_v1_assignments_start_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this assignment.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssignmentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssignmentRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assignment'
+          description: ''
+  /api/v1/attempts/:
+    get:
+      operationId: api_v1_attempts_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAttemptDetailList'
+          description: ''
+  /api/v1/attempts/{id}/:
+    get:
+      operationId: api_v1_attempts_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this attempt.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptDetail'
+          description: ''
+  /api/v1/attempts/{id}/actions/:
+    post:
+      operationId: api_v1_attempts_actions_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this attempt.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttemptDetailRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AttemptDetailRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AttemptDetailRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptDetail'
+          description: ''
+  /api/v1/attempts/{id}/complete/:
+    post:
+      operationId: api_v1_attempts_complete_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this attempt.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttemptDetailRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AttemptDetailRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AttemptDetailRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptDetail'
+          description: ''
+  /api/v1/instructor/attempts/{id}/:
+    get:
+      operationId: api_v1_instructor_attempts_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstructorAttemptReview'
+          description: ''
+  /api/v1/instructor/overview/:
+    get:
+      operationId: api_v1_instructor_overview_retrieve
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstructorOverview'
+          description: ''
+  /api/v1/models/:
+    get:
+      operationId: api_v1_models_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedThreeDModelList'
+          description: ''
+  /api/v1/models/{id}/:
+    get:
+      operationId: api_v1_models_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this three d model.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreeDModel'
+          description: ''
+  /api/v1/school/invitations/:
+    get:
+      operationId: api_v1_school_invitations_list
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SchoolInvitation'
+          description: ''
+    post:
+      operationId: api_v1_school_invitations_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchoolInvitationCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SchoolInvitationCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SchoolInvitationCreateRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolInvitationCreated'
+          description: ''
+  /api/v1/school/invitations/accept/{token}/:
+    get:
+      operationId: api_v1_school_invitations_accept_retrieve
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolInvitationPreview'
+          description: ''
+    post:
+      operationId: api_v1_school_invitations_accept_create
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchoolInvitationAcceptRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SchoolInvitationAcceptRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SchoolInvitationAcceptRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/v1/school/members/:
+    get:
+      operationId: api_v1_school_members_list
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SchoolMember'
+          description: ''
+  /api/v1/school/members/{id}/:
+    patch:
+      operationId: api_v1_school_members_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSchoolMemberUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSchoolMemberUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSchoolMemberUpdateRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolMember'
+          description: ''
+components:
+  schemas:
+    Assignment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        lesson:
+          allOf:
+          - $ref: '#/components/schemas/LessonSummary'
+          readOnly: true
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        latest_attempt:
+          allOf:
+          - $ref: '#/components/schemas/AttemptSummary'
+          nullable: true
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - latest_attempt
+      - lesson
+    AssignmentRequest:
+      type: object
+      properties:
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+    AttemptDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          nullable: true
+        resume_state: {}
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        assignment:
+          allOf:
+          - $ref: '#/components/schemas/Assignment'
+          readOnly: true
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttemptEvent'
+          readOnly: true
+      required:
+      - assignment
+      - events
+      - id
+      - updated_at
+    AttemptDetailRequest:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          nullable: true
+        resume_state: {}
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+    AttemptEvent:
+      type: object
+      properties:
+        sequence:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        event_type:
+          type: string
+          maxLength: 80
+        payload: {}
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+      - event_type
+      - sequence
+    AttemptEventRequest:
+      type: object
+      properties:
+        sequence:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        event_type:
+          type: string
+          minLength: 1
+          maxLength: 80
+        payload: {}
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+      - event_type
+      - sequence
+    AttemptSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          nullable: true
+        resume_state: {}
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - id
+      - updated_at
+    Competency:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          maxLength: 60
+        title:
+          type: string
+          maxLength: 180
+        description:
+          type: string
+        mastery_threshold:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+      required:
+      - code
+      - id
+      - title
+    CompetencyRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 60
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        description:
+          type: string
+        mastery_threshold:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+      required:
+      - code
+      - title
+    Detail:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    InstructorAttemptEvidence:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        learner:
+          allOf:
+          - $ref: '#/components/schemas/InstructorLearner'
+          readOnly: true
+        lesson:
+          allOf:
+          - $ref: '#/components/schemas/InstructorLesson'
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          nullable: true
+        completed_steps:
+          type: integer
+          readOnly: true
+        total_steps:
+          type: integer
+          readOnly: true
+        incorrect_actions:
+          type: integer
+          readOnly: true
+        safety_errors:
+          type: integer
+          readOnly: true
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - completed_steps
+      - id
+      - incorrect_actions
+      - learner
+      - lesson
+      - safety_errors
+      - total_steps
+      - updated_at
+    InstructorAttemptReview:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        learner:
+          allOf:
+          - $ref: '#/components/schemas/InstructorLearner'
+          readOnly: true
+        lesson:
+          allOf:
+          - $ref: '#/components/schemas/InstructorLesson'
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          nullable: true
+        completed_steps:
+          type: integer
+          readOnly: true
+        total_steps:
+          type: integer
+          readOnly: true
+        incorrect_actions:
+          type: integer
+          readOnly: true
+        safety_errors:
+          type: integer
+          readOnly: true
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        procedure_steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcedureStep'
+          readOnly: true
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttemptEvent'
+          readOnly: true
+      required:
+      - completed_steps
+      - events
+      - id
+      - incorrect_actions
+      - learner
+      - lesson
+      - procedure_steps
+      - safety_errors
+      - total_steps
+      - updated_at
+    InstructorLearner:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+      required:
+      - email
+      - id
+      - name
+    InstructorLesson:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        courseTitle:
+          type: string
+          readOnly: true
+        trade:
+          type: string
+          readOnly: true
+        program:
+          type: string
+          readOnly: true
+          nullable: true
+        module:
+          type: string
+          readOnly: true
+          nullable: true
+      required:
+      - courseTitle
+      - id
+      - module
+      - program
+      - title
+      - trade
+    InstructorMetrics:
+      type: object
+      properties:
+        learners:
+          type: integer
+        assignments:
+          type: integer
+        attempts:
+          type: integer
+        completedAttempts:
+          type: integer
+        inProgressAttempts:
+          type: integer
+        safetyErrors:
+          type: integer
+      required:
+      - assignments
+      - attempts
+      - completedAttempts
+      - inProgressAttempts
+      - learners
+      - safetyErrors
+    InstructorOverview:
+      type: object
+      properties:
+        metrics:
+          $ref: '#/components/schemas/InstructorMetrics'
+        attempts:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstructorAttemptEvidence'
+      required:
+      - attempts
+      - metrics
+    LessonSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 180
+        slug:
+          type: string
+          maxLength: 180
+          pattern: ^[-a-zA-Z0-9_]+$
+        summary:
+          type: string
+        objectives: {}
+        safety_notes: {}
+        estimated_minutes:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        course_title:
+          type: string
+          readOnly: true
+        trade:
+          type: string
+          readOnly: true
+        program:
+          type: string
+          readOnly: true
+          nullable: true
+        module:
+          type: string
+          readOnly: true
+          nullable: true
+        competencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Competency'
+          readOnly: true
+        procedure_steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcedureStep'
+          readOnly: true
+      required:
+      - competencies
+      - course_title
+      - id
+      - module
+      - procedure_steps
+      - program
+      - slug
+      - summary
+      - title
+      - trade
+    LessonSummaryRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 180
+          pattern: ^[-a-zA-Z0-9_]+$
+        summary:
+          type: string
+          minLength: 1
+        objectives: {}
+        safety_notes: {}
+        estimated_minutes:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+      required:
+      - slug
+      - summary
+      - title
+    PaginatedAssignmentList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Assignment'
+    PaginatedAttemptDetailList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttemptDetail'
+    PaginatedThreeDModelList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThreeDModel'
+    PatchedSchoolMemberUpdateRequest:
+      type: object
+      properties:
+        isActive:
+          type: boolean
+    ProcedureStep:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        code:
+          type: string
+          maxLength: 80
+          pattern: ^[-a-zA-Z0-9_]+$
+        title:
+          type: string
+          maxLength: 180
+        instruction:
+          type: string
+        action_code:
+          type: string
+          maxLength: 100
+          pattern: ^[-a-zA-Z0-9_]+$
+        feedback:
+          type: string
+        safety_critical:
+          type: boolean
+        points:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        metadata: {}
+      required:
+      - action_code
+      - code
+      - feedback
+      - id
+      - instruction
+      - order
+      - title
+    ProcedureStepRequest:
+      type: object
+      properties:
+        order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        code:
+          type: string
+          minLength: 1
+          maxLength: 80
+          pattern: ^[-a-zA-Z0-9_]+$
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        instruction:
+          type: string
+          minLength: 1
+        action_code:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: ^[-a-zA-Z0-9_]+$
+        feedback:
+          type: string
+          minLength: 1
+        safety_critical:
+          type: boolean
+        points:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        metadata: {}
+      required:
+      - action_code
+      - code
+      - feedback
+      - instruction
+      - order
+      - title
+    RoleEnum:
+      enum:
+      - admin
+      - instructor
+      - learner
+      - content_author
+      type: string
+      description: |-
+        * `admin` - School administrator
+        * `instructor` - Instructor
+        * `learner` - Learner
+        * `content_author` - Content author
+    SchoolInvitation:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        school:
+          allOf:
+          - $ref: '#/components/schemas/SchoolSummary'
+          readOnly: true
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        expires_at:
+          type: string
+          format: date-time
+        accepted_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - email
+      - expires_at
+      - id
+      - role
+      - school
+    SchoolInvitationAcceptRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 150
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 150
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - firstName
+      - lastName
+      - password
+    SchoolInvitationCreateRequest:
+      type: object
+      properties:
+        schoolId:
+          type: integer
+        email:
+          type: string
+          format: email
+          minLength: 1
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+      required:
+      - email
+      - role
+    SchoolInvitationCreated:
+      type: object
+      properties:
+        invitation:
+          $ref: '#/components/schemas/SchoolInvitation'
+        acceptUrl:
+          type: string
+          format: uri
+      required:
+      - acceptUrl
+      - invitation
+    SchoolInvitationPreview:
+      type: object
+      properties:
+        schoolName:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - email
+      - expiresAt
+      - role
+      - schoolName
+    SchoolMember:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        school:
+          allOf:
+          - $ref: '#/components/schemas/SchoolSummary'
+          readOnly: true
+        user:
+          allOf:
+          - $ref: '#/components/schemas/SchoolUserSummary'
+          readOnly: true
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - role
+      - school
+      - user
+    SchoolSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+      required:
+      - code
+      - id
+      - name
+    SchoolUserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+      required:
+      - email
+      - id
+      - name
+    StatusEnum:
+      enum:
+      - in_progress
+      - completed
+      - requires_review
+      type: string
+      description: |-
+        * `in_progress` - In progress
+        * `completed` - Completed
+        * `requires_review` - Requires review
+    ThreeDModel:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        url:
+          type: string
+          nullable: true
+          readOnly: true
+        thumbnail_url:
+          type: string
+          nullable: true
+          readOnly: true
+      required:
+      - description
+      - id
+      - name
+      - thumbnail_url
+      - url
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
