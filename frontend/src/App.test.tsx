@@ -7,6 +7,51 @@ import { App } from "./App";
 
 afterEach(() => vi.unstubAllGlobals());
 
+type Json = Record<string, unknown> | unknown[];
+
+function signedInAs(roles: string[]): Json {
+  return {
+    user: {
+      id: 1,
+      email: "member@opedu.local",
+      username: "member@opedu.local",
+      firstName: "Demo",
+      lastName: "Member",
+      organization: "Rubavu Demo Technical School",
+      isStaff: false,
+      roles,
+    },
+  };
+}
+
+/** Stubs fetch with a path-prefix lookup, returning an empty object for anything unlisted. */
+function stubApi(routes: Record<string, Json>) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      const match = Object.keys(routes).find((path) => url.includes(path));
+      return Promise.resolve(
+        new Response(JSON.stringify(match ? routes[match] : {}), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    }),
+  );
+}
+
+function renderAt(path: string) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe("App", () => {
   it("renders the public value proposition for a signed-out visitor", async () => {
     vi.stubGlobal(
@@ -225,8 +270,48 @@ describe("App", () => {
     expect(await screen.findByText("Demo Learner")).toBeVisible();
     expect(screen.getByRole("link", { name: "Review evidence" })).toHaveAttribute(
       "href",
-      "/instructor/attempts/7",
+      "/teach/attempts/7",
     );
     expect(screen.queryByText("My learning")).not.toBeInTheDocument();
+  });
+
+  it("sends a learner who opens an instructor route back to their own workspace", async () => {
+    stubApi({
+      "/api/v1/auth/me/": signedInAs(["learner"]),
+      "/api/v1/assignments/": { count: 0, next: null, previous: null, results: [] },
+    });
+
+    renderAt("/teach");
+
+    // The learner lands on /learn rather than a shared dashboard or an error page.
+    expect(await screen.findByRole("heading", { name: /good to see you/i })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: /workshop progress/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps a learner out of school administration", async () => {
+    stubApi({
+      "/api/v1/auth/me/": signedInAs(["learner"]),
+      "/api/v1/assignments/": { count: 0, next: null, previous: null, results: [] },
+    });
+
+    renderAt("/school/people");
+
+    expect(await screen.findByRole("heading", { name: /good to see you/i })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: /people and access/i })).not.toBeInTheDocument();
+  });
+
+  it("gives a content author the authoring workspace rather than the learner dashboard", async () => {
+    stubApi({
+      "/api/v1/auth/me/": signedInAs(["content_author"]),
+      "/api/v1/content/scenarios/": [],
+      "/api/v1/content/asset-packages/": [],
+    });
+
+    renderAt("/dashboard");
+
+    // `content_author` previously fell through to the learner dashboard because no role branch
+    // covered it.
+    expect(await screen.findByRole("link", { name: "Scenarios" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: /good to see you/i })).not.toBeInTheDocument();
   });
 });

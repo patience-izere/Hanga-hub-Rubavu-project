@@ -1,0 +1,17 @@
+{
+  "name": "OPedu Technical Learning",
+  "short_name": "OPedu",
+  "description": "Offline-capable technical learning, evidence, and WebAR guidance.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f4f1e8",
+  "theme_color": "#0b5c4b",
+  "icons": [
+    {
+      "src": "/opedu-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

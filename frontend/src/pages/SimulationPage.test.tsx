@@ -119,13 +119,18 @@ describe("SimulationPage", () => {
     expect(
       await screen.findByRole("heading", { name: "Battery Inspection and Diagnosis" }),
     ).toBeVisible();
-    expect(screen.getByTestId("workshop-scene")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Accessible lesson" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /put on eye protection/i }));
     expect(await screen.findByText("Eye protection confirmed.")).toBeVisible();
     const actionRequest = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/actions/"));
     expect(JSON.parse(String(actionRequest?.[1]?.body))).toEqual({
       action: "confirm_ppe",
-      metadata: { source: "accessible-controls" },
+      eventId: expect.any(String),
+      metadata: {
+        source: "accessible-controls",
+        rendererMode: "accessible_2d",
+        occurredAt: expect.any(String),
+      },
     });
   });
 });

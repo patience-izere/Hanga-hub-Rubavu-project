@@ -1,7 +1,12 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import type { AttemptEvent } from "../api/learning";
-import { useInstructorAttempt } from "../learning/useInstructor";
+import {
+  useInstructorAttempt,
+  useOverrideAttemptRecommendation,
+  useSubmitInstructorFeedback,
+} from "../learning/useInstructor";
 
 function eventDescription(event: AttemptEvent, stepTitles: Map<string, string>) {
   const stepCode = String(event.payload.stepCode || event.payload.expectedStepCode || "");
@@ -19,6 +24,14 @@ function eventDescription(event: AttemptEvent, stepTitles: Map<string, string>) 
 export function InstructorAttemptPage() {
   const attemptId = Number(useParams().attemptId);
   const attempt = useInstructorAttempt(attemptId);
+  const submitFeedback = useSubmitInstructorFeedback(attemptId);
+  const overrideRecommendation = useOverrideAttemptRecommendation(attemptId);
+  const [observation, setObservation] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [overrideKind, setOverrideKind] = useState<
+    "continue" | "remediate" | "retry" | "instructor_review" | "complete"
+  >("continue");
+  const [overrideReason, setOverrideReason] = useState("");
 
   if (attempt.isPending) return <p className="panel-status">Loading attempt evidence…</p>;
   if (attempt.isError || !attempt.data) {
@@ -27,7 +40,7 @@ export function InstructorAttemptPage() {
         <p className="form-error" role="alert">
           Attempt evidence is unavailable.
         </p>
-        <Link to="/dashboard">Return to dashboard</Link>
+        <Link to="/teach">Return to the instructor overview</Link>
       </section>
     );
   }
@@ -37,8 +50,8 @@ export function InstructorAttemptPage() {
 
   return (
     <section className="attempt-review-page">
-      <Link className="back-link" to="/dashboard">
-        ← Instructor dashboard
+      <Link className="back-link" to="/teach">
+        ← Instructor overview
       </Link>
       <header className="review-header">
         <div>
@@ -102,6 +115,119 @@ export function InstructorAttemptPage() {
             );
           })}
         </ol>
+      </section>
+
+      {data.recommendations?.[0] ? (
+        <section className="feedback-panel">
+          <div>
+            <span className="eyebrow">Transparent sequencing</span>
+            <h2>Recommendation review</h2>
+            <p>{data.recommendations[0].rationale}</p>
+            <p>
+              Rule {data.recommendations[0].rule_version} recommended{" "}
+              <strong>{data.recommendations[0].kind.replaceAll("_", " ")}</strong>.
+            </p>
+            {data.recommendations[0].override_kind ? (
+              <p role="status">
+                Overridden to {data.recommendations[0].override_kind.replaceAll("_", " ")} by{" "}
+                {data.recommendations[0].overridden_by_name}:{" "}
+                {data.recommendations[0].override_reason}
+              </p>
+            ) : null}
+          </div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              overrideRecommendation.mutate({ kind: overrideKind, reason: overrideReason });
+            }}
+          >
+            <label>
+              Instructor decision
+              <select
+                value={overrideKind}
+                onChange={(event) => setOverrideKind(event.target.value as typeof overrideKind)}
+              >
+                <option value="continue">Continue</option>
+                <option value="remediate">Remediate</option>
+                <option value="retry">Retry</option>
+                <option value="instructor_review">Instructor review</option>
+                <option value="complete">Complete</option>
+              </select>
+            </label>
+            <label>
+              Audit reason
+              <textarea
+                required
+                minLength={10}
+                rows={3}
+                value={overrideReason}
+                onChange={(event) => setOverrideReason(event.target.value)}
+              />
+            </label>
+            <button className="button button-secondary" disabled={overrideRecommendation.isPending}>
+              Record override
+            </button>
+          </form>
+        </section>
+      ) : null}
+
+      <section className="feedback-panel">
+        <div>
+          <span className="eyebrow">Instructor evidence</span>
+          <h2>Observation and learner feedback</h2>
+          <p>
+            Published feedback becomes visible to the learner and is retained with its author and
+            timestamp.
+          </p>
+        </div>
+        {data.feedback?.map((item) => (
+          <article key={item.id}>
+            <strong>{item.author_name}</strong>
+            {item.observation && <p>{item.observation}</p>}
+            <blockquote>{item.feedback}</blockquote>
+            <small>{item.is_published ? "Published" : "Draft"}</small>
+          </article>
+        ))}
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitFeedback.mutate(
+              { observation, feedback, is_published: true },
+              {
+                onSuccess: () => {
+                  setObservation("");
+                  setFeedback("");
+                },
+              },
+            );
+          }}
+        >
+          <label>
+            Practical observation
+            <textarea
+              value={observation}
+              onChange={(event) => setObservation(event.target.value)}
+              rows={3}
+            />
+          </label>
+          <label>
+            Feedback for the learner
+            <textarea
+              required
+              value={feedback}
+              onChange={(event) => setFeedback(event.target.value)}
+              rows={4}
+            />
+          </label>
+          <button className="button button-primary" disabled={submitFeedback.isPending}>
+            {submitFeedback.isPending ? "Publishing…" : "Publish feedback"}
+          </button>
+          {submitFeedback.isError && (
+            <p className="form-error" role="alert">
+              Feedback could not be published.
+            </p>
+          )}
+        </form>
       </section>
     </section>
   );

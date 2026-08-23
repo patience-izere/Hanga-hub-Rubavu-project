@@ -110,31 +110,31 @@ This is the ordered implementation checklist for continuing OPedu in one uninter
 
 - [x] Add `Program`/`Trade`, `Module`, `Cohort`, and `Enrollment` models.
 - [x] Add validated learner and instructor profile fields; remove birth date and phone unless the product brief justifies them.
-- [ ] Add competency curriculum reference, level, evidence rules, and mastery criteria.
-- [ ] Add lesson prerequisites, language, content version, and approval workflow.
-- [ ] Add draft, review, approved, published, and retired states with author/reviewer audit data.
+- [x] Add competency curriculum reference, level, evidence rules, and mastery criteria.
+- [x] Add lesson prerequisites, language, content version, and approval workflow.
+- [x] Add draft, review, approved, published, and retired states with author/reviewer audit data.
 
 ### Versioned simulations
 
-- [ ] Add immutable/versioned `SimulationScenario` records.
-- [ ] Add versioned `AssetPackage` and `AssetFile` records with checksums, MIME type, byte size, and manifest.
-- [ ] Add normalized `Tool`, `Hazard`, `Hint`, tolerance, acceptable-action, and feedback records.
-- [ ] Store the scenario and grading-policy version on every attempt.
-- [ ] Prevent published scenario versions from being edited in place.
+- [x] Add immutable/versioned `SimulationScenario` records.
+- [x] Add versioned `AssetPackage` and `AssetFile` records with checksums, MIME type, byte size, and manifest.
+- [x] Add normalized `Tool`, `Hazard`, `Hint`, tolerance, acceptable-action, and feedback records.
+- [x] Store the scenario and grading-policy version on every attempt.
+- [x] Prevent published scenario versions from being edited in place.
 
 ### Assessment evidence
 
-- [ ] Add `StepResult` with outcome, attempts, hints, duration, tolerance result, and safety violation data.
-- [ ] Add `CompetencyResult` with achieved points, threshold, mastery state, and evidence references.
-- [ ] Add pass, fail, requires-review, and mastered attempt outcomes.
-- [ ] Move penalty constants into a versioned grading policy.
+- [x] Add `StepResult` with outcome, attempts, hints, duration, tolerance result, and safety violation data.
+- [x] Add `CompetencyResult` with achieved points, threshold, mastery state, and evidence references.
+- [x] Add pass, fail, requires-review, and mastered attempt outcomes.
+- [x] Move penalty constants into a versioned grading policy.
 - [ ] Add instructor observation and feedback records with author and timestamp.
 - [ ] Add stable xAPI-compatible identifiers to important event types without adding a separate LRS.
 
 ### Batch 3 gate
 
 - [x] A clean PostgreSQL database can represent and seed the entire learner/instructor workflow.
-- [ ] Attempt results remain reproducible after content changes.
+- [x] Attempt results remain reproducible after content changes.
 - [x] Model, migration, permission, and deterministic-grading tests pass.
 
 ---

@@ -1,12 +1,20 @@
+import hashlib
+import json
+from datetime import UTC, datetime
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
 from lab.models import (
+    AcceptableAction,
+    AssetPackage,
     Assignment,
     Cohort,
     Competency,
     Course,
     Enrollment,
+    GradingPolicy,
+    Hazard,
     InstructorProfile,
     LearnerProfile,
     Lesson,
@@ -15,7 +23,13 @@ from lab.models import (
     Program,
     School,
     SchoolMembership,
+    SimulationScenario,
+    StepFeedback,
+    StepHint,
+    StepTolerance,
+    Tool,
 )
+from lab.scenario_snapshots import build_scenario_definition
 
 
 class Command(BaseCommand):
@@ -144,6 +158,13 @@ class Command(BaseCommand):
             defaults={
                 "title": "Prepare the vehicle electrical system safely",
                 "description": "Identify hazards and isolate electrical energy before inspection.",
+                "curriculum_reference": "AUTO-ELEC-SAFE-01",
+                "level": 1,
+                "evidence_rules": [
+                    {"event": "step_completed", "stepCode": "ppe", "required": True},
+                    {"event": "step_completed", "stepCode": "ignition", "required": True},
+                ],
+                "mastery_criteria": ["Completes every safety-critical preparation step in order."],
                 "mastery_threshold": 100,
             },
         )
@@ -153,6 +174,14 @@ class Command(BaseCommand):
             defaults={
                 "title": "Perform a structured battery diagnosis",
                 "description": "Select the correct instrument settings and interpret measurements.",
+                "curriculum_reference": "AUTO-ELEC-DIAG-01",
+                "level": 1,
+                "evidence_rules": [
+                    {"event": "step_completed", "stepCode": "diagnosis", "required": True}
+                ],
+                "mastery_criteria": [
+                    "Uses the correct meter mode and interprets the stabilized voltage."
+                ],
                 "mastery_threshold": 80,
             },
         )
@@ -161,6 +190,8 @@ class Command(BaseCommand):
             slug="battery-inspection-and-diagnosis",
             defaults={
                 "module": module,
+                "authored_by": administrator,
+                "reviewed_by": administrator,
                 "title": "Battery Inspection and Diagnosis",
                 "summary": "Prepare, inspect, and diagnose a vehicle battery using a safe sequence.",
                 "objectives": [
@@ -173,7 +204,12 @@ class Command(BaseCommand):
                     "Confirm ignition is off before connecting test equipment.",
                 ],
                 "estimated_minutes": 25,
+                "language": Lesson.Language.ENGLISH,
+                "content_version": 1,
                 "status": Lesson.Status.PUBLISHED,
+                "submitted_at": datetime(2026, 1, 5, tzinfo=UTC),
+                "reviewed_at": datetime(2026, 1, 7, tzinfo=UTC),
+                "published_at": datetime(2026, 1, 10, tzinfo=UTC),
             },
         )
         lesson.competencies.set([safety, diagnosis])
@@ -243,16 +279,201 @@ class Command(BaseCommand):
                 "safety_critical": False,
             },
         ]
+        steps = {}
         for step_data in procedure:
-            ProcedureStep.objects.update_or_create(
+            step, _ = ProcedureStep.objects.update_or_create(
                 lesson=lesson,
                 code=step_data["code"],
                 defaults=step_data,
             )
-        assignment, _ = Assignment.objects.get_or_create(
+            steps[step.code] = step
+        safety_glasses, _ = Tool.objects.update_or_create(
+            course=course,
+            code="safety-glasses",
+            defaults={
+                "name": "Safety glasses",
+                "description": "Impact-rated eye protection for battery work.",
+            },
+        )
+        multimeter, _ = Tool.objects.update_or_create(
+            course=course,
+            code="digital-multimeter",
+            defaults={
+                "name": "Digital multimeter",
+                "description": "CAT-rated meter configured for DC voltage measurement.",
+            },
+        )
+        eye_hazard, _ = Hazard.objects.update_or_create(
+            course=course,
+            code="battery-eye-exposure",
+            defaults={
+                "title": "Battery material eye exposure",
+                "description": "Battery material or fragments can injure unprotected eyes.",
+                "mitigation": "Wear eye protection before approaching the battery.",
+                "severity": Hazard.Severity.HIGH,
+            },
+        )
+        electrical_hazard, _ = Hazard.objects.update_or_create(
+            course=course,
+            code="energized-electrical-circuit",
+            defaults={
+                "title": "Energized electrical circuit",
+                "description": "Incorrect isolation or probe placement can cause a short circuit.",
+                "mitigation": "Switch ignition off and connect probes in the defined sequence.",
+                "severity": Hazard.Severity.CRITICAL,
+            },
+        )
+        steps["ppe"].required_tools.set([safety_glasses])
+        steps["ppe"].hazards.set([eye_hazard])
+        steps["ppe"].competencies.set([safety])
+        steps["ignition"].hazards.set([electrical_hazard])
+        steps["ignition"].competencies.set([safety])
+        for code in ["meter-mode", "negative-lead", "positive-lead", "read-voltage"]:
+            steps[code].required_tools.set([multimeter])
+            steps[code].hazards.set([electrical_hazard])
+            steps[code].competencies.set([diagnosis])
+        steps["diagnosis"].competencies.set([diagnosis])
+
+        voltage_tolerance, _ = StepTolerance.objects.update_or_create(
+            step=steps["read-voltage"],
+            code="charged-battery-voltage",
+            defaults={
+                "measurement": "Open-circuit battery voltage",
+                "minimum_value": "12.4000",
+                "maximum_value": "12.8000",
+                "unit": "V",
+            },
+        )
+        for step in steps.values():
+            AcceptableAction.objects.update_or_create(
+                step=step,
+                action_code=step.action_code,
+                defaults={
+                    "label": step.title,
+                    "is_primary": True,
+                    "tolerance": voltage_tolerance if step.code == "read-voltage" else None,
+                },
+            )
+            StepFeedback.objects.update_or_create(
+                step=step,
+                outcome=StepFeedback.Outcome.CORRECT,
+                defaults={"message": step.feedback},
+            )
+            StepFeedback.objects.update_or_create(
+                step=step,
+                outcome=StepFeedback.Outcome.SAFETY
+                if step.safety_critical
+                else StepFeedback.Outcome.INCORRECT,
+                defaults={
+                    "message": "Restore the safe sequence before continuing."
+                    if step.safety_critical
+                    else "Review the current instruction and try again."
+                },
+            )
+        StepFeedback.objects.update_or_create(
+            step=steps["read-voltage"],
+            outcome=StepFeedback.Outcome.TOLERANCE,
+            defaults={"message": "The reading must be between 12.4 V and 12.8 V."},
+        )
+        StepHint.objects.update_or_create(
+            step=steps["meter-mode"],
+            code="look-for-dc-symbol",
+            defaults={
+                "order": 1,
+                "text": "Choose the meter setting marked with a solid line over a dashed line.",
+                "points_penalty": 2,
+            },
+        )
+        StepHint.objects.update_or_create(
+            step=steps["diagnosis"],
+            code="charged-resting-range",
+            defaults={
+                "order": 1,
+                "text": "A charged 12 V battery at rest is close to 12.6 V.",
+                "points_penalty": 2,
+            },
+        )
+        grading_policy, _ = GradingPolicy.objects.update_or_create(
+            code="standard-deterministic",
+            version=1,
+            defaults={
+                "name": "Standard deterministic practical assessment",
+                "algorithm": GradingPolicy.BASE_MINUS_EVENT_PENALTIES_V1,
+                "base_score": 100,
+                "pass_threshold": 80,
+                "incorrect_action_penalty": 5,
+                "safety_critical_penalty": 15,
+                "requires_review_on_safety_error": False,
+                "rules": {
+                    "algorithm": "base-minus-event-penalties",
+                    "minimumScore": 0,
+                },
+                "status": GradingPolicy.Status.PUBLISHED,
+                "published_at": datetime(2026, 1, 8, tzinfo=UTC),
+            },
+        )
+        asset_manifest = {
+            "format": "opedu-asset-package/v2",
+            "renderer": "procedural-r3f",
+            "files": [],
+            "licenseStatus": "prototype-generated-geometry",
+            "qualityTiers": {
+                "low": {
+                    "maximumBytes": 2_000_000,
+                    "maximumTextureDimension": 1024,
+                    "maximumTriangles": 50_000,
+                    "maximumDrawCalls": 40,
+                    "maximumMaterials": 16,
+                },
+                "medium": {
+                    "maximumBytes": 5_000_000,
+                    "maximumTextureDimension": 2048,
+                    "maximumTriangles": 100_000,
+                    "maximumDrawCalls": 70,
+                    "maximumMaterials": 24,
+                },
+                "high": {
+                    "maximumBytes": 12_000_000,
+                    "maximumTextureDimension": 2048,
+                    "maximumTriangles": 180_000,
+                    "maximumDrawCalls": 100,
+                    "maximumMaterials": 32,
+                },
+            },
+            "productionReplacementRequired": True,
+        }
+        asset_package, _ = AssetPackage.objects.update_or_create(
+            course=course,
+            code="battery-workshop",
+            version=1,
+            defaults={
+                "name": "Battery workshop procedural assets",
+                "manifest": asset_manifest,
+                "sha256": hashlib.sha256(
+                    json.dumps(asset_manifest, sort_keys=True).encode("utf-8")
+                ).hexdigest(),
+                "total_byte_size": 0,
+                "status": AssetPackage.Status.PUBLISHED,
+                "published_at": datetime(2026, 1, 9, tzinfo=UTC),
+            },
+        )
+        scenario_definition = build_scenario_definition(lesson)
+        scenario, _ = SimulationScenario.objects.update_or_create(
             lesson=lesson,
+            version=1,
+            defaults={
+                "title": "Battery Inspection and Diagnosis — guided scenario",
+                "definition": scenario_definition,
+                "grading_policy": grading_policy,
+                "asset_package": asset_package,
+                "status": SimulationScenario.Status.PUBLISHED,
+                "published_at": datetime(2026, 1, 10, tzinfo=UTC),
+            },
+        )
+        assignment, _ = Assignment.objects.get_or_create(
+            scenario=scenario,
             learner=learner,
-            defaults={"assigned_by": instructor},
+            defaults={"lesson": lesson, "assigned_by": instructor},
         )
 
         self.stdout.write(self.style.SUCCESS("Demo learning workflow is ready."))

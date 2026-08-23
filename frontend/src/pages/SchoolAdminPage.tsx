@@ -1,5 +1,4 @@
 import { FormEvent, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { ApiError } from "@/api/client";
 import type { SchoolMember } from "@/api/school";
@@ -25,9 +24,6 @@ export function SchoolAdminPage() {
 
   return (
     <section className="dashboard school-admin-page">
-      <Link className="back-link" to="/dashboard">
-        ← Instructor dashboard
-      </Link>
       <div className="dashboard-heading">
         <div>
           <span className="eyebrow">School administration</span>

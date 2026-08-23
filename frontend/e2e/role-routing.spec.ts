@@ -121,6 +121,21 @@ test("school administrators can open membership management", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Invite a person" })).toBeVisible();
 });
 
+test("school administrators can open the frozen pilot evidence workflow", async ({ page }) => {
+  await authenticated(page, ["admin"]);
+  await page.route("**/api/v1/research/pilots/options/", (route) =>
+    route.fulfill(json({ schools: [], cohorts: [], scenarios: [] })),
+  );
+  await page.route("**/api/v1/research/pilots/?*", (route) =>
+    route.fulfill(json({ count: 0, next: null, previous: null, results: [] })),
+  );
+  await page.goto("/research/pilots");
+  await expect(
+    page.getByRole("heading", { name: "Technical-school pilot control room" }),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Create a draft pilot protocol")).toBeVisible();
+});
+
 test("learners cannot open the school administration route", async ({ page }) => {
   await authenticated(page, ["learner"]);
   await page.route("**/api/v1/assignments/", (route) =>

@@ -174,24 +174,24 @@ Replace the single-score data model with records that describe real learning.
 
 - [x] Add `Trade` or `Program`.
 - [x] Add `Course` and `Module`.
-- [ ] Add `Competency` with curriculum reference, level, and mastery criteria. (Core competency and mastery fields are complete.)
-- [ ] Add `Lesson` with objectives, prerequisites, estimated time, language, and publication state. (Core lesson fields and publication state are complete.)
-- [ ] Add versioned `SimulationScenario` records.
-- [ ] Add `ProcedureStep`, required tool, hazard, acceptable action, tolerance, hint, and feedback records. (Ordered steps, acceptable actions, safety-critical flags, points, metadata and feedback are complete; normalized tools, hazards, tolerances and hints remain.)
-- [ ] Add versioned 3D asset packages instead of treating a model as an isolated file.
+- [x] Add `Competency` with curriculum reference, level, evidence rules, and mastery criteria.
+- [x] Add `Lesson` with objectives, prerequisites, estimated time, language, content version, and publication state.
+- [x] Add versioned `SimulationScenario` records with immutable published definitions.
+- [x] Add `ProcedureStep`, required tool, hazard, acceptable action, tolerance, hint, and feedback records.
+- [x] Add versioned 3D asset packages and integrity-checked asset-file metadata. (The legacy isolated model API remains as a compatibility bridge.)
 - [x] Register all existing content models in Django Admin. (Fine-grained authoring permissions remain.)
-- [ ] Add draft, review, approved, published, and retired content states.
+- [x] Add draft, review, approved, published, and retired content states with controlled transitions and audit events.
 
 ### Assignment and assessment
 
 - [ ] Add `Assignment` with school, class, lesson, due date, and attempt rules. (Learner, lesson, assigner and due date are complete.)
-- [ ] Add `Attempt` with status, start/end time, scenario version, and resume state. (Core attempt lifecycle and resume state are complete.)
+- [x] Add `Attempt` with status, start/end time, immutable scenario/grading-policy versions, and resume state.
 - [x] Add immutable `AttemptEvent` records for each significant learner action.
-- [ ] Add `StepResult`, safety violations, hints used, time, and retry counts.
-- [ ] Add competency-level assessment results rather than only a total score.
+- [x] Add immutable `StepResult` records with safety violations, hints used, duration, tolerance outcome, and attempt counts.
+- [x] Add competency-level assessment results with mastery thresholds and event-backed evidence references.
 - [ ] Add instructor observations and feedback.
-- [ ] Define how an attempt becomes completed, passed, failed, or requires review. (Completion validation and scoring are implemented; pass/fail/review rules remain.)
-- [ ] Make grading deterministic and versioned. (The first deterministic server-side penalty model is implemented; scenario/version persistence remains.)
+- [x] Define deterministic pending, passed, failed, requires-review, and mastered attempt outcomes.
+- [x] Make grading deterministic and versioned with an immutable algorithm identifier and policy parameters.
 - [ ] Plan xAPI-compatible event names and identifiers without blocking the first MVP on a separate LRS.
 
 **Phase 3 exit criteria:** the database can represent one complete lesson, its procedure, assignments, resumable attempts, evidence, and competency results.

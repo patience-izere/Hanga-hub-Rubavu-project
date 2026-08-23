@@ -1,13 +1,17 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 
 import { AppShell } from "./components/AppShell";
+import { RequireRole } from "./components/workspace/RequireRole";
+import { WorkspaceShell } from "./components/workspace/WorkspaceShell";
 import { useCurrentUser } from "./auth/useAuth";
-import { DashboardPage } from "./pages/DashboardPage";
+import { roleCapabilities } from "./auth/useRoles";
+import { LearnerDashboardPage } from "./pages/LearnerDashboardPage";
 import { AssignmentPage } from "./pages/AssignmentPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
+import { InstructorDashboardPage } from "./pages/InstructorDashboardPage";
 import { InstructorAttemptPage } from "./pages/InstructorAttemptPage";
 import { AccountSecurityPage } from "./pages/AccountSecurityPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
@@ -21,15 +25,26 @@ import { FeaturesPage } from "./pages/FeaturesPage";
 import { UpdatesPage } from "./pages/UpdatesPage";
 import { ContactPage } from "./pages/ContactPage";
 import { PrivacyPage, TermsPage } from "./pages/LegalPages";
+import { ResearchSurveyPage } from "./pages/ResearchSurveyPage";
+import { ContentAuthoringPage } from "./pages/ContentAuthoringPage";
+import { TrainingMarkerPage } from "./pages/TrainingMarkerPage";
 
 const SimulationPage = lazy(() =>
   import("./pages/SimulationPage").then((module) => ({ default: module.SimulationPage })),
 );
+const PilotAdministrationPage = lazy(() =>
+  import("./pages/PilotAdministrationPage").then((module) => ({
+    default: module.PilotAdministrationPage,
+  })),
+);
+
+function Loading({ label, children }: { label: string; children: ReactNode }) {
+  return <Suspense fallback={<p className="panel-status">{label}</p>}>{children}</Suspense>;
+}
 
 export function App() {
   const auth = useCurrentUser();
   const queryClient = useQueryClient();
-  const location = useLocation();
 
   useEffect(() => {
     const expireSession = () => queryClient.setQueryData(["auth", "current-user"], null);
@@ -54,14 +69,13 @@ export function App() {
     );
   }
 
-  const user = auth.data;
-  const canReviewEvidence =
-    user?.roles.some(
-      (role) => role === "platform_admin" || role === "instructor" || role === "admin",
-    ) ?? false;
+  const user = auth.data ?? null;
+  const roles = roleCapabilities(user);
+
   return (
-    <AppShell user={user}>
-      <Routes>
+    <Routes>
+      {/* Public site — marketing, authentication and invitation acceptance. */}
+      <Route element={<AppShell user={user} />}>
         <Route path="/" element={<HomePage user={user} />} />
         <Route path="/login" element={<LoginPage user={user} />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -75,74 +89,121 @@ export function App() {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/markers/battery" element={<TrainingMarkerPage />} />
+      </Route>
+
+      {/* Workspace — the signed-in surface, one route per role responsibility. */}
+      <Route element={user ? <WorkspaceShell user={user} /> : <Navigate to="/login" replace />}>
+        {/* Learner */}
         <Route
-          path="/account/security"
+          path="/learn"
           element={
-            user ? (
-              <AccountSecurityPage />
-            ) : (
-              <Navigate to="/login" state={{ from: location.pathname }} replace />
-            )
-          }
-        />
-        <Route
-          path="/dashboard"
-          element={
-            user ? (
-              <DashboardPage user={user} />
-            ) : (
-              <Navigate to="/login" state={{ from: location.pathname }} replace />
-            )
+            <RequireRole user={user}>
+              <LearnerDashboardPage />
+            </RequireRole>
           }
         />
         <Route
           path="/assignments/:assignmentId"
           element={
-            user ? (
+            <RequireRole user={user}>
               <AssignmentPage />
-            ) : (
-              <Navigate to="/login" state={{ from: location.pathname }} replace />
-            )
+            </RequireRole>
           }
         />
         <Route
           path="/attempts/:attemptId"
           element={
-            user ? (
-              <Suspense fallback={<p className="panel-status">Loading the 3D workshop…</p>}>
+            <RequireRole user={user}>
+              <Loading label="Loading the 3D workshop…">
                 <SimulationPage />
-              </Suspense>
-            ) : (
-              <Navigate to="/login" state={{ from: location.pathname }} replace />
-            )
+              </Loading>
+            </RequireRole>
+          }
+        />
+
+        {/* Instructor */}
+        <Route
+          path="/teach"
+          element={
+            <RequireRole user={user} capability="canReviewEvidence">
+              <InstructorDashboardPage />
+            </RequireRole>
           }
         />
         <Route
-          path="/instructor/attempts/:attemptId"
+          path="/teach/attempts/:attemptId"
           element={
-            user && canReviewEvidence ? (
+            <RequireRole user={user} capability="canReviewEvidence">
               <InstructorAttemptPage />
-            ) : (
-              <Navigate
-                to={user ? "/dashboard" : "/login"}
-                state={{ from: location.pathname }}
-                replace
-              />
-            )
+            </RequireRole>
+          }
+        />
+
+        {/* Content author */}
+        <Route
+          path="/authoring"
+          element={
+            <RequireRole user={user} capability="canAuthorContent">
+              <ContentAuthoringPage canPublish={roles.canPublishContent} />
+            </RequireRole>
+          }
+        />
+
+        {/* School administration */}
+        <Route path="/school" element={<Navigate to="/school/people" replace />} />
+        <Route
+          path="/school/people"
+          element={
+            <RequireRole user={user} capability="canAdministerSchool">
+              <SchoolAdminPage />
+            </RequireRole>
+          }
+        />
+
+        {/* Research */}
+        <Route
+          path="/research/survey"
+          element={
+            <RequireRole user={user}>
+              <ResearchSurveyPage />
+            </RequireRole>
           }
         />
         <Route
-          path="/school/admin"
+          path="/research/pilots"
           element={
-            user?.roles.some((role) => role === "platform_admin" || role === "admin") ? (
-              <SchoolAdminPage />
-            ) : (
-              <Navigate to={user ? "/dashboard" : "/login"} replace />
-            )
+            <RequireRole user={user} capability="canReviewEvidence">
+              <Loading label="Loading pilot governance…">
+                <PilotAdministrationPage user={user!} />
+              </Loading>
+            </RequireRole>
           }
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AppShell>
+
+        {/* Account */}
+        <Route
+          path="/account/security"
+          element={
+            <RequireRole user={user}>
+              <AccountSecurityPage />
+            </RequireRole>
+          }
+        />
+      </Route>
+
+      {/* Compatibility redirects for paths that existed before the workspace split. */}
+      <Route path="/dashboard" element={<Navigate to={roles.homePath} replace />} />
+      <Route path="/school/admin" element={<Navigate to="/school/people" replace />} />
+      <Route path="/instructor/attempts/:attemptId" element={<InstructorAttemptRedirect />} />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
+}
+
+/** Preserves links to the pre-workspace instructor evidence path. */
+function InstructorAttemptRedirect() {
+  const { attemptId } = useParams();
+  return <Navigate to={`/teach/attempts/${attemptId}`} replace />;
 }

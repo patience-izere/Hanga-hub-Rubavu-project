@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import uuid
 from hashlib import sha256
 
 from django.conf import settings
@@ -24,6 +26,11 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
 from .audit import record_audit_event
+
+health_logger = logging.getLogger("opedu.health")
+client_error_logger = logging.getLogger("opedu.client_errors")
+
+CLIENT_ERROR_KINDS = {"component_error", "unhandled_error", "unhandled_rejection"}
 
 
 def _json_body(request: HttpRequest) -> dict:
@@ -84,7 +91,13 @@ def _primary_school(user):
 
 @require_GET
 def health_live(request: HttpRequest) -> JsonResponse:
-    return JsonResponse({"status": "ok", "service": "opedu-api"})
+    return JsonResponse(
+        {
+            "status": "ok",
+            "service": "opedu-api",
+            "version": settings.OPEDU_RELEASE_VERSION,
+        }
+    )
 
 
 @require_GET
@@ -92,10 +105,73 @@ def health_ready(request: HttpRequest) -> JsonResponse:
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
-            cursor.fetchone()
-    except Exception:
-        return JsonResponse({"status": "unavailable", "database": "error"}, status=503)
-    return JsonResponse({"status": "ok", "database": "ok"})
+            if cursor.fetchone() != (1,):
+                raise RuntimeError("Database readiness probe returned an unexpected value.")
+        cache_key = f"opedu:readiness:{uuid.uuid4()}"
+        cache.set(cache_key, "ok", timeout=10)
+        if cache.get(cache_key) != "ok":
+            raise RuntimeError("Cache readiness probe failed.")
+        cache.delete(cache_key)
+    except Exception as error:
+        health_logger.warning(
+            "Readiness probe failed",
+            extra={"error_type": type(error).__name__},
+        )
+        return JsonResponse(
+            {
+                "status": "unavailable",
+                "service": "opedu-api",
+                "version": settings.OPEDU_RELEASE_VERSION,
+            },
+            status=503,
+        )
+    return JsonResponse(
+        {
+            "status": "ok",
+            "service": "opedu-api",
+            "version": settings.OPEDU_RELEASE_VERSION,
+        }
+    )
+
+
+@require_POST
+def client_error(request: HttpRequest) -> JsonResponse:
+    """Accept a deliberately low-detail browser error signal for central monitoring."""
+
+    if not request.user.is_authenticated:
+        return JsonResponse({"detail": "Authentication required."}, status=401)
+    try:
+        body = _json_body(request)
+        event_id = str(uuid.UUID(str(body.get("eventId", ""))))
+    except (ValueError, TypeError, AttributeError):
+        return JsonResponse({"detail": "A valid eventId is required."}, status=400)
+
+    kind = str(body.get("kind", ""))
+    route = str(body.get("route", ""))
+    release = str(body.get("release", ""))
+    if kind not in CLIENT_ERROR_KINDS:
+        return JsonResponse({"detail": "Unsupported error kind."}, status=400)
+    if not route.startswith("/") or "?" in route or "#" in route or len(route) > 200:
+        return JsonResponse(
+            {"detail": "route must be a path without query or fragment."}, status=400
+        )
+    if not release or len(release) > 100:
+        return JsonResponse({"detail": "release is required."}, status=400)
+
+    client_error_logger.error(
+        json.dumps(
+            {
+                "event": "browser_error",
+                "event_id": event_id,
+                "request_id": getattr(request, "request_id", ""),
+                "kind": kind,
+                "route": route,
+                "release": release,
+            },
+            separators=(",", ":"),
+        )
+    )
+    return JsonResponse({"accepted": True}, status=202)
 
 
 @ensure_csrf_cookie

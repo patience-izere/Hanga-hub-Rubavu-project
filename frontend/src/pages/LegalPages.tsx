@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 export function PrivacyPage() {
   return (
-    <LegalPage title="Privacy overview" eyebrow="Privacy" updated="Working draft · July 2026">
+    <LegalPage title="Privacy overview" eyebrow="Privacy" updated="Working draft · August 2026">
       <h2>Purpose and scope</h2>
       <p>
         OPedu is designed to keep learning records inside the relevant school context. This overview
@@ -32,6 +32,19 @@ export function PrivacyPage() {
       <p>
         OPedu still requires approved retention periods, privacy and safeguarding review, school
         agreements, support ownership, and appropriate learner or parental information and consent.
+      </p>
+      <h2>Optional research and withdrawal</h2>
+      <p>
+        Pilot surveys require an explicit, current consent version and use a school-scoped
+        pseudonymous participant code. A learner can withdraw survey responses from the evaluation
+        page; the responses are deleted while a non-identifying withdrawal receipt is retained.
+        Withdrawal does not change marks or access to required learning.
+      </p>
+      <h2>Retention and incidents</h2>
+      <p>
+        Research responses are removed when their configured retention period expires. The final
+        period, backup deletion schedule, privacy contact, safeguarding lead, and incident process
+        must be approved and communicated by each participating institution before collection.
       </p>
     </LegalPage>
   );

@@ -1,0 +1,170 @@
+{
+  "input": "C:\\Hanga-hub-Rubavu-project\\output\\docx\\OPedu_AR_Platform_Evaluation.docx",
+  "fonts_by_char_count": {
+    "Calibri": 27775
+  },
+  "direct_run_formatting_runs": 397,
+  "direct_paragraph_formatting_paragraphs": 311,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 2,
+      "text": "TECHNICAL PRODUCT EVALUATION",
+      "style": "Normal"
+    },
+    {
+      "para_index": 155,
+      "text": "Evaluation item",
+      "style": "Normal"
+    },
+    {
+      "para_index": 156,
+      "text": "Detail",
+      "style": "Normal"
+    },
+    {
+      "para_index": 167,
+      "text": "Capability",
+      "style": "Normal"
+    },
+    {
+      "para_index": 168,
+      "text": "Score",
+      "style": "Normal"
+    },
+    {
+      "para_index": 169,
+      "text": "Evaluation",
+      "style": "Normal"
+    },
+    {
+      "para_index": 191,
+      "text": "Research requirement",
+      "style": "Normal"
+    },
+    {
+      "para_index": 192,
+      "text": "Meaning for OPedu",
+      "style": "Normal"
+    },
+    {
+      "para_index": 207,
+      "text": "Dissertation capability",
+      "style": "Normal"
+    },
+    {
+      "para_index": 208,
+      "text": "Current status",
+      "style": "Normal"
+    },
+    {
+      "para_index": 209,
+      "text": "Repository evidence",
+      "style": "Normal"
+    },
+    {
+      "para_index": 210,
+      "text": "Gap to target",
+      "style": "Normal"
+    },
+    {
+      "para_index": 259,
+      "text": "Layer",
+      "style": "Normal"
+    },
+    {
+      "para_index": 260,
+      "text": "Recommended responsibility",
+      "style": "Normal"
+    },
+    {
+      "para_index": 276,
+      "text": "Use case",
+      "style": "Normal"
+    },
+    {
+      "para_index": 277,
+      "text": "AR value",
+      "style": "Normal"
+    },
+    {
+      "para_index": 278,
+      "text": "Evidence to capture",
+      "style": "Normal"
+    },
+    {
+      "para_index": 279,
+      "text": "Safety boundary",
+      "style": "Normal"
+    },
+    {
+      "para_index": 300,
+      "text": "Phase",
+      "style": "Normal"
+    },
+    {
+      "para_index": 301,
+      "text": "Outcome",
+      "style": "Normal"
+    }
+  ],
+  "examples": {
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 1,
+        "text": "",
+        "style": "Normal"
+      },
+      {
+        "para_index": 2,
+        "text": "TECHNICAL PRODUCT EVALUATION",
+        "style": "Normal"
+      },
+      {
+        "para_index": 4,
+        "text": "Assessment against the low-bandwidth WebAR e-learning research framework in 25093891 AR ELearning Dissertation",
+        "style": "Subtitle"
+      },
+      {
+        "para_index": 5,
+        "text": "",
+        "style": "Normal"
+      },
+      {
+        "para_index": 6,
+        "text": "",
+        "style": "Normal"
+      }
+    ],
+    "direct_run_formatting": [
+      {
+        "para_index": 2,
+        "run_text": "TECHNICAL PRODUCT EVALUATION",
+        "style": "Normal"
+      },
+      {
+        "para_index": 10,
+        "run_text": "The dissertation proposes a browser-delivered, low-bandwidth AR learning system ",
+        "style": "Normal"
+      },
+      {
+        "para_index": 11,
+        "run_text": "The central gap is categorical, not cosmetic: the current Three.js scene is a vi",
+        "style": "Normal"
+      },
+      {
+        "para_index": 14,
+        "run_text": "Scores below are an evaluation judgment, not a statistical measure: 0 = absent, ",
+        "style": "Normal"
+      },
+      {
+        "para_index": 17,
+        "run_text": "This report treats the attached dissertation as research evidence and the reposi",
+        "style": "Normal"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

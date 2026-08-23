@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git mv *)",
+      "Bash(sed -i '2d' src/pages/PilotAdministrationPage.tsx)",
+      "Bash(sed -i '2d' src/pages/SchoolAdminPage.tsx)",
+      "Bash(DJANGO_DEBUG=true DJANGO_USE_SQLITE=true DJANGO_SECRET_KEY=local-command-only-secret DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,testserver ./.venv/Scripts/python.exe manage.py runserver 8000)",
+      "Bash(curl -s -o /dev/null -w \"8000:%{http_code}\\\\n\" http://localhost:8000/api/v1/health/live/)",
+      "Bash(curl -s -o /dev/null -w \"5173:%{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(curl -s -o /dev/null -w \"5174:%{http_code}\\\\n\" http://localhost:5174/)",
+      "Skill(browser-automation)",
+      "Skill(browser-automation:*)",
+      "Bash(DJANGO_DEBUG=true DJANGO_USE_SQLITE=true DJANGO_SECRET_KEY=local-command-only-secret DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,testserver ./.venv/Scripts/python.exe -c ' *)"
+    ]
+  }
+}

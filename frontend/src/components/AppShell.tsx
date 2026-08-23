@@ -1,24 +1,27 @@
-import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Outlet, useNavigate } from "react-router-dom";
 
 import type { User } from "../api/client";
 import { authQueryKey, useSignOut } from "../auth/useAuth";
+import { roleCapabilities } from "../auth/useRoles";
+import { InstallAppButton } from "./InstallAppButton";
+import { useLocale } from "../i18n/LocaleProvider";
 
 type AppShellProps = {
-  children: ReactNode;
   user: User | null;
 };
 
-export function AppShell({ children, user }: AppShellProps) {
+/**
+ * The public marketing shell. Signed-in users get `WorkspaceShell` instead, so this navigation
+ * carries only public links plus a way back into the workspace.
+ */
+export function AppShell({ user }: AppShellProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const logout = useSignOut();
-  const dashboardLabel = user?.roles.some(
-    (role) => role === "platform_admin" || role === "instructor" || role === "admin",
-  )
-    ? "Instructor dashboard"
-    : "My learning";
+  const { locale, setLocale, t } = useLocale();
+  const roles = roleCapabilities(user);
+  const workspaceLabel = roles.canReviewEvidence ? t("instructor") : t("learning");
 
   async function handleLogout() {
     await logout.mutateAsync();
@@ -29,7 +32,7 @@ export function AppShell({ children, user }: AppShellProps) {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
-        Skip to content
+        Skip to main content
       </a>
       <header className="site-header">
         <Link className="brand" to="/" aria-label="OPedu home">
@@ -38,36 +41,55 @@ export function AppShell({ children, user }: AppShellProps) {
           </span>
           <span>
             <strong>OPedu</strong>
-            <small>Technical learning</small>
+            <small>Open class</small>
           </span>
         </Link>
         <nav aria-label="Primary navigation">
           <Link className="public-nav-link" to="/about">
-            About
+            {t("about")}
           </Link>
           <Link className="public-nav-link" to="/features">
-            Features
+            {t("features")}
           </Link>
           <Link className="public-nav-link nav-secondary" to="/updates">
-            Updates
+            {t("updates")}
           </Link>
           <Link className="public-nav-link nav-secondary" to="/contact">
-            Contact
+            {t("contact")}
           </Link>
-          {user ? <Link to="/dashboard">{dashboardLabel}</Link> : null}
-          {user ? <Link to="/account/security">Security</Link> : null}
+          <Link className="public-nav-link nav-secondary" to="/support">
+            Support
+          </Link>
+          {user ? (
+            <Link className="nav-cta" to={roles.homePath}>
+              {workspaceLabel}
+            </Link>
+          ) : null}
+          <InstallAppButton />
           {user ? (
             <button className="button-link" onClick={handleLogout} disabled={logout.isPending}>
-              {logout.isPending ? "Signing out…" : "Sign out"}
+              {logout.isPending ? "Signing out…" : t("signOut")}
             </button>
           ) : (
             <Link className="nav-cta" to="/login">
-              Sign in
+              {t("signIn")}
             </Link>
           )}
+          <label className="locale-select">
+            <span className="sr-only">{t("language")}</span>
+            <select
+              value={locale}
+              onChange={(event) => setLocale(event.target.value as "en" | "rw")}
+            >
+              <option value="en">EN</option>
+              <option value="rw">RW</option>
+            </select>
+          </label>
         </nav>
       </header>
-      <main id="main-content">{children}</main>
+      <main id="main-content" tabIndex={-1}>
+        <Outlet />
+      </main>
       <footer className="site-footer">
         <div className="footer-brand">
           <span className="brand-mark" aria-hidden="true">

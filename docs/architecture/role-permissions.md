@@ -7,7 +7,7 @@ OPedu uses one platform role and four school-scoped roles. Permissions are deny-
 | Platform administrator | Entire installation | Django administration, platform configuration, cross-school incident response | Routine teaching or learner participation |
 | School administrator | One school | Invitations, membership activation, school access review, instructor evidence | Access to another school |
 | Instructor | One school | Assigned learner evidence, attempt review, future assignment and feedback workflows | Membership administration and content publication |
-| Content author | One school | Future draft lesson and simulation-authoring workflows | Learner evidence, membership administration, final publication without review |
+| Content author | One school | Own draft lessons and submission for review | Learner evidence, membership administration, review, approval, publication, and retirement |
 | Learner | One school | Assigned lessons, own attempts, own results | Other learners' evidence and administrative actions |
 
 ## Identity mapping
@@ -30,3 +30,5 @@ Use `has_active_school_role(user, roles, school=school)` when a service or objec
 ## Mutation and audit rule
 
 Membership changes, invitations, assignment changes, content state changes, grading, and instructor feedback must append an immutable `AuditEvent`. Audit records must not contain invitation tokens, passwords, reset tokens, or unnecessary learner personal data.
+
+The lesson transition API implements this rule for submit, approve, publish, return-to-draft, and retire actions. Final review and publication require a school administrator; content authors cannot publish directly.

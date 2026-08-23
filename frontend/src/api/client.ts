@@ -34,7 +34,7 @@ function cookie(name: string): string | undefined {
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
-  if (init.body) {
+  if (init.body && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
   const csrfToken = cookie("csrftoken");
@@ -50,7 +50,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
   const body = (await response.json().catch(() => ({}))) as T & ApiErrorBody;
   if (!response.ok) {
-    if (response.status === 401 && !path.startsWith("/api/v1/auth/")) {
+    if (
+      response.status === 401 &&
+      !path.startsWith("/api/v1/auth/") &&
+      !path.startsWith("/api/v1/monitoring/")
+    ) {
       sessionStorage.setItem("opedu:session-expired", "true");
       window.dispatchEvent(new Event("opedu:session-expired"));
     }

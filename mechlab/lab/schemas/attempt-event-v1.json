@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opedu.local/schemas/attempt-event-v1.json",
+  "title": "OPedu attempt telemetry event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "rendererMode", "occurredAt", "payload"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "schemaVersion": { "const": 1 },
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "renderer_selected",
+        "device_capability",
+        "ar_session_started",
+        "ar_session_ended",
+        "ar_permission_denied",
+        "ar_marker_found",
+        "ar_marker_lost",
+        "ar_marker_mismatch",
+        "ar_tracking_recovered",
+        "ar_placement_confirmed",
+        "ar_fallback_used",
+        "asset_load_completed",
+        "asset_load_failed",
+        "performance_sample",
+        "sync_state_changed"
+      ]
+    },
+    "rendererMode": {
+      "type": "string",
+      "enum": ["accessible_2d", "desktop_3d", "marker_ar", "markerless_ar"]
+    },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "payload": { "type": "object" }
+  }
+}

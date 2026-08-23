@@ -36,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assignments/{id}/knowledge-check/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_assignments_knowledge_check_retrieve"];
+        put?: never;
+        post: operations["api_v1_assignments_knowledge_check_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assignments/{id}/start/": {
         parameters: {
             query?: never;
@@ -84,6 +100,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attempts/{id}/abandon/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_attempts_abandon_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attempts/{id}/actions/": {
         parameters: {
             query?: never;
@@ -116,6 +148,310 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attempts/{id}/events/batch/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_attempts_events_batch_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{id}/hints/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_attempts_hints_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{id}/recommendation/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_attempts_recommendation_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{id}/renderer/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_attempts_renderer_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{id}/sync-audit/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_attempts_sync_audit_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{id}/xapi/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_attempts_xapi_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/asset-packages/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_content_asset_packages_list"];
+        put?: never;
+        post: operations["api_v1_content_asset_packages_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/asset-packages/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_content_asset_packages_retrieve"];
+        put: operations["api_v1_content_asset_packages_update"];
+        post?: never;
+        delete: operations["api_v1_content_asset_packages_destroy"];
+        options?: never;
+        head?: never;
+        patch: operations["api_v1_content_asset_packages_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/content/asset-packages/{id}/files/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_content_asset_packages_files_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/asset-packages/{id}/files/{file_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["api_v1_content_asset_packages_files_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/asset-packages/{id}/publish/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_content_asset_packages_publish_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/asset-packages/{id}/retire/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_content_asset_packages_retire_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/lessons/{id}/transition/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_content_lessons_transition_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/scenarios/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_content_scenarios_list"];
+        put?: never;
+        post: operations["api_v1_content_scenarios_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/scenarios/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_content_scenarios_retrieve"];
+        put: operations["api_v1_content_scenarios_update"];
+        post?: never;
+        delete: operations["api_v1_content_scenarios_destroy"];
+        options?: never;
+        head?: never;
+        patch: operations["api_v1_content_scenarios_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/content/scenarios/{id}/clone-draft/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_content_scenarios_clone_draft_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/scenarios/{id}/publish/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_content_scenarios_publish_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/scenarios/{id}/transition/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_content_scenarios_transition_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instructor/assignments/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_instructor_assignments_retrieve"];
+        put?: never;
+        post: operations["api_v1_instructor_assignments_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/instructor/attempts/{id}/": {
         parameters: {
             query?: never;
@@ -124,6 +460,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["api_v1_instructor_attempts_retrieve"];
+        put?: never;
+        post: operations["api_v1_instructor_attempts_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["api_v1_instructor_attempts_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/instructor/evidence.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_instructor_evidence.csv_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -148,14 +500,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/models/": {
+    "/api/v1/research/consent-policy/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["api_v1_models_list"];
+        get: operations["api_v1_research_consent_policy_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -164,17 +516,178 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/models/{id}/": {
+    "/api/v1/research/pilots/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["api_v1_models_retrieve"];
+        get: operations["api_v1_research_pilots_list"];
+        put?: never;
+        post: operations["api_v1_research_pilots_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/pilots/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_research_pilots_retrieve"];
+        put: operations["api_v1_research_pilots_update"];
+        post?: never;
+        delete: operations["api_v1_research_pilots_destroy"];
+        options?: never;
+        head?: never;
+        patch: operations["api_v1_research_pilots_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/research/pilots/{id}/approvals/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_research_pilots_approvals_list"];
+        put?: never;
+        post: operations["api_v1_research_pilots_approvals_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/pilots/{id}/incidents/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_research_pilots_incidents_list"];
+        put?: never;
+        post: operations["api_v1_research_pilots_incidents_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/pilots/{id}/observations/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_research_pilots_observations_list"];
+        put?: never;
+        post: operations["api_v1_research_pilots_observations_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/pilots/{id}/rehearsals/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_research_pilots_rehearsals_list"];
+        put?: never;
+        post: operations["api_v1_research_pilots_rehearsals_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/pilots/{id}/report/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_research_pilots_report_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/pilots/{id}/review/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_research_pilots_review_retrieve"];
+        put?: never;
+        post: operations["api_v1_research_pilots_review_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/pilots/{id}/transition/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_research_pilots_transition_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/pilots/options/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Handler method for HTTP 'OPTIONS' request. */
+        get: operations["api_v1_research_pilots_options_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/surveys/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_v1_research_surveys_list"];
+        put?: never;
+        post: operations["api_v1_research_surveys_create"];
+        delete: operations["api_v1_research_surveys_destroy"];
         options?: never;
         head?: never;
         patch?: never;
@@ -248,25 +761,157 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptableActionSnapshot: {
+            readonly action_code: string;
+            readonly label: string;
+            readonly is_primary: boolean;
+            readonly tolerance: components["schemas"]["StepToleranceSnapshot"] | null;
+        };
+        AdaptiveRecommendation: {
+            readonly id: number;
+            rule_version?: string;
+            kind: components["schemas"]["AdaptiveRecommendationKindEnum"];
+            input_snapshot?: unknown;
+            rationale: string;
+            /** Format: decimal */
+            confidence?: string;
+            override_kind?: (components["schemas"]["AdaptiveRecommendationKindEnum"] | components["schemas"]["BlankEnum"] | components["schemas"]["NullEnum"]) | null;
+            override_reason?: string;
+            readonly overridden_by_name: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /**
+         * @description * `continue` - Continue
+         *     * `remediate` - Remediate
+         *     * `retry` - Retry
+         *     * `instructor_review` - Instructor review
+         *     * `complete` - Complete
+         * @enum {string}
+         */
+        AdaptiveRecommendationKindEnum: "continue" | "remediate" | "retry" | "instructor_review" | "complete";
+        AssetFile: {
+            path: string;
+            readonly url: string;
+            mime_type: string;
+            /** Format: int64 */
+            byte_size: number;
+            sha256: string;
+            role?: string;
+            license_spdx?: string;
+            source_attribution?: string;
+            metadata?: unknown;
+        };
+        AssetFileAuthoring: {
+            readonly id: number;
+            readonly path: string;
+            readonly url: string;
+            readonly mime_type: string;
+            readonly byte_size: number;
+            readonly sha256: string;
+            readonly role: string;
+            readonly license_spdx: string;
+            readonly source_attribution: string;
+            readonly metadata: unknown;
+        };
+        AssetFileRequest: {
+            path: string;
+            mime_type: string;
+            /** Format: int64 */
+            byte_size: number;
+            sha256: string;
+            role?: string;
+            license_spdx?: string;
+            source_attribution?: string;
+            metadata?: unknown;
+        };
+        AssetPackage: {
+            code: string;
+            version: number;
+            name: string;
+            manifest?: unknown;
+            sha256: string;
+            /** Format: int64 */
+            total_byte_size?: number;
+            readonly files: components["schemas"]["AssetFile"][];
+        };
+        AssetPackageAuthoring: {
+            readonly id: number;
+            course: number;
+            code: string;
+            version: number;
+            name: string;
+            manifest?: unknown;
+            readonly sha256: string;
+            readonly total_byte_size: number;
+            readonly status: components["schemas"]["AssetPackageAuthoringStatusEnum"];
+            /** Format: date-time */
+            readonly published_at: string | null;
+            readonly files: components["schemas"]["AssetFileAuthoring"][];
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        AssetPackageAuthoringRequest: {
+            course: number;
+            code: string;
+            version: number;
+            name: string;
+            manifest?: unknown;
+        };
+        /**
+         * @description * `draft` - Draft
+         *     * `published` - Published
+         *     * `retired` - Retired
+         * @enum {string}
+         */
+        AssetPackageAuthoringStatusEnum: "draft" | "published" | "retired";
+        AssetPackageRequest: {
+            code: string;
+            version: number;
+            name: string;
+            manifest?: unknown;
+            sha256: string;
+            /** Format: int64 */
+            total_byte_size?: number;
+        };
         Assignment: {
             readonly id: number;
             readonly lesson: components["schemas"]["LessonSummary"];
+            readonly scenario: components["schemas"]["SimulationScenarioSummary"];
+            /** Format: date-time */
+            available_at?: string | null;
             /** Format: date-time */
             due_at?: string | null;
+            attempt_limit?: number;
+            instructions?: string;
             /** Format: date-time */
             readonly created_at: string;
             readonly latest_attempt: components["schemas"]["AttemptSummary"] | null;
+            readonly attempt_history: components["schemas"]["AttemptSummary"][];
         };
         AssignmentRequest: {
             /** Format: date-time */
+            available_at?: string | null;
+            /** Format: date-time */
             due_at?: string | null;
+            attempt_limit?: number;
+            instructions?: string;
         };
         AttemptDetail: {
             readonly id: number;
-            status?: components["schemas"]["StatusEnum"];
+            status?: components["schemas"]["AttemptStatusEnum"];
+            outcome?: components["schemas"]["AttemptOutcomeEnum"];
             /** Format: decimal */
             score?: string | null;
+            readonly scenario_version: number;
+            readonly grading_policy_code: string;
+            readonly grading_policy_version: number;
             resume_state?: unknown;
+            renderer_mode?: components["schemas"]["RendererModeEnum"];
+            learning_mode?: components["schemas"]["LearningModeEnum"];
+            capability_profile?: unknown;
             /** Format: date-time */
             started_at?: string;
             /** Format: date-time */
@@ -275,39 +920,85 @@ export interface components {
             readonly updated_at: string;
             readonly assignment: components["schemas"]["Assignment"];
             readonly events: components["schemas"]["AttemptEvent"][];
+            readonly step_results: components["schemas"]["StepResult"][];
+            readonly competency_results: components["schemas"]["CompetencyResult"][];
+            readonly feedback: components["schemas"]["InstructorFeedback"][];
+            readonly recommendation: components["schemas"]["AdaptiveRecommendation"] | null;
         };
         AttemptDetailRequest: {
-            status?: components["schemas"]["StatusEnum"];
+            status?: components["schemas"]["AttemptStatusEnum"];
+            outcome?: components["schemas"]["AttemptOutcomeEnum"];
             /** Format: decimal */
             score?: string | null;
             resume_state?: unknown;
+            renderer_mode?: components["schemas"]["RendererModeEnum"];
+            learning_mode?: components["schemas"]["LearningModeEnum"];
+            capability_profile?: unknown;
             /** Format: date-time */
             started_at?: string;
             /** Format: date-time */
             completed_at?: string | null;
         };
         AttemptEvent: {
-            /** Format: int64 */
+            /** Format: uuid */
+            readonly event_id: string;
             sequence: number;
             event_type: string;
+            schema_version?: number;
+            /** Format: uri */
+            activity_id?: string;
+            renderer_mode?: components["schemas"]["RendererModeEnum"];
             payload?: unknown;
             /** Format: date-time */
             occurred_at?: string;
+            /** Format: date-time */
+            client_occurred_at?: string | null;
+            /** Format: date-time */
+            readonly received_at: string;
         };
         AttemptEventRequest: {
-            /** Format: int64 */
             sequence: number;
             event_type: string;
+            schema_version?: number;
+            /** Format: uri */
+            activity_id?: string;
+            renderer_mode?: components["schemas"]["RendererModeEnum"];
             payload?: unknown;
             /** Format: date-time */
             occurred_at?: string;
+            /** Format: date-time */
+            client_occurred_at?: string | null;
         };
+        /**
+         * @description * `pending` - Pending
+         *     * `passed` - Passed
+         *     * `failed` - Failed
+         *     * `requires_review` - Requires review
+         *     * `mastered` - Mastered
+         * @enum {string}
+         */
+        AttemptOutcomeEnum: "pending" | "passed" | "failed" | "requires_review" | "mastered";
+        /**
+         * @description * `in_progress` - In progress
+         *     * `completed` - Completed
+         *     * `requires_review` - Requires review
+         *     * `abandoned` - Abandoned
+         * @enum {string}
+         */
+        AttemptStatusEnum: "in_progress" | "completed" | "requires_review" | "abandoned";
         AttemptSummary: {
             readonly id: number;
-            status?: components["schemas"]["StatusEnum"];
+            status?: components["schemas"]["AttemptStatusEnum"];
+            outcome?: components["schemas"]["AttemptOutcomeEnum"];
             /** Format: decimal */
             score?: string | null;
+            readonly scenario_version: number;
+            readonly grading_policy_code: string;
+            readonly grading_policy_version: number;
             resume_state?: unknown;
+            renderer_mode?: components["schemas"]["RendererModeEnum"];
+            learning_mode?: components["schemas"]["LearningModeEnum"];
+            capability_profile?: unknown;
             /** Format: date-time */
             started_at?: string;
             /** Format: date-time */
@@ -315,35 +1006,172 @@ export interface components {
             /** Format: date-time */
             readonly updated_at: string;
         };
+        AttemptSyncAudit: {
+            /** Format: uuid */
+            readonly audit_id: string;
+            client_event_ids?: unknown;
+            server_event_ids?: unknown;
+            missing_event_ids?: unknown;
+            pending_count?: number;
+            passed?: boolean;
+            /** Format: date-time */
+            client_created_at: string;
+            /** Format: date-time */
+            readonly audited_at: string;
+        };
+        AttemptSyncAuditInputRequest: {
+            eventIds: string[];
+            pendingCount: number;
+            /** Format: date-time */
+            clientCreatedAt: string;
+        };
+        /** @enum {unknown} */
+        BlankEnum: "";
         Competency: {
             readonly id: number;
             code: string;
             title: string;
             description?: string;
-            /** Format: int64 */
+            curriculum_reference?: string;
+            level?: number;
+            evidence_rules?: unknown;
+            mastery_criteria?: unknown;
             mastery_threshold?: number;
         };
-        CompetencyRequest: {
-            code: string;
-            title: string;
-            description?: string;
-            /** Format: int64 */
-            mastery_threshold?: number;
+        CompetencyResult: {
+            competency_code: string;
+            /** Format: decimal */
+            achieved_points: string;
+            /** Format: decimal */
+            available_points: string;
+            /** Format: decimal */
+            mastery_percentage: string;
+            mastery_threshold: number;
+            mastery_state: components["schemas"]["MasteryStateEnum"];
+            evidence?: unknown;
+            /** Format: date-time */
+            readonly created_at: string;
         };
+        CompetencyResultRequest: {
+            competency_code: string;
+            /** Format: decimal */
+            achieved_points: string;
+            /** Format: decimal */
+            available_points: string;
+            /** Format: decimal */
+            mastery_percentage: string;
+            mastery_threshold: number;
+            mastery_state: components["schemas"]["MasteryStateEnum"];
+            evidence?: unknown;
+        };
+        /**
+         * @description * `expand` - Approve expansion
+         *     * `limit` - Continue with limits
+         *     * `reject` - Reject expansion
+         * @enum {string}
+         */
+        DecisionEnum: "expand" | "limit" | "reject";
         Detail: {
             detail: string;
+        };
+        /**
+         * @description * `ethics` - Ethics
+         *     * `privacy` - Privacy
+         *     * `safeguarding` - Safeguarding
+         *     * `instructor` - Qualified instructor
+         *     * `safety` - Workshop safety
+         *     * `device` - Device baseline
+         *     * `accessibility` - Accessibility
+         *     * `security` - Security
+         *     * `operations` - School operations
+         *     * `recovery` - Recovery
+         *     * `evidence` - Research evidence
+         * @enum {string}
+         */
+        DomainEnum: "ethics" | "privacy" | "safeguarding" | "instructor" | "safety" | "device" | "accessibility" | "security" | "operations" | "recovery" | "evidence";
+        GradingPolicyReference: {
+            code: string;
+            version: number;
+            algorithm?: string;
+            base_score?: number;
+            pass_threshold?: number;
+            incorrect_action_penalty?: number;
+            safety_critical_penalty?: number;
+            requires_review_on_safety_error?: boolean;
+        };
+        GradingPolicyReferenceRequest: {
+            code: string;
+            version: number;
+            algorithm?: string;
+            base_score?: number;
+            pass_threshold?: number;
+            incorrect_action_penalty?: number;
+            safety_critical_penalty?: number;
+            requires_review_on_safety_error?: boolean;
+        };
+        HazardSnapshot: {
+            readonly code: string;
+            readonly title: string;
+            readonly description: string;
+            readonly mitigation: string;
+            readonly severity: components["schemas"]["HazardSnapshotSeverityEnum"];
+        };
+        /**
+         * @description * `low` - low
+         *     * `medium` - medium
+         *     * `high` - high
+         *     * `critical` - critical
+         * @enum {string}
+         */
+        HazardSnapshotSeverityEnum: "low" | "medium" | "high" | "critical";
+        InstructorAssignmentCreateRequest: {
+            scenarioId: number;
+            learnerIds?: number[];
+            cohortIds?: number[];
+            /** Format: date-time */
+            availableAt?: string | null;
+            /** Format: date-time */
+            dueAt?: string | null;
+            /** @default 3 */
+            attemptLimit: number;
+            /** @default  */
+            instructions: string;
+        };
+        InstructorAssignmentCreateResponse: {
+            assignmentIds: number[];
+            created: number;
+            existing: number;
+        };
+        InstructorAssignmentOptions: {
+            learners: {
+                [key: string]: unknown;
+            }[];
+            cohorts: {
+                [key: string]: unknown;
+            }[];
+            scenarios: {
+                [key: string]: unknown;
+            }[];
         };
         InstructorAttemptEvidence: {
             readonly id: number;
             readonly learner: components["schemas"]["InstructorLearner"];
             readonly lesson: components["schemas"]["InstructorLesson"];
-            status?: components["schemas"]["StatusEnum"];
+            status?: components["schemas"]["AttemptStatusEnum"];
+            outcome?: components["schemas"]["AttemptOutcomeEnum"];
             /** Format: decimal */
             score?: string | null;
+            readonly scenario_version: number;
+            readonly grading_policy_code: string;
+            readonly grading_policy_version: number;
             readonly completed_steps: number;
             readonly total_steps: number;
             readonly incorrect_actions: number;
             readonly safety_errors: number;
+            /** Format: date-time */
+            readonly due_at: string | null;
+            readonly is_overdue: boolean;
+            readonly is_blocked: boolean;
             /** Format: date-time */
             started_at?: string;
             /** Format: date-time */
@@ -355,13 +1183,21 @@ export interface components {
             readonly id: number;
             readonly learner: components["schemas"]["InstructorLearner"];
             readonly lesson: components["schemas"]["InstructorLesson"];
-            status?: components["schemas"]["StatusEnum"];
+            status?: components["schemas"]["AttemptStatusEnum"];
+            outcome?: components["schemas"]["AttemptOutcomeEnum"];
             /** Format: decimal */
             score?: string | null;
+            readonly scenario_version: number;
+            readonly grading_policy_code: string;
+            readonly grading_policy_version: number;
             readonly completed_steps: number;
             readonly total_steps: number;
             readonly incorrect_actions: number;
             readonly safety_errors: number;
+            /** Format: date-time */
+            readonly due_at: string | null;
+            readonly is_overdue: boolean;
+            readonly is_blocked: boolean;
             /** Format: date-time */
             started_at?: string;
             /** Format: date-time */
@@ -370,6 +1206,28 @@ export interface components {
             readonly updated_at: string;
             readonly procedure_steps: components["schemas"]["ProcedureStep"][];
             readonly events: components["schemas"]["AttemptEvent"][];
+            readonly step_results: components["schemas"]["StepResult"][];
+            readonly competency_results: components["schemas"]["CompetencyResult"][];
+            readonly feedback: components["schemas"]["InstructorFeedback"][];
+            readonly recommendations: components["schemas"]["AdaptiveRecommendation"][];
+        };
+        InstructorFeedback: {
+            readonly id: number;
+            readonly author_name: string;
+            observation?: string;
+            feedback: string;
+            is_published?: boolean;
+            /** Format: date-time */
+            readonly published_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        InstructorFeedbackRequest: {
+            observation?: string;
+            feedback: string;
+            is_published?: boolean;
         };
         InstructorLearner: {
             readonly id: number;
@@ -384,6 +1242,8 @@ export interface components {
             readonly trade: string;
             readonly program: string | null;
             readonly module: string | null;
+            readonly language: string;
+            readonly contentVersion: number;
         };
         InstructorMetrics: {
             learners: number;
@@ -392,11 +1252,47 @@ export interface components {
             completedAttempts: number;
             inProgressAttempts: number;
             safetyErrors: number;
+            overdueAttempts: number;
+            requiresReview: number;
+            failedAttempts: number;
         };
         InstructorOverview: {
             metrics: components["schemas"]["InstructorMetrics"];
             attempts: components["schemas"]["InstructorAttemptEvidence"][];
+            competencies: {
+                [key: string]: unknown;
+            }[];
+            operationalAnalytics: {
+                [key: string]: unknown;
+            };
         };
+        /**
+         * @description * `en` - English
+         *     * `rw` - Kinyarwanda
+         *     * `en-rw` - English and Kinyarwanda
+         * @enum {string}
+         */
+        LanguageEnum: "en" | "rw" | "en-rw";
+        /**
+         * @description * `guided` - Guided practice
+         *     * `independent` - Independent assessment
+         * @enum {string}
+         */
+        LearningModeEnum: "guided" | "independent";
+        LessonPrerequisite: {
+            readonly id: number;
+            title: string;
+            slug: string;
+        };
+        /**
+         * @description * `draft` - Draft
+         *     * `review` - In review
+         *     * `approved` - Approved
+         *     * `published` - Published
+         *     * `retired` - Retired
+         * @enum {string}
+         */
+        LessonPublicationStatusEnum: "draft" | "review" | "approved" | "published" | "retired";
         LessonSummary: {
             readonly id: number;
             title: string;
@@ -404,23 +1300,78 @@ export interface components {
             summary: string;
             objectives?: unknown;
             safety_notes?: unknown;
-            /** Format: int64 */
             estimated_minutes?: number;
+            language?: components["schemas"]["LanguageEnum"];
+            content_version?: number;
             readonly course_title: string;
             readonly trade: string;
             readonly program: string | null;
             readonly module: string | null;
             readonly competencies: components["schemas"]["Competency"][];
+            readonly prerequisites: components["schemas"]["LessonPrerequisite"][];
             readonly procedure_steps: components["schemas"]["ProcedureStep"][];
         };
-        LessonSummaryRequest: {
+        /**
+         * @description * `submit` - Submit for review
+         *     * `approve` - Approve
+         *     * `publish` - Publish
+         *     * `return_to_draft` - Return to draft
+         *     * `retire` - Retire
+         * @enum {string}
+         */
+        LessonTransitionActionEnum: "submit" | "approve" | "publish" | "return_to_draft" | "retire";
+        LessonTransitionRequest: {
+            action: components["schemas"]["LessonTransitionActionEnum"];
+            reviewNotes?: string;
+        };
+        LessonWorkflow: {
+            readonly id: number;
             title: string;
-            slug: string;
-            summary: string;
-            objectives?: unknown;
-            safety_notes?: unknown;
-            /** Format: int64 */
-            estimated_minutes?: number;
+            status?: components["schemas"]["LessonPublicationStatusEnum"];
+            language?: components["schemas"]["LanguageEnum"];
+            readonly contentVersion: number;
+            readonly authoredBy: number | null;
+            readonly reviewedBy: number | null;
+            readonly reviewNotes: string;
+            /** Format: date-time */
+            readonly submittedAt: string | null;
+            /** Format: date-time */
+            readonly reviewedAt: string | null;
+            /** Format: date-time */
+            readonly publishedAt: string | null;
+            readonly prerequisiteIds: number[];
+        };
+        /**
+         * @description * `not_demonstrated` - Not demonstrated
+         *     * `developing` - Developing
+         *     * `mastered` - Mastered
+         *     * `requires_review` - Requires review
+         * @enum {string}
+         */
+        MasteryStateEnum: "not_demonstrated" | "developing" | "mastered" | "requires_review";
+        /** @enum {unknown} */
+        NullEnum: null;
+        /**
+         * @description * `pass` - pass
+         *     * `fail` - fail
+         *     * `insufficient` - insufficient
+         * @enum {string}
+         */
+        OverallGateEnum: "pass" | "fail" | "insufficient";
+        PaginatedAssetPackageAuthoringList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["AssetPackageAuthoring"][];
         };
         PaginatedAssignmentList: {
             /** @example 123 */
@@ -452,7 +1403,7 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["AttemptDetail"][];
         };
-        PaginatedThreeDModelList: {
+        PaginatedPilotApprovalList: {
             /** @example 123 */
             count: number;
             /**
@@ -465,14 +1416,431 @@ export interface components {
              * @example http://api.example.org/accounts/?page=2
              */
             previous?: string | null;
-            results: components["schemas"]["ThreeDModel"][];
+            results: components["schemas"]["PilotApproval"][];
+        };
+        PaginatedPilotIncidentList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["PilotIncident"][];
+        };
+        PaginatedPilotObservationList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["PilotObservation"][];
+        };
+        PaginatedPilotRehearsalList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["PilotRehearsal"][];
+        };
+        PaginatedPilotStudyList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["PilotStudy"][];
+        };
+        PaginatedScenarioAuthoringList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["ScenarioAuthoring"][];
+        };
+        PatchedAssetPackageAuthoringRequest: {
+            course?: number;
+            code?: string;
+            version?: number;
+            name?: string;
+            manifest?: unknown;
+        };
+        PatchedPilotStudyRequest: {
+            school?: number;
+            code?: string;
+            title?: string;
+            scenario?: number;
+            cohort?: number;
+            protocol_version?: string;
+            consent_version?: string;
+            instruments?: unknown;
+            supported_devices?: unknown;
+            analysis_plan?: unknown;
+            thresholds?: unknown;
+        };
+        PatchedRecommendationOverrideRequest: {
+            kind?: components["schemas"]["AdaptiveRecommendationKindEnum"];
+            reason?: string;
+        };
+        PatchedScenarioAuthoringRequest: {
+            lesson?: number;
+            version?: number;
+            title?: string;
+            definition?: unknown;
+            grading_policy?: number;
+            asset_package?: number | null;
         };
         PatchedSchoolMemberUpdateRequest: {
             isActive?: boolean;
         };
+        PilotApproval: {
+            readonly id: number;
+            domain: components["schemas"]["DomainEnum"];
+            status?: components["schemas"]["PilotApprovalStatusEnum"];
+            approver_name?: string;
+            approver_role?: string;
+            organization?: string;
+            evidence_reference?: string;
+            scope?: string;
+            /** Format: date-time */
+            decision_at?: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        PilotApprovalRequest: {
+            domain: components["schemas"]["DomainEnum"];
+            status?: components["schemas"]["PilotApprovalStatusEnum"];
+            approver_name?: string;
+            approver_role?: string;
+            organization?: string;
+            evidence_reference?: string;
+            scope?: string;
+            /** Format: date-time */
+            decision_at?: string | null;
+        };
+        /**
+         * @description * `pending` - Pending
+         *     * `approved` - Approved
+         *     * `rejected` - Rejected
+         * @enum {string}
+         */
+        PilotApprovalStatusEnum: "pending" | "approved" | "rejected";
+        PilotIncident: {
+            readonly id: number;
+            kind: components["schemas"]["PilotIncidentKindEnum"];
+            severity: components["schemas"]["PilotIncidentSeverityEnum"];
+            status?: components["schemas"]["PilotIncidentStatusEnum"];
+            summary: string;
+            resolution?: string;
+            evidence_reference?: string;
+            safety_critical?: boolean;
+            ar_caused_grading_penalty?: boolean;
+            /** Format: date-time */
+            occurred_at?: string;
+            /** Format: date-time */
+            resolved_at?: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        /**
+         * @description * `safety` - Safety
+         *     * `usability` - Usability
+         *     * `privacy` - Privacy
+         *     * `technical` - Technical
+         *     * `support` - Support
+         * @enum {string}
+         */
+        PilotIncidentKindEnum: "safety" | "usability" | "privacy" | "technical" | "support";
+        PilotIncidentRequest: {
+            kind: components["schemas"]["PilotIncidentKindEnum"];
+            severity: components["schemas"]["PilotIncidentSeverityEnum"];
+            status?: components["schemas"]["PilotIncidentStatusEnum"];
+            summary: string;
+            resolution?: string;
+            evidence_reference?: string;
+            safety_critical?: boolean;
+            ar_caused_grading_penalty?: boolean;
+            /** Format: date-time */
+            occurred_at?: string;
+            /** Format: date-time */
+            resolved_at?: string | null;
+        };
+        /**
+         * @description * `low` - Low
+         *     * `medium` - Medium
+         *     * `high` - High
+         *     * `critical` - Critical
+         * @enum {string}
+         */
+        PilotIncidentSeverityEnum: "low" | "medium" | "high" | "critical";
+        /**
+         * @description * `open` - Open
+         *     * `resolved` - Resolved
+         *     * `accepted_risk` - Accepted risk
+         * @enum {string}
+         */
+        PilotIncidentStatusEnum: "open" | "resolved" | "accepted_risk";
+        PilotObservation: {
+            readonly id: number;
+            readonly participant_code: string;
+            readonly instrument: components["schemas"]["PilotObservationInstrumentEnum"];
+            readonly responses: unknown;
+            readonly consent_version: string;
+            /** Format: date-time */
+            readonly collected_at: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        PilotObservationInputRequest: {
+            instrument: components["schemas"]["PilotObservationInstrumentEnum"];
+            responses: {
+                [key: string]: unknown;
+            };
+            /** @default false */
+            consent_accepted: boolean;
+            learner_id?: number;
+            /** Format: date-time */
+            collected_at?: string;
+        };
+        /**
+         * @description * `pre_test` - Pre-test
+         *     * `post_test` - Post-test
+         *     * `transfer` - Independent transfer rubric
+         *     * `sus` - System Usability Scale
+         *     * `tam` - Technology Acceptance Model
+         *     * `learner_interview` - Learner interview codes
+         *     * `instructor_interview` - Instructor interview codes
+         *     * `instructor_workload` - Instructor workload
+         * @enum {string}
+         */
+        PilotObservationInstrumentEnum: "pre_test" | "post_test" | "transfer" | "sus" | "tam" | "learner_interview" | "instructor_interview" | "instructor_workload";
+        PilotOptions: {
+            schools: {
+                [key: string]: unknown;
+            }[];
+            cohorts: {
+                [key: string]: unknown;
+            }[];
+            scenarios: {
+                [key: string]: unknown;
+            }[];
+        };
+        PilotRehearsal: {
+            readonly id: number;
+            kind: components["schemas"]["PilotRehearsalKindEnum"];
+            outcome: components["schemas"]["PilotRehearsalOutcomeEnum"];
+            facilitator: string;
+            participant_count: number;
+            evidence_reference: string;
+            notes?: string;
+            /** Format: date-time */
+            completed_at: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /**
+         * @description * `instructor_training` - Instructor training
+         *     * `custodian_training` - Device-custodian training
+         *     * `outage` - Outage and synchronization
+         *     * `fallback` - Fallback and accessibility
+         *     * `stop` - Safety stop
+         *     * `usability_safety` - Small usability and safety rehearsal
+         * @enum {string}
+         */
+        PilotRehearsalKindEnum: "instructor_training" | "custodian_training" | "outage" | "fallback" | "stop" | "usability_safety";
+        /**
+         * @description * `pass` - Passed
+         *     * `issues` - Issues found
+         *     * `fail` - Failed
+         * @enum {string}
+         */
+        PilotRehearsalOutcomeEnum: "pass" | "issues" | "fail";
+        PilotRehearsalRequest: {
+            kind: components["schemas"]["PilotRehearsalKindEnum"];
+            outcome: components["schemas"]["PilotRehearsalOutcomeEnum"];
+            facilitator: string;
+            participant_count: number;
+            evidence_reference: string;
+            notes?: string;
+            /** Format: date-time */
+            completed_at: string;
+        };
+        PilotReport: {
+            studyId: number;
+            protocolVersion: string;
+            status: string;
+            expectedParticipants: number;
+            observedParticipants: number;
+            instrumentCounts: {
+                [key: string]: unknown;
+            };
+            missingByInstrument: {
+                [key: string]: unknown;
+            };
+            learning: {
+                [key: string]: unknown;
+            };
+            transfer: {
+                [key: string]: unknown;
+            };
+            acceptance: {
+                [key: string]: unknown;
+            };
+            rendererParity: {
+                [key: string]: unknown;
+            };
+            recognition: {
+                [key: string]: unknown;
+            };
+            byDeviceTier: {
+                [key: string]: unknown;
+            };
+            operations: {
+                [key: string]: unknown;
+            };
+            qualitativeThemes: {
+                [key: string]: unknown;
+            };
+            incidents: {
+                [key: string]: unknown;
+            };
+            excludedRecords: {
+                [key: string]: unknown;
+            };
+            gates: {
+                [key: string]: unknown;
+            };
+            overallGate: components["schemas"]["OverallGateEnum"];
+            limitations: string[];
+        };
+        PilotReview: {
+            readonly id: number;
+            decision: components["schemas"]["DecisionEnum"];
+            reviewer_name: string;
+            reviewer_role: string;
+            organization: string;
+            evidence_reference: string;
+            rationale: string;
+            limitations: string;
+            independent_confirmed?: boolean;
+            /** Format: date-time */
+            decided_at: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        PilotReviewRequest: {
+            decision: components["schemas"]["DecisionEnum"];
+            reviewer_name: string;
+            reviewer_role: string;
+            organization: string;
+            evidence_reference: string;
+            rationale: string;
+            limitations: string;
+            independent_confirmed?: boolean;
+            /** Format: date-time */
+            decided_at: string;
+        };
+        PilotStudy: {
+            readonly id: number;
+            school: number;
+            code: string;
+            title: string;
+            scenario: number;
+            cohort: number;
+            protocol_version: string;
+            consent_version: string;
+            instruments?: unknown;
+            supported_devices?: unknown;
+            analysis_plan?: unknown;
+            thresholds?: unknown;
+            readonly protocol_snapshot: unknown;
+            readonly status: components["schemas"]["PilotStudyStatusEnum"];
+            /** Format: date-time */
+            readonly frozen_at: string | null;
+            /** Format: date-time */
+            readonly collection_started_at: string | null;
+            /** Format: date-time */
+            readonly collection_closed_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+            readonly freezeErrors: string[];
+            readonly collectionErrors: string[];
+        };
+        PilotStudyRequest: {
+            school: number;
+            code: string;
+            title: string;
+            scenario: number;
+            cohort: number;
+            protocol_version: string;
+            consent_version: string;
+            instruments?: unknown;
+            supported_devices?: unknown;
+            analysis_plan?: unknown;
+            thresholds?: unknown;
+        };
+        /**
+         * @description * `draft` - Draft
+         *     * `frozen` - Protocol frozen
+         *     * `collecting` - Collecting evidence
+         *     * `closed` - Collection closed
+         *     * `reviewed` - Independently reviewed
+         * @enum {string}
+         */
+        PilotStudyStatusEnum: "draft" | "frozen" | "collecting" | "closed" | "reviewed";
+        /**
+         * @description * `freeze` - freeze
+         *     * `start` - start
+         *     * `close` - close
+         * @enum {string}
+         */
+        PilotTransitionActionEnum: "freeze" | "start" | "close";
+        PilotTransitionRequest: {
+            action: components["schemas"]["PilotTransitionActionEnum"];
+        };
         ProcedureStep: {
             readonly id: number;
-            /** Format: int64 */
             order: number;
             code: string;
             title: string;
@@ -480,22 +1848,64 @@ export interface components {
             action_code: string;
             feedback: string;
             safety_critical?: boolean;
-            /** Format: int64 */
             points?: number;
             metadata?: unknown;
+            readonly acceptable_actions: components["schemas"]["AcceptableActionSnapshot"][];
+            readonly hints: components["schemas"]["StepHintSnapshot"][];
+            readonly tolerances: components["schemas"]["StepToleranceSnapshot"][];
+            readonly tools: components["schemas"]["ToolSnapshot"][];
+            readonly hazards: components["schemas"]["HazardSnapshot"][];
+            readonly feedback_rules: {
+                [key: string]: string;
+            };
+            readonly competency_codes: string[];
         };
-        ProcedureStepRequest: {
-            /** Format: int64 */
-            order: number;
-            code: string;
-            title: string;
-            instruction: string;
-            action_code: string;
-            feedback: string;
-            safety_critical?: boolean;
-            /** Format: int64 */
-            points?: number;
-            metadata?: unknown;
+        /**
+         * @description * `accessible_2d` - Accessible 2D
+         *     * `desktop_3d` - Desktop 3D
+         *     * `marker_ar` - Marker AR
+         *     * `markerless_ar` - Markerless AR
+         * @enum {string}
+         */
+        RendererModeEnum: "accessible_2d" | "desktop_3d" | "marker_ar" | "markerless_ar";
+        ResearchConsentPolicy: {
+            version: string;
+            retention_days: number;
+            status: components["schemas"]["ResearchConsentPolicyStatusEnum"];
+            privacy_path: string;
+        };
+        /**
+         * @description * `draft` - draft
+         *     * `approved` - approved
+         * @enum {string}
+         */
+        ResearchConsentPolicyStatusEnum: "draft" | "approved";
+        /**
+         * @description * `tam` - Technology Acceptance Model
+         *     * `sus` - System Usability Scale
+         *     * `pre_test` - Pre-test
+         *     * `post_test` - Post-test
+         *     * `transfer` - Practical transfer
+         *     * `interview` - Interview
+         * @enum {string}
+         */
+        ResearchSurveyInstrumentEnum: "tam" | "sus" | "pre_test" | "post_test" | "transfer" | "interview";
+        ResearchSurveyResponse: {
+            readonly id: number;
+            readonly participant_code: string;
+            instrument: components["schemas"]["ResearchSurveyInstrumentEnum"];
+            responses?: unknown;
+            consent_version: string;
+            scenario_version?: string;
+            /** Format: date-time */
+            readonly submitted_at: string;
+        };
+        ResearchSurveyResponseRequest: {
+            instrument: components["schemas"]["ResearchSurveyInstrumentEnum"];
+            responses?: unknown;
+            consent_version: string;
+            consent_accepted: boolean;
+            scenario_version?: string;
         };
         /**
          * @description * `admin` - School administrator
@@ -505,6 +1915,40 @@ export interface components {
          * @enum {string}
          */
         RoleEnum: "admin" | "instructor" | "learner" | "content_author";
+        ScenarioAuthoring: {
+            readonly id: number;
+            lesson: number;
+            version: number;
+            title: string;
+            definition?: unknown;
+            grading_policy: number;
+            asset_package?: number | null;
+            readonly status: components["schemas"]["LessonPublicationStatusEnum"];
+            readonly authoredBy: number | null;
+            readonly reviewedBy: number | null;
+            readonly reviewNotes: string;
+            /** Format: date-time */
+            readonly submittedAt: string | null;
+            /** Format: date-time */
+            readonly reviewedAt: string | null;
+            readonly publicationChecks: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            readonly published_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        ScenarioAuthoringRequest: {
+            lesson: number;
+            version: number;
+            title: string;
+            definition?: unknown;
+            grading_policy: number;
+            asset_package?: number | null;
+        };
         SchoolInvitation: {
             readonly id: number;
             readonly school: components["schemas"]["SchoolSummary"];
@@ -563,19 +2007,76 @@ export interface components {
             /** Format: email */
             email: string;
         };
+        SimulationScenarioSummary: {
+            readonly id: number;
+            version: number;
+            title: string;
+            readonly grading_policy: components["schemas"]["GradingPolicyReference"];
+            readonly asset_package: components["schemas"]["AssetPackage"] | null;
+            readonly renderer_config: {
+                [key: string]: unknown;
+            };
+        };
+        SimulationScenarioSummaryRequest: {
+            version: number;
+            title: string;
+        };
+        StepHintSnapshot: {
+            readonly code: string;
+            readonly order: number;
+            readonly text: string;
+            readonly points_penalty: number;
+        };
+        StepResult: {
+            step_code: string;
+            outcome: components["schemas"]["StepResultOutcomeEnum"];
+            attempts_count?: number;
+            hints_used?: number;
+            duration_seconds?: number;
+            /** Format: decimal */
+            achieved_points: string;
+            /** Format: decimal */
+            available_points: string;
+            tolerance_passed?: boolean | null;
+            safety_violations?: number;
+            evidence_sequences?: unknown;
+            /** Format: date-time */
+            completed_at: string;
+        };
         /**
-         * @description * `in_progress` - In progress
-         *     * `completed` - Completed
+         * @description * `passed` - Passed
+         *     * `failed` - Failed
          *     * `requires_review` - Requires review
          * @enum {string}
          */
-        StatusEnum: "in_progress" | "completed" | "requires_review";
-        ThreeDModel: {
-            readonly id: number;
-            name: string;
-            description: string;
-            readonly url: string | null;
-            readonly thumbnail_url: string | null;
+        StepResultOutcomeEnum: "passed" | "failed" | "requires_review";
+        StepResultRequest: {
+            step_code: string;
+            outcome: components["schemas"]["StepResultOutcomeEnum"];
+            attempts_count?: number;
+            hints_used?: number;
+            duration_seconds?: number;
+            /** Format: decimal */
+            achieved_points: string;
+            /** Format: decimal */
+            available_points: string;
+            tolerance_passed?: boolean | null;
+            safety_violations?: number;
+            evidence_sequences?: unknown;
+            /** Format: date-time */
+            completed_at: string;
+        };
+        StepToleranceSnapshot: {
+            readonly code: string;
+            readonly measurement: string;
+            readonly minimum_value: string;
+            readonly maximum_value: string;
+            readonly unit: string;
+        };
+        ToolSnapshot: {
+            readonly code: string;
+            readonly name: string;
+            readonly description: string;
         };
     };
     responses: never;
@@ -623,6 +2124,56 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Assignment"];
+                };
+            };
+        };
+    };
+    api_v1_assignments_knowledge_check_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this assignment. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Assignment"];
+                };
+            };
+        };
+    };
+    api_v1_assignments_knowledge_check_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this assignment. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AssignmentRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AssignmentRequest"];
+                "multipart/form-data": components["schemas"]["AssignmentRequest"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -710,6 +2261,34 @@ export interface operations {
             };
         };
     };
+    api_v1_attempts_abandon_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this attempt. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AttemptDetailRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AttemptDetailRequest"];
+                "multipart/form-data": components["schemas"]["AttemptDetailRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptDetail"];
+                };
+            };
+        };
+    };
     api_v1_attempts_actions_create: {
         parameters: {
             query?: never;
@@ -766,6 +2345,723 @@ export interface operations {
             };
         };
     };
+    api_v1_attempts_events_batch_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this attempt. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AttemptDetailRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AttemptDetailRequest"];
+                "multipart/form-data": components["schemas"]["AttemptDetailRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptDetail"];
+                };
+            };
+        };
+    };
+    api_v1_attempts_hints_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this attempt. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AttemptDetailRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AttemptDetailRequest"];
+                "multipart/form-data": components["schemas"]["AttemptDetailRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptDetail"];
+                };
+            };
+        };
+    };
+    api_v1_attempts_recommendation_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this attempt. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptDetail"];
+                };
+            };
+        };
+    };
+    api_v1_attempts_renderer_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this attempt. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AttemptDetailRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AttemptDetailRequest"];
+                "multipart/form-data": components["schemas"]["AttemptDetailRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptDetail"];
+                };
+            };
+        };
+    };
+    api_v1_attempts_sync_audit_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this attempt. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttemptSyncAuditInputRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AttemptSyncAuditInputRequest"];
+                "multipart/form-data": components["schemas"]["AttemptSyncAuditInputRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptSyncAudit"];
+                };
+            };
+        };
+    };
+    api_v1_attempts_xapi_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this attempt. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptDetail"];
+                };
+            };
+        };
+    };
+    api_v1_content_asset_packages_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedAssetPackageAuthoringList"];
+                };
+            };
+        };
+    };
+    api_v1_content_asset_packages_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetPackageAuthoringRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AssetPackageAuthoringRequest"];
+                "multipart/form-data": components["schemas"]["AssetPackageAuthoringRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetPackageAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_asset_packages_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this asset package. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetPackageAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_asset_packages_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this asset package. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetPackageAuthoringRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AssetPackageAuthoringRequest"];
+                "multipart/form-data": components["schemas"]["AssetPackageAuthoringRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetPackageAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_asset_packages_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this asset package. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_v1_content_asset_packages_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this asset package. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedAssetPackageAuthoringRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedAssetPackageAuthoringRequest"];
+                "multipart/form-data": components["schemas"]["PatchedAssetPackageAuthoringRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetPackageAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_asset_packages_files_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this asset package. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetPackageAuthoringRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AssetPackageAuthoringRequest"];
+                "multipart/form-data": components["schemas"]["AssetPackageAuthoringRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetPackageAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_asset_packages_files_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: number;
+                /** @description A unique integer value identifying this asset package. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_v1_content_asset_packages_publish_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this asset package. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetPackageAuthoringRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AssetPackageAuthoringRequest"];
+                "multipart/form-data": components["schemas"]["AssetPackageAuthoringRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetPackageAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_asset_packages_retire_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this asset package. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetPackageAuthoringRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AssetPackageAuthoringRequest"];
+                "multipart/form-data": components["schemas"]["AssetPackageAuthoringRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetPackageAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_transition_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LessonTransitionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["LessonTransitionRequest"];
+                "multipart/form-data": components["schemas"]["LessonTransitionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LessonWorkflow"];
+                };
+            };
+        };
+    };
+    api_v1_content_scenarios_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedScenarioAuthoringList"];
+                };
+            };
+        };
+    };
+    api_v1_content_scenarios_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioAuthoringRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ScenarioAuthoringRequest"];
+                "multipart/form-data": components["schemas"]["ScenarioAuthoringRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_scenarios_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this simulation scenario. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_scenarios_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this simulation scenario. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioAuthoringRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ScenarioAuthoringRequest"];
+                "multipart/form-data": components["schemas"]["ScenarioAuthoringRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_scenarios_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this simulation scenario. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_v1_content_scenarios_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this simulation scenario. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedScenarioAuthoringRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedScenarioAuthoringRequest"];
+                "multipart/form-data": components["schemas"]["PatchedScenarioAuthoringRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_scenarios_clone_draft_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this simulation scenario. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioAuthoringRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ScenarioAuthoringRequest"];
+                "multipart/form-data": components["schemas"]["ScenarioAuthoringRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_scenarios_publish_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this simulation scenario. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioAuthoringRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ScenarioAuthoringRequest"];
+                "multipart/form-data": components["schemas"]["ScenarioAuthoringRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_content_scenarios_transition_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this simulation scenario. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioAuthoringRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ScenarioAuthoringRequest"];
+                "multipart/form-data": components["schemas"]["ScenarioAuthoringRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioAuthoring"];
+                };
+            };
+        };
+    };
+    api_v1_instructor_assignments_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructorAssignmentOptions"];
+                };
+            };
+        };
+    };
+    api_v1_instructor_assignments_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstructorAssignmentCreateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["InstructorAssignmentCreateRequest"];
+                "multipart/form-data": components["schemas"]["InstructorAssignmentCreateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructorAssignmentCreateResponse"];
+                };
+            };
+        };
+    };
     api_v1_instructor_attempts_retrieve: {
         parameters: {
             query?: never;
@@ -783,6 +3079,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InstructorAttemptReview"];
+                };
+            };
+        };
+    };
+    api_v1_instructor_attempts_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstructorFeedbackRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["InstructorFeedbackRequest"];
+                "multipart/form-data": components["schemas"]["InstructorFeedbackRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructorFeedback"];
+                };
+            };
+        };
+    };
+    api_v1_instructor_attempts_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedRecommendationOverrideRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedRecommendationOverrideRequest"];
+                "multipart/form-data": components["schemas"]["PatchedRecommendationOverrideRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdaptiveRecommendation"];
+                };
+            };
+        };
+    };
+    "api_v1_instructor_evidence.csv_retrieve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
                 };
             };
         };
@@ -806,7 +3175,26 @@ export interface operations {
             };
         };
     };
-    api_v1_models_list: {
+    api_v1_research_consent_policy_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchConsentPolicy"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_list: {
         parameters: {
             query?: {
                 /** @description Which field to use when ordering the results. */
@@ -827,17 +3215,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PaginatedThreeDModelList"];
+                    "application/json": components["schemas"]["PaginatedPilotStudyList"];
                 };
             };
         };
     };
-    api_v1_models_retrieve: {
+    api_v1_research_pilots_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PilotStudyRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PilotStudyRequest"];
+                "multipart/form-data": components["schemas"]["PilotStudyRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotStudy"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_retrieve: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description A unique integer value identifying this three d model. */
+                /** @description A unique integer value identifying this pilot study. */
                 id: number;
             };
             cookie?: never;
@@ -849,8 +3262,522 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ThreeDModel"];
+                    "application/json": components["schemas"]["PilotStudy"];
                 };
+            };
+        };
+    };
+    api_v1_research_pilots_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PilotStudyRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PilotStudyRequest"];
+                "multipart/form-data": components["schemas"]["PilotStudyRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotStudy"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_v1_research_pilots_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedPilotStudyRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedPilotStudyRequest"];
+                "multipart/form-data": components["schemas"]["PatchedPilotStudyRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotStudy"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_approvals_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPilotApprovalList"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_approvals_create: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PilotApprovalRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PilotApprovalRequest"];
+                "multipart/form-data": components["schemas"]["PilotApprovalRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPilotApprovalList"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_incidents_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPilotIncidentList"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_incidents_create: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PilotIncidentRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PilotIncidentRequest"];
+                "multipart/form-data": components["schemas"]["PilotIncidentRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPilotIncidentList"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_observations_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPilotObservationList"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_observations_create: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PilotObservationInputRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PilotObservationInputRequest"];
+                "multipart/form-data": components["schemas"]["PilotObservationInputRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPilotObservationList"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_rehearsals_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPilotRehearsalList"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_rehearsals_create: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PilotRehearsalRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PilotRehearsalRequest"];
+                "multipart/form-data": components["schemas"]["PilotRehearsalRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPilotRehearsalList"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_report_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotReport"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_review_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotReview"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_review_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PilotReviewRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PilotReviewRequest"];
+                "multipart/form-data": components["schemas"]["PilotReviewRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotReview"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_transition_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PilotTransitionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PilotTransitionRequest"];
+                "multipart/form-data": components["schemas"]["PilotTransitionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotStudy"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_options_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotOptions"];
+                };
+            };
+        };
+    };
+    api_v1_research_surveys_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSurveyResponse"][];
+                };
+            };
+        };
+    };
+    api_v1_research_surveys_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchSurveyResponseRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ResearchSurveyResponseRequest"];
+                "multipart/form-data": components["schemas"]["ResearchSurveyResponseRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSurveyResponse"];
+                };
+            };
+        };
+    };
+    api_v1_research_surveys_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

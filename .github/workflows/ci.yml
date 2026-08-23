@@ -12,6 +12,7 @@ jobs:
       DJANGO_USE_SQLITE: "false"
       DJANGO_SECRET_KEY: "ci-only-secret-key"
       DJANGO_ALLOWED_HOSTS: "testserver,localhost,127.0.0.1"
+      DJANGO_REQUEST_LOG_LEVEL: "WARNING"
       DATABASE_URL: postgresql://opedu:opedu-ci-password@localhost:5432/opedu
     services:
       postgres:
@@ -71,6 +72,37 @@ jobs:
         working-directory: mechlab
         run: python manage.py check
 
+      - name: Validate production security and private media settings
+        working-directory: mechlab
+        env:
+          DJANGO_DEBUG: "false"
+          DJANGO_SECRET_KEY: "ci-production-check-only-9f4c0fdf8f8a42dd8324db56b592bd2307d67f55"
+          DJANGO_ALLOWED_HOSTS: "opedu.example"
+          DJANGO_CSRF_TRUSTED_ORIGINS: "https://opedu.example"
+          FRONTEND_URL: "https://opedu.example"
+          OPEDU_RELEASE_VERSION: "ci-production-check"
+          REDIS_URL: "redis://127.0.0.1:6379/0"
+          OPEDU_REQUIRE_REDIS: "true"
+          OPEDU_REQUIRE_OBJECT_STORAGE: "true"
+          OPEDU_OBJECT_STORAGE_BUCKET: "opedu-ci-private-media"
+          OPEDU_OBJECT_STORAGE_REGION: "eu-west-1"
+          OPEDU_OBJECT_STORAGE_ACCESS_KEY: "ci-key"
+          OPEDU_OBJECT_STORAGE_SECRET_KEY: "ci-secret"
+        run: |
+          python manage.py check --deploy --fail-level WARNING
+          python manage.py shell -c "from django.core.files.storage import storages; storage=storages['default']; assert type(storage).__module__ == 'storages.backends.s3'; assert storage.bucket_name == 'opedu-ci-private-media'; assert storage.querystring_auth is True; assert storage.file_overwrite is False; assert storage.object_parameters['ServerSideEncryption'] == 'AES256'"
+
+      - name: Validate immersive asset manifests
+        working-directory: mechlab
+        run: python manage.py validate_asset_packages
+
+      - name: Validate event and xAPI contracts
+        working-directory: mechlab
+        run: |
+          python manage.py validate_event_contracts
+          python manage.py deliver_xapi --limit 1
+          python manage.py purge_expired_research --dry-run
+
       - name: Run tests
         run: pytest
 
@@ -116,6 +148,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Enforce frontend performance budgets
+        run: npm run budget:check
 
       - name: Validate production web image
         run: |

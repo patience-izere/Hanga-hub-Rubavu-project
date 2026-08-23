@@ -4,7 +4,18 @@
 
 The repository's ignored `mechlab/db.sqlite3` is development-only and disposable. No production SQLite database has been identified. Do not import an unknown SQLite file automatically: if a school later supplies data that must be retained, inventory and validate it before writing a one-off import into PostgreSQL.
 
-The complete migration chain from `lab.0001_initial` through `lab.0008_curriculum_organization` was applied to a clean PostgreSQL 17 database on 2026-07-17. The full 26-test Django suite passed on that database. Migration `0008` backfills role profiles before removing the obsolete generic profile table.
+The migration chain now extends through `lab.0019_researchconsentreceipt`.
+Migration `0012` adds assignment scheduling/attempt limits, renderer capability evidence, globally
+unique event IDs, knowledge checks, instructor feedback, deterministic recommendations, and
+pseudonymized pilot responses. Migration `0013` records the instructor's explicit recommendation
+override without erasing the original rules-based decision. Migrations `0014`–`0018` add scenario
+governance, learning modes, durable xAPI delivery, governed asset files, and explicit abandonment.
+Migration `0019` adds pseudonymous, withdrawable, expiring research-consent receipts. The earlier
+PostgreSQL 17 clean-build and restore evidence remains valid for migrations through `0011`; CI
+applies the complete current chain, while a new production-provider restore drill through `0019`
+remains a release gate.
+
+The demonstration workflow was seeded twice successfully on the clean database to verify idempotency. PostgreSQL retained one assignment and one `opedu-scenario/v2` snapshot containing seven steps, seven acceptable actions, two tools, two hazards, two hints, and one measurement tolerance. Its grading-policy algorithm/version, asset-package version, assignment-scenario binding, and normalized resource counts were read back after seeding.
 
 An actual custom-format backup and restore drill also passed on 2026-07-17. The restored database matched the seeded source counts: 1 school, 3 memberships, 1 assignment, and 1 lesson. The disposable drill container and archive were removed after verification.
 

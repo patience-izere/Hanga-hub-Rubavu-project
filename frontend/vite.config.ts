@@ -25,6 +25,22 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules/@react-three/drei")) return "react-three-drei";
+            if (id.includes("node_modules/@react-three/fiber")) return "react-three-fiber";
+            if (id.includes("node_modules/three/examples")) return "three-addons";
+            if (id.includes("node_modules/three")) return "three-core";
+            if (id.includes("node_modules/react") || id.includes("node_modules/@tanstack")) {
+              return "react-platform";
+            }
+          },
+        },
+      },
+      chunkSizeWarningLimit: 700,
+    },
     test: {
       environment: "jsdom",
       setupFiles: "./src/test/setup.ts",

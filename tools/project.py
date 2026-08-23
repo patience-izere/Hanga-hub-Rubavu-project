@@ -23,6 +23,7 @@ def django_env() -> dict[str, str]:
     env.setdefault("DJANGO_USE_SQLITE", "true")
     env.setdefault("DJANGO_SECRET_KEY", "local-command-only-secret")
     env.setdefault("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver")
+    env.setdefault("DJANGO_REQUEST_LOG_LEVEL", "WARNING")
     return env
 
 
@@ -38,15 +39,20 @@ def npm(*arguments: str) -> None:
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit(
-            "Usage: python tools/project.py <dev|seed|lint|format|test|build|check|api-generate>"
+            "Usage: python tools/project.py <dev|migrate|seed|validate-assets|lint|format|test|build|check|api-generate>"
         )
 
     task = sys.argv[1]
     if task == "dev":
         run("docker", "compose", "up", "--build")
+    elif task == "migrate":
+        backend("migrate")
     elif task == "seed":
         backend("migrate")
         backend("seed_demo")
+    elif task == "validate-assets":
+        backend("validate_asset_packages")
+        backend("validate_event_contracts")
     elif task == "lint":
         run(sys.executable, "-m", "ruff", "check", "mechlab", "tools")
         run(sys.executable, "-m", "ruff", "format", "--check", "mechlab", "tools")
@@ -62,13 +68,16 @@ def main() -> None:
     elif task == "build":
         backend("check")
         npm("run", "build")
+        npm("run", "budget:check")
     elif task == "api-generate":
         schema_path = ROOT / "openapi" / "schema.yml"
         schema_path.parent.mkdir(exist_ok=True)
-        backend("spectacular", "--file", str(schema_path), "--validate", "--fail-on-warn")
+        schema_output = Path("..") / "openapi" / "schema.yml"
+        backend("spectacular", "--file", str(schema_output), "--validate", "--fail-on-warn")
         npm("run", "api:types")
     elif task == "check":
         backend("makemigrations", "--check", "--dry-run")
+        backend("validate_asset_packages")
         main_task("api-generate")
         main_task("lint")
         main_task("test")

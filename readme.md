@@ -101,4 +101,4 @@ npm run build
 
 The current vertical slice covers normalized programs, modules, cohorts and enrollment; controlled school onboarding; and the learner/instructor evidence paths. It includes assignment, lesson briefing, a resumable guided 3D battery procedure, immutable action evidence, server-side completion/scoring, learner results, school-level instructor metrics, and attempt review. The 3D route is lazy-loaded so the engine does not slow public, authentication, or dashboard pages.
 
-The next priority is offline action buffering and an optimized glTF asset pipeline, followed by competency aggregation and instructor feedback. WebXR should be added only after the same procedure is validated with technical instructors on desktop hardware.
+The next priority is instructor observations and published learner feedback, plus stable xAPI-compatible evidence identifiers. Offline action buffering and an optimized glTF asset pipeline follow that assessment foundation, then broader competency reporting. WebXR should be added only after the same procedure is validated with technical instructors on desktop hardware.

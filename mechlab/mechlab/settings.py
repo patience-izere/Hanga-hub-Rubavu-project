@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = BASE_DIR.parent
-load_dotenv(PROJECT_ROOT / ".env")
+# load_dotenv(PROJECT_ROOT / ".env")
+load_dotenv(BASE_DIR / ".env")
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -26,6 +27,7 @@ def env_list(name: str, default: str = "") -> list[str]:
 
 
 DEBUG = env_bool("DJANGO_DEBUG", False)
+
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
     if DEBUG:
@@ -40,8 +42,16 @@ ALLOWED_HOSTS = env_list(
 if not ALLOWED_HOSTS:
     raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must contain at least one hostname.")
 
-CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+CSRF_TRUSTED_ORIGINS = env_list(
+    "DJANGO_CSRF_TRUSTED_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173" if DEBUG else "",
+)
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+OPEDU_RELEASE_VERSION = os.environ.get("OPEDU_RELEASE_VERSION", "development")
+if not DEBUG and not FRONTEND_URL.startswith("https://"):
+    raise ImproperlyConfigured("FRONTEND_URL must use HTTPS when DJANGO_DEBUG is false.")
+if not DEBUG and OPEDU_RELEASE_VERSION == "development":
+    raise ImproperlyConfigured("OPEDU_RELEASE_VERSION must identify an immutable production build.")
 
 
 INSTALLED_APPS = [
@@ -59,6 +69,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "lab.middleware.RequestObservabilityMiddleware",
+    "lab.middleware.SecurityHeadersMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -121,6 +133,9 @@ else:
 
 
 redis_url = os.environ.get("REDIS_URL")
+require_redis = env_bool("OPEDU_REQUIRE_REDIS", not DEBUG)
+if require_redis and not redis_url:
+    raise ImproperlyConfigured("REDIS_URL is required when OPEDU_REQUIRE_REDIS is enabled.")
 if redis_url:
     CHANNEL_LAYERS = {
         "default": {
@@ -156,6 +171,67 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("DJANGO_MAX_REQUEST_BYTES", "26214400"))
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("DJANGO_MAX_FILE_MEMORY_BYTES", "5242880"))
+
+OBJECT_STORAGE_BUCKET = os.environ.get("OPEDU_OBJECT_STORAGE_BUCKET", "").strip()
+REQUIRE_OBJECT_STORAGE = env_bool("OPEDU_REQUIRE_OBJECT_STORAGE", not DEBUG)
+if REQUIRE_OBJECT_STORAGE and not OBJECT_STORAGE_BUCKET:
+    raise ImproperlyConfigured(
+        "OPEDU_OBJECT_STORAGE_BUCKET is required when OPEDU_REQUIRE_OBJECT_STORAGE is enabled."
+    )
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "OPTIONS": {"location": MEDIA_ROOT, "base_url": MEDIA_URL, "allow_overwrite": False},
+    },
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+if OBJECT_STORAGE_BUCKET:
+    INSTALLED_APPS.append("storages")
+    object_storage_endpoint = os.environ.get("OPEDU_OBJECT_STORAGE_ENDPOINT", "").strip()
+    if object_storage_endpoint and not DEBUG and not object_storage_endpoint.startswith("https://"):
+        raise ImproperlyConfigured("Production object-storage endpoints must use HTTPS.")
+    signed_url_expiry = int(os.environ.get("OPEDU_MEDIA_URL_EXPIRY_SECONDS", "300"))
+    if not 60 <= signed_url_expiry <= 3600:
+        raise ImproperlyConfigured("OPEDU_MEDIA_URL_EXPIRY_SECONDS must be between 60 and 3600.")
+    object_storage_prefix = os.environ.get("OPEDU_OBJECT_STORAGE_PREFIX", "media").strip("/")
+    if not object_storage_prefix:
+        raise ImproperlyConfigured("OPEDU_OBJECT_STORAGE_PREFIX cannot be empty.")
+    storage_encryption = os.environ.get("OPEDU_OBJECT_STORAGE_ENCRYPTION", "AES256")
+    object_storage_options = {
+        "bucket_name": OBJECT_STORAGE_BUCKET,
+        "region_name": os.environ.get("OPEDU_OBJECT_STORAGE_REGION", "").strip() or None,
+        "endpoint_url": object_storage_endpoint or None,
+        "default_acl": None,
+        "querystring_auth": True,
+        "querystring_expire": signed_url_expiry,
+        "file_overwrite": False,
+        "location": object_storage_prefix,
+        "signature_version": "s3v4",
+        "object_parameters": {
+            "CacheControl": "private, max-age=300",
+            "ServerSideEncryption": storage_encryption,
+        },
+    }
+    if storage_encryption == "aws:kms":
+        kms_key_id = os.environ.get("OPEDU_OBJECT_STORAGE_KMS_KEY_ID", "").strip()
+        if not kms_key_id:
+            raise ImproperlyConfigured(
+                "OPEDU_OBJECT_STORAGE_KMS_KEY_ID is required for aws:kms encryption."
+            )
+        object_storage_options["object_parameters"]["SSEKMSKeyId"] = kms_key_id
+    access_key = os.environ.get("OPEDU_OBJECT_STORAGE_ACCESS_KEY", "").strip()
+    secret_key = os.environ.get("OPEDU_OBJECT_STORAGE_SECRET_KEY", "")
+    if access_key:
+        object_storage_options["access_key"] = access_key
+    if secret_key:
+        object_storage_options["secret_key"] = secret_key
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": object_storage_options,
+    }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "login"
@@ -174,8 +250,40 @@ EMAIL_BACKEND = os.environ.get(
     "django.core.mail.backends.console.EmailBackend",
 )
 DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "no-reply@opedu.local")
+LRS_ENDPOINT = os.environ.get("OPEDU_LRS_ENDPOINT", "").strip()
+LRS_KEY = os.environ.get("OPEDU_LRS_KEY", "")
+LRS_SECRET = os.environ.get("OPEDU_LRS_SECRET", "")
+LRS_MAX_DELIVERY_ATTEMPTS = int(os.environ.get("OPEDU_LRS_MAX_DELIVERY_ATTEMPTS", "5"))
+RESEARCH_CONSENT_VERSION = os.environ.get(
+    "OPEDU_RESEARCH_CONSENT_VERSION", "opedu-pilot-consent-v1"
+)
+RESEARCH_CONSENT_STATUS = os.environ.get("OPEDU_RESEARCH_CONSENT_STATUS", "draft").strip().lower()
+if RESEARCH_CONSENT_STATUS not in {"draft", "approved"}:
+    raise ImproperlyConfigured("OPEDU_RESEARCH_CONSENT_STATUS must be draft or approved.")
+RESEARCH_RETENTION_DAYS = int(os.environ.get("OPEDU_RESEARCH_RETENTION_DAYS", "365"))
+if RESEARCH_RETENTION_DAYS < 1:
+    raise ImproperlyConfigured("OPEDU_RESEARCH_RETENTION_DAYS must be at least 1.")
 LOGIN_FAILURE_LIMIT = int(os.environ.get("DJANGO_LOGIN_FAILURE_LIMIT", "5"))
 LOGIN_LOCKOUT_SECONDS = int(os.environ.get("DJANGO_LOGIN_LOCKOUT_SECONDS", "300"))
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {
+        "opedu.requests": {
+            "handlers": ["console"],
+            "level": os.environ.get("DJANGO_REQUEST_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+        "opedu.health": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        "opedu.client_errors": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -215,4 +323,56 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
+    "ENUM_NAME_OVERRIDES": {
+        "LessonPublicationStatusEnum": [
+            ("draft", "Draft"),
+            ("review", "In review"),
+            ("approved", "Approved"),
+            ("published", "Published"),
+            ("retired", "Retired"),
+        ],
+        "AttemptStatusEnum": [
+            ("in_progress", "In progress"),
+            ("completed", "Completed"),
+            ("requires_review", "Requires review"),
+            ("abandoned", "Abandoned"),
+        ],
+        "AttemptOutcomeEnum": [
+            ("pending", "Pending"),
+            ("passed", "Passed"),
+            ("failed", "Failed"),
+            ("requires_review", "Requires review"),
+            ("mastered", "Mastered"),
+        ],
+        "StepResultOutcomeEnum": [
+            ("passed", "Passed"),
+            ("failed", "Failed"),
+            ("requires_review", "Requires review"),
+        ],
+        "AdaptiveRecommendationKindEnum": [
+            ("continue", "Continue"),
+            ("remediate", "Remediate"),
+            ("retry", "Retry"),
+            ("instructor_review", "Instructor review"),
+            ("complete", "Complete"),
+        ],
+        "ResearchSurveyInstrumentEnum": [
+            ("tam", "Technology Acceptance Model"),
+            ("sus", "System Usability Scale"),
+            ("pre_test", "Pre-test"),
+            ("post_test", "Post-test"),
+            ("transfer", "Practical transfer"),
+            ("interview", "Interview"),
+        ],
+        "PilotObservationInstrumentEnum": [
+            ("pre_test", "Pre-test"),
+            ("post_test", "Post-test"),
+            ("transfer", "Independent transfer rubric"),
+            ("sus", "System Usability Scale"),
+            ("tam", "Technology Acceptance Model"),
+            ("learner_interview", "Learner interview codes"),
+            ("instructor_interview", "Instructor interview codes"),
+            ("instructor_workload", "Instructor workload"),
+        ],
+    },
 }
