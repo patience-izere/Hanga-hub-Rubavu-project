@@ -342,6 +342,8 @@ class AttemptEventInputSerializer(serializers.Serializer):
             "ar_marker_mismatch",
             "ar_tracking_recovered",
             "ar_placement_confirmed",
+            "ar_camera_devices_changed",
+            "ar_camera_switched",
             "ar_fallback_used",
             "asset_load_completed",
             "asset_load_failed",
@@ -773,3 +775,67 @@ class InstructorAssignmentCreateResponseSerializer(serializers.Serializer):
     assignmentIds = serializers.ListField(child=serializers.IntegerField())
     created = serializers.IntegerField()
     existing = serializers.IntegerField()
+
+
+class InstructorRosterCompetencySerializer(serializers.Serializer):
+    code = serializers.CharField()
+    title = serializers.CharField()
+    masteryState = serializers.CharField()
+    masteryPercentage = serializers.DecimalField(max_digits=5, decimal_places=2)
+
+
+class InstructorRosterEntrySerializer(serializers.Serializer):
+    """One learner in the instructor's schools, with their aggregate progress."""
+
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    email = serializers.EmailField()
+    school = serializers.CharField()
+    cohorts = serializers.ListField(child=serializers.CharField())
+    assignments = serializers.IntegerField()
+    attempts = serializers.IntegerField()
+    completedAttempts = serializers.IntegerField()
+    safetyErrors = serializers.IntegerField()
+    overdueAssignments = serializers.IntegerField()
+    averageScore = serializers.DecimalField(max_digits=5, decimal_places=2, allow_null=True)
+    lastActivityAt = serializers.DateTimeField(allow_null=True)
+
+
+class InstructorRosterSerializer(serializers.Serializer):
+    learners = InstructorRosterEntrySerializer(many=True)
+
+
+class InstructorLearnerAssignmentSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    lessonTitle = serializers.CharField()
+    courseTitle = serializers.CharField()
+    trade = serializers.CharField()
+    dueAt = serializers.DateTimeField(allow_null=True)
+    availableAt = serializers.DateTimeField(allow_null=True)
+    attemptLimit = serializers.IntegerField()
+    attemptsUsed = serializers.IntegerField()
+    isOverdue = serializers.BooleanField()
+    latestStatus = serializers.CharField(allow_null=True)
+    latestScore = serializers.DecimalField(max_digits=5, decimal_places=2, allow_null=True)
+
+
+class InstructorLearnerAttemptSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    lessonTitle = serializers.CharField()
+    status = serializers.CharField()
+    outcome = serializers.CharField()
+    score = serializers.DecimalField(max_digits=5, decimal_places=2, allow_null=True)
+    completedSteps = serializers.IntegerField()
+    totalSteps = serializers.IntegerField()
+    safetyErrors = serializers.IntegerField()
+    startedAt = serializers.DateTimeField()
+    updatedAt = serializers.DateTimeField()
+
+
+class InstructorLearnerDetailSerializer(serializers.Serializer):
+    """One learner's full picture for their instructor."""
+
+    learner = InstructorRosterEntrySerializer()
+    assignments = InstructorLearnerAssignmentSerializer(many=True)
+    attempts = InstructorLearnerAttemptSerializer(many=True)
+    competencies = serializers.ListField(child=serializers.DictField())

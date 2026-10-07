@@ -2077,6 +2077,137 @@ class LearningApiTests(TestCase):
             404,
         )
 
+    def test_instructor_roster_is_school_scoped_and_aggregates_learner_progress(self):
+        attempt = Attempt.objects.create(
+            assignment=self.assignment,
+            learner=self.learner,
+            scenario=self.scenario,
+            grading_policy=self.grading_policy,
+        )
+        AttemptEvent.objects.create(
+            attempt=attempt,
+            sequence=1,
+            event_type="incorrect_action",
+            activity_id="https://opedu.local/xapi/attempt/roster-test",
+            payload={"safetyCritical": True},
+            occurred_at=timezone.now(),
+        )
+
+        self.client.force_login(self.instructor)
+        response = self.client.get("/api/v1/instructor/learners/")
+        self.assertEqual(response.status_code, 200)
+        learners = response.json()["learners"]
+        entry = next(item for item in learners if item["id"] == self.learner.pk)
+        self.assertEqual(entry["assignments"], 1)
+        self.assertEqual(entry["attempts"], 1)
+        self.assertEqual(entry["completedAttempts"], 0)
+        self.assertEqual(entry["safetyErrors"], 1)
+        self.assertIsNotNone(entry["lastActivityAt"])
+
+        # A learner may never read the roster.
+        self.client.force_login(self.learner)
+        self.assertEqual(self.client.get("/api/v1/instructor/learners/").status_code, 403)
+
+        # An instructor in another school sees none of these learners.
+        other_instructor = User.objects.create_user(
+            "roster-elsewhere@example.com", password="password-123"
+        )
+        other_school = School.objects.create(name="Roster Other", code="roster-other")
+        SchoolMembership.objects.create(
+            school=other_school,
+            user=other_instructor,
+            role=SchoolMembership.Role.INSTRUCTOR,
+        )
+        self.client.force_login(other_instructor)
+        other = self.client.get("/api/v1/instructor/learners/")
+        self.assertEqual(other.status_code, 200)
+        self.assertEqual(other.json()["learners"], [])
+
+    def test_instructor_learner_detail_is_scoped_and_lists_assignments(self):
+        Attempt.objects.create(
+            assignment=self.assignment,
+            learner=self.learner,
+            scenario=self.scenario,
+            grading_policy=self.grading_policy,
+        )
+
+        self.client.force_login(self.instructor)
+        response = self.client.get(f"/api/v1/instructor/learners/{self.learner.pk}/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["learner"]["id"], self.learner.pk)
+        self.assertEqual(len(body["assignments"]), 1)
+        self.assertEqual(body["assignments"][0]["attemptsUsed"], 1)
+        self.assertEqual(len(body["attempts"]), 1)
+
+        # A learner may not read another learner's detail, nor their own through this route.
+        self.client.force_login(self.learner)
+        self.assertEqual(
+            self.client.get(f"/api/v1/instructor/learners/{self.learner.pk}/").status_code,
+            403,
+        )
+
+        # An instructor from another school gets 404, never a partial answer.
+        other_instructor = User.objects.create_user(
+            "detail-elsewhere@example.com", password="password-123"
+        )
+        other_school = School.objects.create(name="Detail Other", code="detail-other")
+        SchoolMembership.objects.create(
+            school=other_school,
+            user=other_instructor,
+            role=SchoolMembership.Role.INSTRUCTOR,
+        )
+        self.client.force_login(other_instructor)
+        self.assertEqual(
+            self.client.get(f"/api/v1/instructor/learners/{self.learner.pk}/").status_code,
+            404,
+        )
+
+    def test_school_audit_and_overview_are_admin_only_and_school_scoped(self):
+        self.client.force_login(self.school_admin)
+
+        # Creating an invitation writes an audit event the trail must surface.
+        created = self.client.post(
+            "/api/v1/school/invitations/",
+            {"email": "audited@example.com", "role": "learner"},
+            content_type="application/json",
+        )
+        self.assertEqual(created.status_code, 201)
+
+        audit = self.client.get("/api/v1/school/audit/")
+        self.assertEqual(audit.status_code, 200)
+        types = [item["eventType"] for item in audit.json()["events"]]
+        self.assertIn("membership.invitation_created", types)
+
+        overview = self.client.get("/api/v1/school/overview/")
+        self.assertEqual(overview.status_code, 200)
+        self.assertEqual(overview.json()["pendingInvitations"], 1)
+
+        # Revoking is audited and flips the invitation inactive.
+        invitation_id = created.json()["invitation"]["id"]
+        revoked = self.client.delete(f"/api/v1/school/invitations/{invitation_id}/")
+        self.assertEqual(revoked.status_code, 200)
+        self.assertFalse(revoked.json()["is_active"])
+
+        # Instructors and learners are excluded from governance surfaces.
+        for user in (self.instructor, self.learner):
+            self.client.force_login(user)
+            self.assertEqual(self.client.get("/api/v1/school/audit/").status_code, 403)
+            self.assertEqual(self.client.get("/api/v1/school/overview/").status_code, 403)
+
+        # Another school's administrator sees none of these events.
+        other_admin = User.objects.create_user("audit-other@example.com", password="password-123")
+        other_school = School.objects.create(name="Audit Other", code="audit-other")
+        SchoolMembership.objects.create(
+            school=other_school, user=other_admin, role=SchoolMembership.Role.ADMIN
+        )
+        self.client.force_login(other_admin)
+        self.assertEqual(self.client.get("/api/v1/school/audit/").json()["events"], [])
+        self.assertEqual(
+            self.client.delete(f"/api/v1/school/invitations/{invitation_id}/").status_code,
+            404,
+        )
+
     def test_instructor_csv_export_is_scoped_and_research_export_is_pseudonymized(self):
         Attempt.objects.create(
             assignment=self.assignment,

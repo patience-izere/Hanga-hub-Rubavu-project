@@ -1,14 +1,21 @@
 import type { RoleCapabilities } from "../../auth/useRoles";
+import type { MessageKey } from "../../i18n/messages";
 
 export type WorkspaceLink = {
   to: string;
-  label: string;
+  /** Message key resolved through the active locale at render time. */
+  label: MessageKey;
   /** Matches nested routes, e.g. `/teach/learners/4` highlights the `/teach/learners` link. */
   end?: boolean;
+  /**
+   * Extra path prefixes that should also highlight this link. Needed where a sibling route
+   * would otherwise prefix-match, e.g. `/authoring/assets` under `/authoring`.
+   */
+  alsoActiveFor?: string[];
 };
 
 export type WorkspaceSection = {
-  heading: string;
+  heading: MessageKey;
   links: WorkspaceLink[];
 };
 
@@ -31,41 +38,63 @@ export function workspaceSections(roles: RoleCapabilities): WorkspaceSection[] {
   const hasOtherWorkspace = roles.canReviewEvidence || roles.canAuthorContent;
   if (roles.isLearner || !hasOtherWorkspace) {
     sections.push({
-      heading: "Learning",
-      links: [{ to: "/learn", label: "My lessons", end: true }],
+      heading: "nav.learning",
+      links: [
+        { to: "/learn", label: "nav.myLessons", end: true },
+        { to: "/learn/progress", label: "nav.myProgress" },
+      ],
     });
   }
 
   if (roles.canReviewEvidence) {
     sections.push({
-      heading: "Teaching",
-      links: [{ to: "/teach", label: "Overview", end: true }],
+      heading: "nav.teaching",
+      links: [
+        { to: "/teach", label: "nav.overview", end: true },
+        { to: "/teach/learners", label: "nav.learners" },
+        { to: "/teach/assign", label: "nav.assign" },
+        { to: "/teach/competencies", label: "nav.competencies" },
+        { to: "/teach/operations", label: "nav.operations" },
+      ],
     });
   }
 
   if (roles.canAuthorContent) {
     sections.push({
-      heading: "Content",
-      links: [{ to: "/authoring", label: "Scenarios", end: true }],
+      heading: "nav.content",
+      links: [
+        {
+          to: "/authoring",
+          label: "nav.scenarios",
+          end: true,
+          alsoActiveFor: ["/authoring/scenarios"],
+        },
+        { to: "/authoring/assets", label: "nav.assets" },
+      ],
     });
   }
 
   if (roles.canAdministerSchool) {
     sections.push({
-      heading: "School",
-      links: [{ to: "/school/people", label: "People and access" }],
+      heading: "nav.school",
+      links: [
+        { to: "/school", label: "nav.overview", end: true },
+        { to: "/school/people", label: "nav.people" },
+        { to: "/school/invitations", label: "nav.invitations" },
+        { to: "/school/audit", label: "nav.audit" },
+      ],
     });
   }
 
-  const research: WorkspaceLink[] = [{ to: "/research/survey", label: "Survey" }];
+  const research: WorkspaceLink[] = [{ to: "/research/survey", label: "nav.survey" }];
   if (roles.canReviewEvidence) {
-    research.unshift({ to: "/research/pilots", label: "Pilot governance" });
+    research.unshift({ to: "/research/pilots", label: "nav.pilots" });
   }
-  sections.push({ heading: "Research", links: research });
+  sections.push({ heading: "nav.research", links: research });
 
   sections.push({
-    heading: "Account",
-    links: [{ to: "/account/security", label: "Security" }],
+    heading: "nav.account",
+    links: [{ to: "/account/security", label: "security" }],
   });
 
   return sections;

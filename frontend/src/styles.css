@@ -191,6 +191,9 @@ main {
   cursor: wait;
 }
 .button-secondary {
+  /* Without an explicit background this falls through to the user-agent ButtonFace, which is
+     light regardless of theme and leaves light-on-light text in dark mode. */
+  background: var(--paper);
   border-color: var(--green-950);
   color: var(--green-950);
 }
@@ -4122,4 +4125,1014 @@ main {
   .workspace-nav-exit {
     margin-top: 0;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Instructor workspace — attention band, assignment builder, competency rollup
+   --------------------------------------------------------------------------- */
+
+.section-title {
+  margin: 34px 0 12px;
+  font-size: 1.05rem;
+}
+.evidence-controls {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.evidence-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.evidence-controls select {
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+.attention-band {
+  margin-top: 26px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--danger);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.attention-band .attention-intro h2 {
+  margin: 4px 0 4px;
+  font-size: 1.15rem;
+}
+.attention-band .attention-intro p {
+  margin: 0;
+  color: var(--muted);
+}
+.attention-band ul {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.attention-band li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--sand);
+}
+.attention-band li a {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  text-decoration: none;
+}
+.attention-band li a span {
+  color: var(--muted);
+}
+.attention-band li small {
+  white-space: nowrap;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.assign-form {
+  display: grid;
+  gap: 22px;
+  margin-top: 26px;
+  max-width: 900px;
+}
+.assign-section {
+  margin: 0;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.assign-section legend {
+  padding: 0 8px;
+  font-size: 0.76rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.assign-section label {
+  display: block;
+  margin-top: 12px;
+  font-weight: 600;
+}
+.assign-section label input,
+.assign-section label select,
+.assign-section label textarea {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-weight: 400;
+  background: var(--paper);
+}
+.assign-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+.assign-group {
+  margin-top: 18px;
+}
+.assign-group h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+.checkbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.checkbox-list.scrollable {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.checkbox-list label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-weight: 400;
+  cursor: pointer;
+}
+.checkbox-list label:hover {
+  background: var(--sand);
+}
+.checkbox-list label input {
+  width: auto;
+  margin: 0;
+}
+.checkbox-list label span {
+  display: flex;
+  flex-direction: column;
+}
+.checkbox-list label small {
+  color: var(--muted);
+}
+.learner-search input {
+  max-width: 340px;
+}
+.field-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.assign-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 18px 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--green-950);
+  color: var(--paper);
+}
+.assign-summary h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+.assign-summary p {
+  margin: 0;
+  color: rgba(255, 253, 247, 0.82);
+}
+
+.competency-rollup {
+  list-style: none;
+  margin: 26px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+.competency-rollup > li {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.competency-rollup-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.competency-code {
+  display: inline-block;
+  margin-right: 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--sand);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.competency-rate {
+  text-align: right;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.competency-rate small {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+}
+.competency-bar {
+  display: flex;
+  height: 10px;
+  margin: 14px 0 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--sand);
+}
+.competency-bar span {
+  display: block;
+}
+.band-mastered {
+  background: var(--green-650);
+}
+.band-developing {
+  background: var(--lime);
+}
+.band-not-demonstrated {
+  background: #c9cfc4;
+}
+.band-requires-review {
+  background: var(--danger);
+}
+.competency-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 0;
+}
+.competency-legend div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.competency-legend dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.competency-legend dt span {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.competency-legend dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.export-panel {
+  margin-top: 34px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.export-panel h2 {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+}
+.export-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  flex-wrap: wrap;
+  padding: 14px 0;
+}
+.export-option + .export-option {
+  border-top: 1px solid var(--line);
+}
+.export-option p {
+  margin: 4px 0 0;
+  max-width: 60ch;
+  color: var(--muted);
+}
+
+/* Instructor roster */
+.roster-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 26px;
+}
+.roster-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.roster-controls input,
+.roster-controls select {
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+.roster-controls input[type="search"] {
+  min-width: 280px;
+}
+.roster-count {
+  color: var(--muted);
+  margin-left: auto;
+}
+.roster-list {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.roster-list > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.roster-list > li.needs-attention {
+  border-left: 4px solid var(--danger);
+}
+.roster-identity {
+  min-width: 220px;
+}
+.roster-identity strong,
+.roster-identity small,
+.roster-cohorts {
+  display: block;
+}
+.roster-identity small {
+  color: var(--muted);
+}
+.roster-cohorts {
+  margin-top: 5px;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+.roster-cohorts.muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+.roster-stats {
+  display: flex;
+  gap: 26px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.roster-stats dt {
+  font-size: 0.74rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.roster-stats dd {
+  margin: 3px 0 0;
+  font-weight: 700;
+}
+.roster-stats .stat-alert dd {
+  color: var(--danger);
+}
+
+@media (max-width: 760px) {
+  .roster-count {
+    margin-left: 0;
+  }
+  .roster-controls input[type="search"] {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* Instructor learner detail */
+.roster-identity a {
+  text-decoration: none;
+}
+.roster-identity a:hover strong,
+.roster-identity a:focus-visible strong {
+  text-decoration: underline;
+}
+.learner-competencies {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.learner-competencies > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 13px 18px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+.learner-competencies > li.mastery-mastered {
+  border-left-color: var(--green-650);
+}
+.learner-competencies > li.mastery-developing {
+  border-left-color: var(--lime);
+}
+.learner-competencies > li.mastery-requires_review {
+  border-left-color: var(--danger);
+}
+.mastery-state {
+  text-align: right;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.mastery-state small {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+}
+.learner-attempts {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.learner-attempts > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 13px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+.learner-attempts small {
+  display: block;
+  color: var(--muted);
+}
+.learner-attempt-stats {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  text-align: right;
+}
+.evidence-table tr.is-overdue td:first-child {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+.evidence-table small.overdue {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Camera AR device detection */
+.camera-detection {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  margin: 4px 0 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 253, 247, 0.28);
+  border-radius: 12px;
+  background: rgba(7, 63, 53, 0.35);
+}
+.camera-status {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.camera-status::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+}
+.camera-status.is-ready {
+  color: var(--lime);
+}
+.camera-status.is-warning {
+  color: #ffd9a8;
+}
+.camera-note {
+  margin: 0;
+  font-size: 0.86rem;
+  opacity: 0.78;
+  max-width: 52ch;
+}
+.camera-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.camera-picker select {
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 253, 247, 0.35);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+  max-width: 260px;
+}
+.camera-picker.in-session {
+  margin: 6px 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Learner workspace — due dates, grouping, progress, offline panel
+   --------------------------------------------------------------------------- */
+
+.resume-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 26px;
+  padding: 20px 24px;
+  border-radius: 18px;
+  background: var(--green-950);
+  color: var(--paper);
+}
+.resume-band h2 {
+  margin: 4px 0 6px;
+  font-size: 1.25rem;
+}
+.resume-band p {
+  margin: 0;
+  color: rgba(255, 253, 247, 0.82);
+}
+.resume-band .eyebrow {
+  color: var(--lime);
+}
+
+.assignment-group {
+  margin-top: 34px;
+}
+.assignment-group-heading h2 {
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+}
+.assignment-group-heading p {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+.assignment-card.is-overdue {
+  border-left: 4px solid var(--danger);
+}
+.assignment-card h3 {
+  margin: 10px 0 6px;
+  font-size: 1.1rem;
+}
+.assignment-due {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 10px;
+  font-size: 0.92rem;
+}
+.assignment-due small {
+  color: var(--muted);
+}
+.assignment-due.due-overdue {
+  color: var(--danger);
+  font-weight: 600;
+}
+.assignment-due.due-overdue small {
+  color: var(--danger);
+}
+.assignment-due.due-due-soon strong {
+  color: var(--green-800);
+}
+
+.lesson-terms {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 20px 0 8px;
+}
+.lesson-term {
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+}
+.lesson-term dt {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.lesson-term dd {
+  margin: 4px 0 0;
+  font-weight: 700;
+}
+.lesson-term dd small {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+}
+.lesson-term.due-overdue {
+  border-color: var(--danger);
+}
+.lesson-term.due-overdue dt,
+.lesson-term.due-overdue dd {
+  color: var(--danger);
+}
+.instructions-panel {
+  margin-top: 18px;
+}
+
+.offline-panel > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.offline-panel > summary::-webkit-details-marker {
+  display: none;
+}
+.offline-summary-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.offline-summary-title::after {
+  content: "▸";
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.offline-panel[open] > summary .offline-summary-title::after {
+  content: "▾";
+}
+.offline-badge {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--lime);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.offline-badge.is-stale {
+  background: var(--danger);
+  color: var(--paper);
+}
+
+.result-competencies {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.result-competencies > li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border-left: 4px solid var(--line);
+  background: var(--sand);
+  text-align: left;
+}
+.result-competencies > li.mastery-mastered {
+  border-left-color: var(--green-650);
+}
+.result-competencies > li.mastery-developing {
+  border-left-color: var(--lime);
+}
+.result-competencies > li.mastery-requires_review {
+  border-left-color: var(--danger);
+}
+.result-negative {
+  color: var(--danger);
+}
+
+/* ---------------------------------------------------------------------------
+   School administration workspace
+   --------------------------------------------------------------------------- */
+
+.admin-quick-links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+.cohort-list,
+.audit-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.cohort-list > li,
+.audit-list > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 13px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+.cohort-list small,
+.audit-list small {
+  display: block;
+  color: var(--muted);
+}
+.audit-list time {
+  color: var(--muted);
+  white-space: nowrap;
+  font-size: 0.88rem;
+}
+.audit-list.compact > li {
+  padding: 10px 14px;
+}
+.audit-main {
+  min-width: 0;
+}
+.audit-payload {
+  margin: 6px 0 0;
+  font-size: 0.86rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.audit-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 26px;
+}
+.audit-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.audit-controls select {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+}
+.audit-count {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.member-grid article.is-suspended {
+  opacity: 0.72;
+  border-left: 4px solid var(--muted);
+}
+.invitation-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.invitation-list > li.invitation-revoked,
+.invitation-list > li.invitation-expired {
+  opacity: 0.75;
+}
+.status-pending {
+  background: var(--lime);
+}
+.status-accepted {
+  background: var(--green-650);
+  color: var(--paper);
+}
+.status-expired,
+.status-revoked {
+  background: var(--line);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(7, 63, 53, 0.55);
+}
+.modal {
+  width: min(460px, 100%);
+  padding: 24px 26px;
+  border-radius: 18px;
+  background: var(--paper);
+  box-shadow: 0 24px 60px rgba(7, 63, 53, 0.28);
+}
+.modal h2 {
+  margin: 0 0 10px;
+  font-size: 1.2rem;
+}
+.modal p {
+  margin: 0 0 20px;
+  color: var(--muted);
+}
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Dark theme
+   The light palette on :root is the base; only the tokens change here so every
+   component that uses them follows automatically.
+   --------------------------------------------------------------------------- */
+
+/*
+ * --green-950 is a hue, not a role: the light theme uses it for headings AND for deep surfaces.
+ * In dark mode it becomes a light tint so the ~30 text usages stay legible, and the handful of
+ * places that use it as a background are overridden explicitly below.
+ */
+:root[data-theme="dark"],
+:root:not([data-theme="light"]) {
+  --deep-surface: #0f2b25;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color: #e6efe9;
+    background: #0c1a17;
+    --green-950: #cfe8db;
+    --green-800: #9fd4bd;
+    --green-650: #4fbf9c;
+    --lime: #c7e56b;
+    --sand: #0c1a17;
+    --paper: #14241f;
+    --ink: #e6efe9;
+    --muted: #9db2aa;
+    --line: #26403a;
+    --danger: #ff9a9a;
+  }
+}
+
+:root[data-theme="dark"] {
+  color: #e6efe9;
+  background: #0c1a17;
+  --green-950: #cfe8db;
+  --green-800: #9fd4bd;
+  --green-650: #4fbf9c;
+  --lime: #c7e56b;
+  --sand: #0c1a17;
+  --paper: #14241f;
+  --ink: #e6efe9;
+  --muted: #9db2aa;
+  --line: #26403a;
+  --danger: #ff9a9a;
+}
+
+/* Surfaces that were deep green in light mode must stay deep in dark mode, and keep light text. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .brand-mark,
+  :root:not([data-theme="light"]) .nav-cta,
+  :root:not([data-theme="light"]) .button-primary,
+  :root:not([data-theme="light"]) .auth-layout,
+  :root:not([data-theme="light"]) .lesson-launch,
+  :root:not([data-theme="light"]) .site-footer,
+  :root:not([data-theme="light"]) .simulation-progress,
+  :root:not([data-theme="light"]) .assignment-builder,
+  :root:not([data-theme="light"]) .resume-band,
+  :root:not([data-theme="light"]) .assign-summary,
+  :root:not([data-theme="light"]) .workspace-nav-section a.is-active {
+    background: var(--deep-surface);
+    color: #e6efe9;
+  }
+}
+:root[data-theme="dark"] .brand-mark,
+:root[data-theme="dark"] .nav-cta,
+:root[data-theme="dark"] .button-primary,
+:root[data-theme="dark"] .auth-layout,
+:root[data-theme="dark"] .lesson-launch,
+:root[data-theme="dark"] .site-footer,
+:root[data-theme="dark"] .simulation-progress,
+:root[data-theme="dark"] .assignment-builder,
+:root[data-theme="dark"] .resume-band,
+:root[data-theme="dark"] .assign-summary,
+:root[data-theme="dark"] .workspace-nav-section a.is-active {
+  background: var(--deep-surface);
+  color: #e6efe9;
+}
+
+body {
+  background: var(--sand);
+  color: var(--ink);
+}
+
+/* Form controls default to the user-agent light surface unless told otherwise. */
+input,
+select,
+textarea {
+  color-scheme: light dark;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.locale-coverage {
+  max-width: 26ch;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* Authoring workspace additions */
+.authoring-group {
+  margin-bottom: 16px;
+}
+.authoring-group h3 {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.returned-flag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--paper);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.returned-banner {
+  margin-bottom: 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  border-left: 4px solid var(--danger);
+  background: var(--sand);
+}
+.returned-banner strong {
+  display: block;
+  color: var(--danger);
+}
+.returned-banner p {
+  margin: 6px 0 0;
+}
+.authoring-advanced {
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.authoring-advanced > summary {
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.advanced-warning {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--paper);
+  font-size: 0.72rem;
+  font-weight: 700;
 }

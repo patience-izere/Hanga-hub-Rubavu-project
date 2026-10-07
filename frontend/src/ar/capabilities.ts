@@ -1,4 +1,5 @@
 import type { CapabilityProfile, RendererMode } from "../api/learning";
+import { listCameras, mediaDevicesSupported } from "./cameras";
 
 type NavigatorWithCapabilities = Navigator & {
   deviceMemory?: number;
@@ -27,7 +28,13 @@ export async function detectCapabilities(): Promise<CapabilityProfile> {
   const storage = await navigator.storage?.estimate().catch(() => undefined);
   const quota = storage?.quota;
   const usage = storage?.usage ?? 0;
-  const camera = Boolean(navigator.mediaDevices?.getUserMedia);
+  // Enumerate real inputs rather than trusting the API's existence: a shared workshop desktop
+  // with no webcam exposes getUserMedia and then fails with NotFoundError at start time.
+  const cameraApi = mediaDevicesSupported();
+  const cameras = await listCameras();
+  const cameraCount = cameras.length;
+  const externalCamera = cameras.some((device) => device.isExternal);
+  const camera = cameraApi && cameraCount > 0;
   const webgl = supportsWebGl();
   const deviceTier = immersiveAr
     ? "immersive-ar"
@@ -40,6 +47,9 @@ export async function detectCapabilities(): Promise<CapabilityProfile> {
   return {
     secureContext: window.isSecureContext,
     camera,
+    cameraApi,
+    cameraCount,
+    externalCamera,
     webgl,
     immersiveAr,
     hitTest: immersiveAr,
@@ -57,6 +67,8 @@ export async function detectCapabilities(): Promise<CapabilityProfile> {
 
 export function recommendedRenderer(profile: CapabilityProfile): RendererMode {
   if (profile.secureContext && profile.immersiveAr && profile.hitTest) return "markerless_ar";
+  // Only recommend Camera AR once a real input is confirmed, so a webcam-less desktop is not
+  // steered into a mode that cannot start.
   if (profile.secureContext && profile.camera) return "marker_ar";
   if (profile.webgl) return "desktop_3d";
   return "accessible_2d";
@@ -66,7 +78,10 @@ export function rendererAvailability(profile: CapabilityProfile): Record<Rendere
   return {
     accessible_2d: true,
     desktop_3d: profile.webgl,
-    marker_ar: profile.secureContext && profile.camera,
+    // Offered whenever the browser has the API, even with no camera enumerated yet: some
+    // browsers hide devices until permission is granted, and a learner may attach a USB camera
+    // after the page loaded. Camera AR itself reports absence and offers a re-check.
+    marker_ar: profile.secureContext && profile.cameraApi,
     markerless_ar: profile.secureContext && profile.immersiveAr && profile.hitTest,
   };
 }

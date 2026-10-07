@@ -8,6 +8,7 @@ import {
   getAttempt,
   ingestAttemptEvents,
   listAssignments,
+  listAttempts,
   recordAttemptAction,
   requestAttemptHint,
   saveAssignmentKnowledgeCheck,
@@ -243,4 +244,9 @@ export function useAbandonAttempt(id: number) {
       void queryClient.invalidateQueries({ queryKey: assignmentsQueryKey });
     },
   });
+}
+
+/** Every attempt this learner has made, newest first. Backs the progress view. */
+export function useAttempts() {
+  return useQuery({ queryKey: ["learning", "attempts"], queryFn: listAttempts });
 }

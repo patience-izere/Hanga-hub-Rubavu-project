@@ -21,6 +21,8 @@
         "ar_marker_mismatch",
         "ar_tracking_recovered",
         "ar_placement_confirmed",
+        "ar_camera_devices_changed",
+        "ar_camera_switched",
         "ar_fallback_used",
         "asset_load_completed",
         "asset_load_failed",

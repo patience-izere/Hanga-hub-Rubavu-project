@@ -1,16 +1,25 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 import type { AuthoredScenario } from "../api/content";
 import {
-  useAuthoredAssetPackages,
   useAuthoredScenarios,
   useCloneAuthoredScenario,
   usePublishAuthoredScenario,
   useTransitionAuthoredScenario,
-  usePublishAuthoredAssetPackage,
-  useUploadAuthoredAsset,
   useUpdateAuthoredScenario,
 } from "../learning/useContentAuthoring";
+
+/** Draft first: a returned scenario is the thing an author must act on. */
+const STATUS_ORDER = ["draft", "review", "approved", "published", "retired"] as const;
+
+const STATUS_LABELS: Record<(typeof STATUS_ORDER)[number], string> = {
+  draft: "Drafts",
+  review: "In review",
+  approved: "Approved",
+  published: "Published",
+  retired: "Retired",
+};
 
 export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
   const scenarios = useAuthoredScenarios();
@@ -18,25 +27,15 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
   const clone = useCloneAuthoredScenario();
   const publish = usePublishAuthoredScenario();
   const transition = useTransitionAuthoredScenario();
-  const assetPackages = useAuthoredAssetPackages();
-  const uploadAsset = useUploadAuthoredAsset();
-  const publishAsset = usePublishAuthoredAssetPackage();
-  const [selectedId, setSelectedId] = useState(0);
+  const navigate = useNavigate();
+  const routeScenarioId = Number(useParams().scenarioId ?? 0);
+  const [selectedId, setSelectedId] = useState(routeScenarioId);
   const [title, setTitle] = useState("");
   const [definition, setDefinition] = useState("");
   const [validationError, setValidationError] = useState("");
   const [reviewNotes, setReviewNotes] = useState("");
-  const [selectedPackageId, setSelectedPackageId] = useState(0);
-  const [assetFile, setAssetFile] = useState<File | null>(null);
-  const [assetRole, setAssetRole] = useState("primary-scene");
-  const [assetLicense, setAssetLicense] = useState("CC-BY-4.0");
-  const [assetAttribution, setAssetAttribution] = useState("");
-  const [assetAltText, setAssetAltText] = useState("");
-  const [assetTranscript, setAssetTranscript] = useState("");
 
   const selected = scenarios.data?.find((scenario) => scenario.id === selectedId);
-  const selectedPackage =
-    assetPackages.data?.find((item) => item.id === selectedPackageId) ?? assetPackages.data?.[0];
   let previewSteps: Array<Record<string, unknown>> = [];
   let parsedDefinition: Record<string, unknown> = {};
   try {
@@ -60,7 +59,15 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
     setReviewNotes(selected.reviewNotes);
   }, [selected]);
 
-  const chooseScenario = (scenario: AuthoredScenario) => setSelectedId(scenario.id);
+  // Selection lives in the URL so a scenario under review can be linked to and bookmarked.
+  useEffect(() => {
+    if (routeScenarioId && routeScenarioId !== selectedId) setSelectedId(routeScenarioId);
+  }, [routeScenarioId, selectedId]);
+
+  const chooseScenario = (scenario: AuthoredScenario) => {
+    setSelectedId(scenario.id);
+    navigate(`/authoring/scenarios/${scenario.id}`);
+  };
 
   function changeDefinition(change: (current: Record<string, unknown>) => void) {
     try {
@@ -114,19 +121,31 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
       <div className="authoring-grid">
         <aside className="lesson-panel" aria-label="Scenario versions">
           <h2>School scenarios</h2>
-          {scenarios.data?.map((scenario) => (
-            <button
-              className={scenario.id === selectedId ? "authoring-item active" : "authoring-item"}
-              key={scenario.id}
-              onClick={() => chooseScenario(scenario)}
-              type="button"
-            >
-              <strong>{scenario.title}</strong>
-              <span>
-                Version {scenario.version} · {scenario.status}
-              </span>
-            </button>
-          ))}
+          {STATUS_ORDER.map((status) => {
+            const group = (scenarios.data ?? []).filter((item) => item.status === status);
+            if (group.length === 0) return null;
+            return (
+              <div className="authoring-group" key={status}>
+                <h3>{STATUS_LABELS[status]}</h3>
+                {group.map((scenario) => (
+                  <button
+                    className={
+                      scenario.id === selectedId ? "authoring-item active" : "authoring-item"
+                    }
+                    key={scenario.id}
+                    onClick={() => chooseScenario(scenario)}
+                    type="button"
+                  >
+                    <strong>{scenario.title}</strong>
+                    <span>Version {scenario.version}</span>
+                    {status === "draft" && scenario.reviewNotes ? (
+                      <span className="returned-flag">Returned for revision</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
         </aside>
         <article className="lesson-panel">
           {!selected ? (
@@ -144,6 +163,15 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
                 }
               }}
             >
+              {/* Review notes are mandatory when an administrator returns a scenario, and are the
+                  one thing the author must read before doing anything else. */}
+              {selected.status === "draft" && selected.reviewNotes ? (
+                <div className="returned-banner" role="status">
+                  <strong>Returned for revision</strong>
+                  <p>{selected.reviewNotes}</p>
+                </div>
+              ) : null}
+
               <div className="authoring-actions">
                 <span className="status-badge">{selected.status}</span>
                 <button
@@ -411,16 +439,29 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
                   <p>Add valid scenario steps to see the safe preview.</p>
                 )}
               </section>
-              <label>
-                Renderer-neutral scenario definition
-                <textarea
-                  rows={24}
-                  value={definition}
-                  onChange={(event) => setDefinition(event.target.value)}
-                  disabled={selected.status !== "draft"}
-                  spellCheck={false}
-                />
-              </label>
+              {/* The structured editor above is the primary surface. Raw JSON stays available
+                  for cases it cannot express, but demoting it keeps a stray keystroke from
+                  disabling the structured controls, which was the previous trap. */}
+              <details className="authoring-advanced">
+                <summary>
+                  Advanced: edit the raw scenario definition
+                  {validationError ? <span className="advanced-warning">JSON error</span> : null}
+                </summary>
+                <p className="field-note">
+                  This is the same data the structured editor writes. Invalid JSON disables the
+                  structured controls until it is fixed.
+                </p>
+                <label>
+                  Renderer-neutral scenario definition
+                  <textarea
+                    rows={24}
+                    value={definition}
+                    onChange={(event) => setDefinition(event.target.value)}
+                    disabled={selected.status !== "draft"}
+                    spellCheck={false}
+                  />
+                </label>
+              </details>
               <p>
                 Grading policy {selected.grading_policy} · asset package{" "}
                 {selected.asset_package ?? "fallback only"}
@@ -485,139 +526,6 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
           )}
         </article>
       </div>
-      <section className="lesson-panel" aria-labelledby="asset-pipeline-title">
-        <span className="eyebrow">Governed immersive assets</span>
-        <h2 id="asset-pipeline-title">Validated glTF and media packages</h2>
-        <p>
-          Uploads are checked for type, declared MIME, size, glTF 2.0 structure, checksum,
-          attribution, and generated performance metadata before an administrator can publish.
-        </p>
-        <label>
-          Asset package
-          <select
-            value={selectedPackage?.id ?? ""}
-            onChange={(event) => setSelectedPackageId(Number(event.target.value))}
-          >
-            {assetPackages.data?.map((item) => (
-              <option value={item.id} key={item.id}>
-                {item.name} · v{item.version} · {item.status}
-              </option>
-            ))}
-          </select>
-        </label>
-        {selectedPackage ? (
-          <>
-            <p>
-              {selectedPackage.files.length} validated file(s) ·{" "}
-              {Math.ceil(selectedPackage.total_byte_size / 1024)} KB · digest{" "}
-              <code>{selectedPackage.sha256.slice(0, 16)}…</code>
-            </p>
-            <ul>
-              {selectedPackage.files.map((file) => (
-                <li key={file.id}>
-                  <strong>{file.role}</strong> · {file.path} · {file.license_spdx} ·{" "}
-                  {Math.ceil(file.byte_size / 1024)} KB
-                </li>
-              ))}
-            </ul>
-            {selectedPackage.status === "draft" ? (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (!assetFile) return;
-                  uploadAsset.mutate({
-                    packageId: selectedPackage.id,
-                    file: assetFile,
-                    role: assetRole,
-                    licenseSpdx: assetLicense,
-                    sourceAttribution: assetAttribution,
-                    altText: assetAltText,
-                    transcript: assetTranscript,
-                  });
-                }}
-              >
-                <label>
-                  glTF, GLB, KTX2, or fallback image
-                  <input
-                    type="file"
-                    accept=".gltf,.glb,.ktx2,.png,.jpg,.jpeg,.webp,.mp4,.webm,.vtt"
-                    onChange={(event) => setAssetFile(event.target.files?.[0] ?? null)}
-                  />
-                </label>
-                <label>
-                  Delivery role
-                  <select value={assetRole} onChange={(event) => setAssetRole(event.target.value)}>
-                    <option value="primary-scene">Primary scene</option>
-                    <option value="scene-low">Low-quality scene</option>
-                    <option value="scene-medium">Medium-quality scene</option>
-                    <option value="scene-high">High-quality scene</option>
-                    <option value="thumbnail">Thumbnail</option>
-                    <option value="fallback-media">Accessible fallback media</option>
-                    <option value="captions">Caption track</option>
-                  </select>
-                </label>
-                <label>
-                  SPDX license
-                  <input
-                    value={assetLicense}
-                    onChange={(event) => setAssetLicense(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Source and ownership attribution
-                  <textarea
-                    rows={3}
-                    value={assetAttribution}
-                    onChange={(event) => setAssetAttribution(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Alternative text (required for fallback images)
-                  <textarea
-                    rows={2}
-                    value={assetAltText}
-                    onChange={(event) => setAssetAltText(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Transcript (required for fallback video)
-                  <textarea
-                    rows={4}
-                    value={assetTranscript}
-                    onChange={(event) => setAssetTranscript(event.target.value)}
-                  />
-                </label>
-                <button
-                  className="button button-secondary"
-                  disabled={
-                    uploadAsset.isPending || !assetFile || !assetLicense || !assetAttribution.trim()
-                  }
-                >
-                  {uploadAsset.isPending ? "Validating upload…" : "Validate and add asset"}
-                </button>
-                {canPublish ? (
-                  <button
-                    className="button button-primary"
-                    type="button"
-                    disabled={publishAsset.isPending}
-                    onClick={() => publishAsset.mutate(selectedPackage.id)}
-                  >
-                    Publish validated asset package
-                  </button>
-                ) : null}
-              </form>
-            ) : null}
-            {uploadAsset.isError || publishAsset.isError ? (
-              <p className="form-error" role="alert">
-                The asset package failed validation. Review its manifest, license, file metadata,
-                and primary-scene role.
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p>No asset package is available for this school yet.</p>
-        )}
-      </section>
     </section>
   );
 }

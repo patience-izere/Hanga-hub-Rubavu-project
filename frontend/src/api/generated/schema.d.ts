@@ -484,6 +484,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/instructor/learners/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Learner-centric view of the instructor's schools.
+         *
+         *     The overview endpoint is organised around attempts, which cannot answer "how is this
+         *     learner doing across the term". This aggregates the same school-scoped evidence per learner.
+         */
+        get: operations["instructor_roster_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instructor/learners/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description One learner's assignments, attempts and competency profile.
+         *
+         *     Scoped exactly like the roster: a learner outside the caller's schools is a 404, never a
+         *     partial answer.
+         */
+        get: operations["instructor_learner_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/instructor/overview/": {
         parameters: {
             query?: never;
@@ -693,6 +737,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/school/audit/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Read-only governance trail for the administered schools.
+         *
+         *     Every membership, invitation, assignment, content and grading mutation already appends an
+         *     AuditEvent; until now those were reachable only through Django admin, which the person
+         *     accountable for governance may not have access to.
+         */
+        get: operations["api_v1_school_audit_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/school/invitations/": {
         parameters: {
             query?: never;
@@ -704,6 +771,23 @@ export interface paths {
         put?: never;
         post: operations["api_v1_school_invitations_create"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/school/invitations/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Revoke a pending invitation before it is accepted. */
+        delete: operations["api_v1_school_invitations_destroy"];
         options?: never;
         head?: never;
         patch?: never;
@@ -755,6 +839,23 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["api_v1_school_members_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/school/overview/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Landing summary so an administrator is not sent to the instructor dashboard. */
+        get: operations["api_v1_school_overview_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -1025,6 +1126,19 @@ export interface components {
             /** Format: date-time */
             clientCreatedAt: string;
         };
+        AuditEvent: {
+            id: number;
+            eventType: string;
+            readonly actorName: string;
+            readonly schoolName: string;
+            targetType: string;
+            targetId: string;
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            occurredAt: string;
+        };
         /** @enum {unknown} */
         BlankEnum: "";
         Competency: {
@@ -1235,6 +1349,46 @@ export interface components {
             /** Format: email */
             readonly email: string;
         };
+        InstructorLearnerAssignment: {
+            id: number;
+            lessonTitle: string;
+            courseTitle: string;
+            trade: string;
+            /** Format: date-time */
+            dueAt: string | null;
+            /** Format: date-time */
+            availableAt: string | null;
+            attemptLimit: number;
+            attemptsUsed: number;
+            isOverdue: boolean;
+            latestStatus: string | null;
+            /** Format: decimal */
+            latestScore: string | null;
+        };
+        InstructorLearnerAttempt: {
+            id: number;
+            lessonTitle: string;
+            status: string;
+            outcome: string;
+            /** Format: decimal */
+            score: string | null;
+            completedSteps: number;
+            totalSteps: number;
+            safetyErrors: number;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @description One learner's full picture for their instructor. */
+        InstructorLearnerDetail: {
+            learner: components["schemas"]["InstructorRosterEntry"];
+            assignments: components["schemas"]["InstructorLearnerAssignment"][];
+            attempts: components["schemas"]["InstructorLearnerAttempt"][];
+            competencies: {
+                [key: string]: unknown;
+            }[];
+        };
         InstructorLesson: {
             readonly id: number;
             readonly title: string;
@@ -1265,6 +1419,27 @@ export interface components {
             operationalAnalytics: {
                 [key: string]: unknown;
             };
+        };
+        InstructorRoster: {
+            learners: components["schemas"]["InstructorRosterEntry"][];
+        };
+        /** @description One learner in the instructor's schools, with their aggregate progress. */
+        InstructorRosterEntry: {
+            id: number;
+            name: string;
+            /** Format: email */
+            email: string;
+            school: string;
+            cohorts: string[];
+            assignments: number;
+            attempts: number;
+            completedAttempts: number;
+            safetyErrors: number;
+            overdueAssignments: number;
+            /** Format: decimal */
+            averageScore: string | null;
+            /** Format: date-time */
+            lastActivityAt: string | null;
         };
         /**
          * @description * `en` - English
@@ -1995,6 +2170,22 @@ export interface components {
             is_active?: boolean;
             /** Format: date-time */
             readonly created_at: string;
+        };
+        /** @description Counts a school administrator needs before drilling into any single list. */
+        SchoolOverview: {
+            schools: {
+                [key: string]: unknown;
+            }[];
+            membersByRole: {
+                [key: string]: number;
+            };
+            pendingInvitations: number;
+            expiredInvitations: number;
+            suspendedMembers: number;
+            cohorts: {
+                [key: string]: unknown;
+            }[];
+            recentAudit: components["schemas"]["AuditEvent"][];
         };
         SchoolSummary: {
             id: number;
@@ -3156,6 +3347,46 @@ export interface operations {
             };
         };
     };
+    instructor_roster_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructorRoster"];
+                };
+            };
+        };
+    };
+    instructor_learner_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructorLearnerDetail"];
+                };
+            };
+        };
+    };
     api_v1_instructor_overview_retrieve: {
         parameters: {
             query?: never;
@@ -3781,6 +4012,25 @@ export interface operations {
             };
         };
     };
+    api_v1_school_audit_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEvent"][];
+                };
+            };
+        };
+    };
     api_v1_school_invitations_list: {
         parameters: {
             query?: never;
@@ -3822,6 +4072,26 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SchoolInvitationCreated"];
                 };
+            };
+        };
+    };
+    api_v1_school_invitations_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -3915,6 +4185,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SchoolMember"];
+                };
+            };
+        };
+    };
+    api_v1_school_overview_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolOverview"];
                 };
             };
         };

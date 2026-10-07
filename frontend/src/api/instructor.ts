@@ -8,8 +8,23 @@ type AttemptStatus = "in_progress" | "completed" | "requires_review" | "abandone
 export type InstructorAttemptEvidence = Omit<GeneratedEvidence, "status"> & {
   status: AttemptStatus;
 };
-export type InstructorOverview = Omit<components["schemas"]["InstructorOverview"], "attempts"> & {
+/** School-wide rollup of `CompetencyResult` rows, one entry per competency code. */
+export type InstructorCompetencyRollup = {
+  code: string;
+  title: string;
+  attempts: number;
+  mastered: number;
+  developing: number;
+  notDemonstrated: number;
+  requiresReview: number;
+};
+
+export type InstructorOverview = Omit<
+  components["schemas"]["InstructorOverview"],
+  "attempts" | "competencies"
+> & {
   attempts: InstructorAttemptEvidence[];
+  competencies: InstructorCompetencyRollup[];
   operationalAnalytics: {
     learning: { masteredAttempts: number; failedAttempts: number };
     recognition: {
@@ -97,4 +112,72 @@ export async function createInstructorAssignments(input: {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+/** One learner in the instructor's schools, aggregated across all their assignments. */
+export type InstructorRosterEntry = {
+  id: number;
+  name: string;
+  email: string;
+  school: string;
+  cohorts: string[];
+  assignments: number;
+  attempts: number;
+  completedAttempts: number;
+  safetyErrors: number;
+  overdueAssignments: number;
+  averageScore: string | null;
+  lastActivityAt: string | null;
+};
+
+export function getInstructorRoster(): Promise<InstructorRosterEntry[]> {
+  return apiFetch<{ learners: InstructorRosterEntry[] }>("/api/v1/instructor/learners/").then(
+    (response) => response.learners,
+  );
+}
+
+export type InstructorLearnerAssignment = {
+  id: number;
+  lessonTitle: string;
+  courseTitle: string;
+  trade: string;
+  dueAt: string | null;
+  availableAt: string | null;
+  attemptLimit: number;
+  attemptsUsed: number;
+  isOverdue: boolean;
+  latestStatus: string | null;
+  latestScore: string | null;
+};
+
+export type InstructorLearnerAttempt = {
+  id: number;
+  lessonTitle: string;
+  status: AttemptStatus;
+  outcome: string;
+  score: string | null;
+  completedSteps: number;
+  totalSteps: number;
+  safetyErrors: number;
+  startedAt: string;
+  updatedAt: string;
+};
+
+export type InstructorLearnerCompetency = {
+  code: string;
+  title: string;
+  masteryState: string;
+  masteryPercentage: string;
+  attempts: number;
+};
+
+export type InstructorLearnerDetail = {
+  learner: InstructorRosterEntry;
+  assignments: InstructorLearnerAssignment[];
+  attempts: InstructorLearnerAttempt[];
+  competencies: InstructorLearnerCompetency[];
+};
+
+export function getInstructorLearner(id: number): Promise<InstructorLearnerDetail> {
+  return apiFetch<InstructorLearnerDetail>(`/api/v1/instructor/learners/${id}/`);
 }

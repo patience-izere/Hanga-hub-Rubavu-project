@@ -7,17 +7,28 @@ import { RequireRole } from "./components/workspace/RequireRole";
 import { WorkspaceShell } from "./components/workspace/WorkspaceShell";
 import { useCurrentUser } from "./auth/useAuth";
 import { roleCapabilities } from "./auth/useRoles";
+import { useApplyPreferredLocale } from "./i18n/LocaleProvider";
 import { LearnerDashboardPage } from "./pages/LearnerDashboardPage";
+import { LearnerProgressPage } from "./pages/LearnerProgressPage";
+import { AttemptResultPage } from "./pages/AttemptResultPage";
 import { AssignmentPage } from "./pages/AssignmentPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { InstructorDashboardPage } from "./pages/InstructorDashboardPage";
 import { InstructorAttemptPage } from "./pages/InstructorAttemptPage";
+import { InstructorAssignPage } from "./pages/InstructorAssignPage";
+import { InstructorLearnersPage } from "./pages/InstructorLearnersPage";
+import { InstructorLearnerDetailPage } from "./pages/InstructorLearnerDetailPage";
+import { InstructorCompetenciesPage } from "./pages/InstructorCompetenciesPage";
+import { InstructorOperationsPage } from "./pages/InstructorOperationsPage";
 import { AccountSecurityPage } from "./pages/AccountSecurityPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { JoinSchoolPage } from "./pages/JoinSchoolPage";
-import { SchoolAdminPage } from "./pages/SchoolAdminPage";
+import { SchoolOverviewPage } from "./pages/SchoolOverviewPage";
+import { SchoolPeoplePage } from "./pages/SchoolPeoplePage";
+import { SchoolInvitationsPage } from "./pages/SchoolInvitationsPage";
+import { SchoolAuditPage } from "./pages/SchoolAuditPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { SupportPage } from "./pages/SupportPage";
 import { AboutPage } from "./pages/AboutPage";
@@ -27,6 +38,7 @@ import { ContactPage } from "./pages/ContactPage";
 import { PrivacyPage, TermsPage } from "./pages/LegalPages";
 import { ResearchSurveyPage } from "./pages/ResearchSurveyPage";
 import { ContentAuthoringPage } from "./pages/ContentAuthoringPage";
+import { AuthoringAssetsPage } from "./pages/AuthoringAssetsPage";
 import { TrainingMarkerPage } from "./pages/TrainingMarkerPage";
 
 const SimulationPage = lazy(() =>
@@ -45,6 +57,7 @@ function Loading({ label, children }: { label: string; children: ReactNode }) {
 export function App() {
   const auth = useCurrentUser();
   const queryClient = useQueryClient();
+  useApplyPreferredLocale(auth.data?.preferredLanguage);
 
   useEffect(() => {
     const expireSession = () => queryClient.setQueryData(["auth", "current-user"], null);
@@ -104,6 +117,22 @@ export function App() {
           }
         />
         <Route
+          path="/learn/progress"
+          element={
+            <RequireRole user={user}>
+              <LearnerProgressPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/learn/attempts/:attemptId"
+          element={
+            <RequireRole user={user}>
+              <AttemptResultPage />
+            </RequireRole>
+          }
+        />
+        <Route
           path="/assignments/:assignmentId"
           element={
             <RequireRole user={user}>
@@ -132,6 +161,46 @@ export function App() {
           }
         />
         <Route
+          path="/teach/learners"
+          element={
+            <RequireRole user={user} capability="canReviewEvidence">
+              <InstructorLearnersPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/teach/learners/:learnerId"
+          element={
+            <RequireRole user={user} capability="canReviewEvidence">
+              <InstructorLearnerDetailPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/teach/assign"
+          element={
+            <RequireRole user={user} capability="canReviewEvidence">
+              <InstructorAssignPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/teach/competencies"
+          element={
+            <RequireRole user={user} capability="canReviewEvidence">
+              <InstructorCompetenciesPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/teach/operations"
+          element={
+            <RequireRole user={user} capability="canReviewEvidence">
+              <InstructorOperationsPage />
+            </RequireRole>
+          }
+        />
+        <Route
           path="/teach/attempts/:attemptId"
           element={
             <RequireRole user={user} capability="canReviewEvidence">
@@ -149,14 +218,53 @@ export function App() {
             </RequireRole>
           }
         />
+        <Route
+          path="/authoring/scenarios/:scenarioId"
+          element={
+            <RequireRole user={user} capability="canAuthorContent">
+              <ContentAuthoringPage canPublish={roles.canPublishContent} />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/authoring/assets"
+          element={
+            <RequireRole user={user} capability="canAuthorContent">
+              <AuthoringAssetsPage canPublish={roles.canPublishContent} />
+            </RequireRole>
+          }
+        />
 
         {/* School administration */}
-        <Route path="/school" element={<Navigate to="/school/people" replace />} />
+        <Route
+          path="/school"
+          element={
+            <RequireRole user={user} capability="canAdministerSchool">
+              <SchoolOverviewPage />
+            </RequireRole>
+          }
+        />
         <Route
           path="/school/people"
           element={
             <RequireRole user={user} capability="canAdministerSchool">
-              <SchoolAdminPage />
+              <SchoolPeoplePage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/school/invitations"
+          element={
+            <RequireRole user={user} capability="canAdministerSchool">
+              <SchoolInvitationsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/school/audit"
+          element={
+            <RequireRole user={user} capability="canAdministerSchool">
+              <SchoolAuditPage />
             </RequireRole>
           }
         />

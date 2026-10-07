@@ -203,7 +203,10 @@ class PilotStudyViewSet(viewsets.ModelViewSet):
         input_serializer = PilotTransitionSerializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
         with transaction.atomic():
-            study = self.get_queryset().select_for_update().get(pk=self.get_object().pk)
+            # Lock the row alone: get_queryset() ends in .distinct() and left-outer-joins
+            # nullable scenario relations, both of which PostgreSQL refuses to combine with
+            # FOR UPDATE. get_object() has already applied the school scoping.
+            study = PilotStudy.objects.select_for_update().get(pk=self.get_object().pk)
             if not _is_admin(request.user, study.school):
                 raise PermissionDenied("A school administrator must transition the pilot.")
             transition = input_serializer.validated_data["action"]

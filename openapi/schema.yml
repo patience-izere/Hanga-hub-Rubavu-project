@@ -1166,6 +1166,50 @@ paths:
                 type: string
                 format: binary
           description: ''
+  /api/v1/instructor/learners/:
+    get:
+      operationId: instructor_roster_list
+      description: |-
+        Learner-centric view of the instructor's schools.
+
+        The overview endpoint is organised around attempts, which cannot answer "how is this
+        learner doing across the term". This aggregates the same school-scoped evidence per learner.
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstructorRoster'
+          description: ''
+  /api/v1/instructor/learners/{id}/:
+    get:
+      operationId: instructor_learner_retrieve
+      description: |-
+        One learner's assignments, attempts and competency profile.
+
+        Scoped exactly like the roster: a learner outside the caller's schools is a 404, never a
+        partial answer.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstructorLearnerDetail'
+          description: ''
   /api/v1/instructor/overview/:
     get:
       operationId: api_v1_instructor_overview_retrieve
@@ -1880,6 +1924,28 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/school/audit/:
+    get:
+      operationId: api_v1_school_audit_list
+      description: |-
+        Read-only governance trail for the administered schools.
+
+        Every membership, invitation, assignment, content and grading mutation already appends an
+        AuditEvent; until now those were reachable only through Django admin, which the person
+        accountable for governance may not have access to.
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditEvent'
+          description: ''
   /api/v1/school/invitations/:
     get:
       operationId: api_v1_school_invitations_list
@@ -1921,6 +1987,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/SchoolInvitationCreated'
           description: ''
+  /api/v1/school/invitations/{id}/:
+    delete:
+      operationId: api_v1_school_invitations_destroy
+      description: Revoke a pending invitation before it is accepted.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/school/invitations/accept/{token}/:
     get:
       operationId: api_v1_school_invitations_accept_retrieve
@@ -2020,6 +2103,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SchoolMember'
+          description: ''
+  /api/v1/school/overview/:
+    get:
+      operationId: api_v1_school_overview_retrieve
+      description: Landing summary so an administrator is not sent to the instructor
+        dashboard.
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolOverview'
           description: ''
 components:
   schemas:
@@ -2742,6 +2841,38 @@ components:
       - clientCreatedAt
       - eventIds
       - pendingCount
+    AuditEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventType:
+          type: string
+        actorName:
+          type: string
+          readOnly: true
+        schoolName:
+          type: string
+          readOnly: true
+        targetType:
+          type: string
+        targetId:
+          type: string
+        payload:
+          type: object
+          additionalProperties: {}
+        occurredAt:
+          type: string
+          format: date-time
+      required:
+      - actorName
+      - eventType
+      - id
+      - occurredAt
+      - payload
+      - schoolName
+      - targetId
+      - targetType
     BlankEnum:
       enum:
       - ''
@@ -3334,6 +3465,114 @@ components:
       - email
       - id
       - name
+    InstructorLearnerAssignment:
+      type: object
+      properties:
+        id:
+          type: integer
+        lessonTitle:
+          type: string
+        courseTitle:
+          type: string
+        trade:
+          type: string
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+        availableAt:
+          type: string
+          format: date-time
+          nullable: true
+        attemptLimit:
+          type: integer
+        attemptsUsed:
+          type: integer
+        isOverdue:
+          type: boolean
+        latestStatus:
+          type: string
+          nullable: true
+        latestScore:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          nullable: true
+      required:
+      - attemptLimit
+      - attemptsUsed
+      - availableAt
+      - courseTitle
+      - dueAt
+      - id
+      - isOverdue
+      - latestScore
+      - latestStatus
+      - lessonTitle
+      - trade
+    InstructorLearnerAttempt:
+      type: object
+      properties:
+        id:
+          type: integer
+        lessonTitle:
+          type: string
+        status:
+          type: string
+        outcome:
+          type: string
+        score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          nullable: true
+        completedSteps:
+          type: integer
+        totalSteps:
+          type: integer
+        safetyErrors:
+          type: integer
+        startedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - completedSteps
+      - id
+      - lessonTitle
+      - outcome
+      - safetyErrors
+      - score
+      - startedAt
+      - status
+      - totalSteps
+      - updatedAt
+    InstructorLearnerDetail:
+      type: object
+      description: One learner's full picture for their instructor.
+      properties:
+        learner:
+          $ref: '#/components/schemas/InstructorRosterEntry'
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstructorLearnerAssignment'
+        attempts:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstructorLearnerAttempt'
+        competencies:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - assignments
+      - attempts
+      - competencies
+      - learner
     InstructorLesson:
       type: object
       properties:
@@ -3425,6 +3664,64 @@ components:
       - competencies
       - metrics
       - operationalAnalytics
+    InstructorRoster:
+      type: object
+      properties:
+        learners:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstructorRosterEntry'
+      required:
+      - learners
+    InstructorRosterEntry:
+      type: object
+      description: One learner in the instructor's schools, with their aggregate progress.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        school:
+          type: string
+        cohorts:
+          type: array
+          items:
+            type: string
+        assignments:
+          type: integer
+        attempts:
+          type: integer
+        completedAttempts:
+          type: integer
+        safetyErrors:
+          type: integer
+        overdueAssignments:
+          type: integer
+        averageScore:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          nullable: true
+        lastActivityAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - assignments
+      - attempts
+      - averageScore
+      - cohorts
+      - completedAttempts
+      - email
+      - id
+      - lastActivityAt
+      - name
+      - overdueAssignments
+      - safetyErrors
+      - school
     LanguageEnum:
       enum:
       - en
@@ -5065,6 +5362,43 @@ components:
       - role
       - school
       - user
+    SchoolOverview:
+      type: object
+      description: Counts a school administrator needs before drilling into any single
+        list.
+      properties:
+        schools:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        membersByRole:
+          type: object
+          additionalProperties:
+            type: integer
+        pendingInvitations:
+          type: integer
+        expiredInvitations:
+          type: integer
+        suspendedMembers:
+          type: integer
+        cohorts:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        recentAudit:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+      required:
+      - cohorts
+      - expiredInvitations
+      - membersByRole
+      - pendingInvitations
+      - recentAudit
+      - schools
+      - suspendedMembers
     SchoolSummary:
       type: object
       properties:

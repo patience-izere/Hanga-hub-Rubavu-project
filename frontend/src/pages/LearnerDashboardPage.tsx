@@ -1,10 +1,64 @@
 import { Link } from "react-router-dom";
 
+import type { Assignment } from "../api/learning";
 import { useCurrentUser } from "../auth/useAuth";
 import { QueryBoundary } from "../components/ui/QueryBoundary";
 import { StatusPill } from "../components/ui/StatusPill";
-import { assignmentStatusLabel } from "../learning/labels";
+import {
+  attemptsUsed,
+  dueRelative,
+  dueState,
+  formatDue,
+  groupAssignments,
+  hasAttemptsLeft,
+} from "../learning/progress";
 import { useAssignments } from "../learning/useAssignments";
+
+function AssignmentCard({ assignment }: { assignment: Assignment }) {
+  const state = dueState(assignment);
+  const used = attemptsUsed(assignment);
+  const inProgress = assignment.latest_attempt?.status === "in_progress";
+  const exhausted = !hasAttemptsLeft(assignment);
+
+  return (
+    <article className={`assignment-card${state === "overdue" ? " is-overdue" : ""}`}>
+      <div className="assignment-meta">
+        <span>{assignment.lesson.trade}</span>
+        <StatusPill status={assignment.latest_attempt?.status} />
+      </div>
+      <h3>{assignment.lesson.title}</h3>
+      <p>{assignment.lesson.summary}</p>
+
+      {assignment.due_at ? (
+        <p className={`assignment-due due-${state}`}>
+          <strong>{state === "overdue" ? "Overdue" : "Due"}</strong> {formatDue(assignment.due_at)}
+          <small>{dueRelative(assignment.due_at)}</small>
+        </p>
+      ) : null}
+
+      <dl>
+        <div>
+          <dt>Course</dt>
+          <dd>{assignment.lesson.course_title}</dd>
+        </div>
+        <div>
+          <dt>Duration</dt>
+          <dd>{assignment.lesson.estimated_minutes} minutes</dd>
+        </div>
+        <div>
+          <dt>Attempts</dt>
+          <dd>
+            {used}/{assignment.attempt_limit}
+          </dd>
+        </div>
+      </dl>
+
+      <Link className="button button-primary" to={`/assignments/${assignment.id}`}>
+        {inProgress ? "Continue lesson" : exhausted ? "Review lesson" : "Open lesson"}
+      </Link>
+    </article>
+  );
+}
 
 export function LearnerDashboardPage() {
   const user = useCurrentUser().data;
@@ -31,59 +85,49 @@ export function LearnerDashboardPage() {
           symbol: "⚙",
         }}
       >
-        {(items) => (
-          <div className="assignment-grid">
-            {items.map((assignment) => (
-              <article className="assignment-card" key={assignment.id}>
-                <div className="assignment-meta">
-                  <span>{assignment.lesson.trade}</span>
-                  <StatusPill status={assignment.latest_attempt?.status} />
-                </div>
-                <h2>{assignment.lesson.title}</h2>
-                <p>{assignment.lesson.summary}</p>
-                <dl>
+        {(items) => {
+          const resume = items.find(
+            (assignment) => assignment.latest_attempt?.status === "in_progress",
+          );
+
+          return (
+            <>
+              {resume ? (
+                <section className="resume-band">
                   <div>
-                    <dt>Course</dt>
-                    <dd>{assignment.lesson.course_title}</dd>
+                    <span className="eyebrow">Continue where you left off</span>
+                    <h2>{resume.lesson.title}</h2>
+                    <p>
+                      Attempt {resume.latest_attempt?.id} is saved.{" "}
+                      {resume.latest_attempt?.resume_state?.completedSteps?.length ?? 0} step(s)
+                      already evidenced.
+                    </p>
                   </div>
-                  <div>
-                    <dt>Duration</dt>
-                    <dd>{assignment.lesson.estimated_minutes} minutes</dd>
+                  <Link
+                    className="button button-primary"
+                    to={`/attempts/${resume.latest_attempt?.id}`}
+                  >
+                    Resume attempt
+                  </Link>
+                </section>
+              ) : null}
+
+              {groupAssignments(items).map((group) => (
+                <section className="assignment-group" key={group.key}>
+                  <div className="assignment-group-heading">
+                    <h2>{group.title}</h2>
+                    <p>{group.description}</p>
                   </div>
-                  <div>
-                    <dt>Competencies</dt>
-                    <dd>{assignment.lesson.competencies.length}</dd>
+                  <div className="assignment-grid">
+                    {group.assignments.map((assignment) => (
+                      <AssignmentCard key={assignment.id} assignment={assignment} />
+                    ))}
                   </div>
-                </dl>
-                <Link className="button button-primary" to={`/assignments/${assignment.id}`}>
-                  {assignment.latest_attempt?.status === "in_progress"
-                    ? "Continue lesson"
-                    : "Open lesson"}
-                </Link>
-                {(assignment.attempt_history ?? []).length ? (
-                  <details className="attempt-history">
-                    <summary>
-                      Attempt history ({assignment.attempt_history.length}/
-                      {assignment.attempt_limit})
-                    </summary>
-                    <ol>
-                      {assignment.attempt_history.map((attempt) => (
-                        <li key={attempt.id}>
-                          <Link to={`/attempts/${attempt.id}`}>
-                            {new Date(attempt.started_at).toLocaleDateString()} ·{" "}
-                            {attempt.score
-                              ? `${Number(attempt.score)}%`
-                              : assignmentStatusLabel(attempt.status)}
-                          </Link>
-                        </li>
-                      ))}
-                    </ol>
-                  </details>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        )}
+                </section>
+              ))}
+            </>
+          );
+        }}
       </QueryBoundary>
     </section>
   );

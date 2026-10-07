@@ -65,3 +65,44 @@ export async function acceptInvitation(
     body: JSON.stringify(details),
   });
 }
+
+export type AuditEvent = {
+  id: number;
+  eventType: string;
+  actorName: string;
+  schoolName: string;
+  targetType: string;
+  targetId: string;
+  payload: Record<string, unknown>;
+  occurredAt: string;
+};
+
+export type SchoolOverview = {
+  schools: Array<{ id: number; name: string; code: string }>;
+  membersByRole: Record<string, number>;
+  pendingInvitations: number;
+  expiredInvitations: number;
+  suspendedMembers: number;
+  cohorts: Array<{
+    id: number;
+    name: string;
+    code: string;
+    school: string;
+    learnerCount: number;
+  }>;
+  recentAudit: AuditEvent[];
+};
+
+export function getSchoolOverview(): Promise<SchoolOverview> {
+  return apiFetch<SchoolOverview>("/api/v1/school/overview/");
+}
+
+export function getSchoolAudit(filters: { eventType?: string } = {}) {
+  const query = filters.eventType ? `?eventType=${encodeURIComponent(filters.eventType)}` : "";
+  return apiFetch<{ events: AuditEvent[]; eventTypes: string[] }>(`/api/v1/school/audit/${query}`);
+}
+
+export async function revokeSchoolInvitation(id: number): Promise<SchoolInvitation> {
+  await ensureCsrf();
+  return apiFetch<SchoolInvitation>(`/api/v1/school/invitations/${id}/`, { method: "DELETE" });
+}

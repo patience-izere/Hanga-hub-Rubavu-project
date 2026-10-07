@@ -7,6 +7,8 @@ export type User = {
   organization: string;
   isStaff: boolean;
   roles: Array<"platform_admin" | "admin" | "instructor" | "learner" | "content_author">;
+  /** Language chosen at invitation time; used as the initial interface locale. */
+  preferredLanguage?: string;
 };
 
 type ApiErrorBody = {

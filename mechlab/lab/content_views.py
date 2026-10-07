@@ -56,10 +56,11 @@ class LessonTransitionView(APIView):
         review_notes = serializer.validated_data.get("reviewNotes", "").strip()
 
         with transaction.atomic():
+            # No select_related here: Course.school is nullable, so select_related("course__school")
+            # produces a left outer join and PostgreSQL refuses FOR UPDATE against its nullable
+            # side. The filter still scopes by school without joining School itself.
             lesson = (
                 Lesson.objects.select_for_update()
-                .select_related("course", "course__school")
-                .prefetch_related("prerequisites")
                 .filter(pk=pk, course__school_id__in=_content_school_ids(request.user))
                 .first()
             )
@@ -208,7 +209,11 @@ class ScenarioAuthoringViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
         with transaction.atomic():
-            scenario = self.get_queryset().select_for_update().get(pk=self.get_object().pk)
+            # Lock the row alone: get_queryset() left-outer-joins nullable relations
+            # (grading_policy, asset_package), and PostgreSQL refuses FOR UPDATE against
+            # the nullable side of an outer join. get_object() has already applied the
+            # school scoping and object permissions.
+            scenario = SimulationScenario.objects.select_for_update().get(pk=self.get_object().pk)
             school = scenario.lesson.course.school
             if not has_active_school_role(
                 request.user,
@@ -249,7 +254,11 @@ class ScenarioAuthoringViewSet(viewsets.ModelViewSet):
         transition = serializer.validated_data["action"]
         review_notes = serializer.validated_data.get("reviewNotes", "").strip()
         with transaction.atomic():
-            scenario = self.get_queryset().select_for_update().get(pk=self.get_object().pk)
+            # Lock the row alone: get_queryset() left-outer-joins nullable relations
+            # (grading_policy, asset_package), and PostgreSQL refuses FOR UPDATE against
+            # the nullable side of an outer join. get_object() has already applied the
+            # school scoping and object permissions.
+            scenario = SimulationScenario.objects.select_for_update().get(pk=self.get_object().pk)
             school = scenario.lesson.course.school
             is_admin = request.user.is_superuser or has_active_school_role(
                 request.user,

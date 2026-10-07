@@ -267,7 +267,9 @@ describe("App", () => {
     expect(
       await screen.findByRole("heading", { name: /workshop progress at a glance/i }),
     ).toBeVisible();
-    expect(await screen.findByText("Demo Learner")).toBeVisible();
+    // The attempt has a safety error, so it surfaces in the attention band as well as the table.
+    expect(await screen.findByRole("heading", { name: /1 attempt to look at/i })).toBeVisible();
+    expect(await screen.findAllByText("Demo Learner")).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Review evidence" })).toHaveAttribute(
       "href",
       "/teach/attempts/7",

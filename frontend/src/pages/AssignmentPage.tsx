@@ -8,6 +8,7 @@ import {
   useStartAssignment,
 } from "../learning/useAssignments";
 import { downloadAssignmentAssets, removeAssignmentAssets } from "../offline/outbox";
+import { attemptsUsed, dueRelative, dueState, formatDue } from "../learning/progress";
 
 export function AssignmentPage() {
   const assignmentId = Number(useParams().assignmentId);
@@ -59,6 +60,8 @@ export function AssignmentPage() {
   }
 
   const { lesson, latest_attempt: latestAttempt } = assignment.data;
+  const due = dueState(assignment.data);
+  const used = attemptsUsed(assignment.data);
   const offlineStale =
     offlineInstalled &&
     installedVersion !== null &&
@@ -109,6 +112,32 @@ export function AssignmentPage() {
           <span>minutes</span>
         </div>
       </div>
+
+      <div className="lesson-terms">
+        <div className={`lesson-term due-${due}`}>
+          <dt>{due === "overdue" ? "Overdue" : "Due"}</dt>
+          <dd>
+            {formatDue(assignment.data.due_at)}
+            {dueRelative(assignment.data.due_at) ? (
+              <small>{dueRelative(assignment.data.due_at)}</small>
+            ) : null}
+          </dd>
+        </div>
+        <div className="lesson-term">
+          <dt>Attempts</dt>
+          <dd>
+            {used} of {assignment.data.attempt_limit} used
+          </dd>
+        </div>
+      </div>
+
+      {assignment.data.instructions ? (
+        <article className="lesson-panel instructions-panel">
+          <h2>Instructions from your instructor</h2>
+          <p>{assignment.data.instructions}</p>
+        </article>
+      ) : null}
+
       <div className="lesson-content-grid">
         <article className="lesson-panel">
           <h2>Learning objectives</h2>
@@ -209,9 +238,17 @@ export function AssignmentPage() {
           </form>
         )}
       </article>
-      <article className="lesson-panel">
-        <span className="eyebrow">Low-connectivity preparation</span>
-        <h2>Download this practical lesson</h2>
+      {/* Device administration is collapsed by default: it sits between the learner and the
+          Start button, and most learners on a prepared workshop machine never need it. */}
+      <details className="lesson-panel offline-panel" open={offlineStale}>
+        <summary>
+          <span className="eyebrow">Low-connectivity preparation</span>
+          <span className="offline-summary-title">
+            Prepare this device for offline use
+            {offlineInstalled ? <span className="offline-badge">Downloaded</span> : null}
+            {offlineStale ? <span className="offline-badge is-stale">Update needed</span> : null}
+          </span>
+        </summary>
         <p>
           Save the app shell and available 3D assets on this device. Open the simulation once while
           online to also store its latest steps and evidence state.
@@ -294,7 +331,7 @@ export function AssignmentPage() {
         {storageAvailableMb !== null ? (
           <small>{storageAvailableMb} MB storage available</small>
         ) : null}
-      </article>
+      </details>
       <div className="lesson-launch">
         <div>
           <h2>

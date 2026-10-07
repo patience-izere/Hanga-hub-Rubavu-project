@@ -4,6 +4,8 @@ import {
   getInstructorAttempt,
   getInstructorAssignmentOptions,
   getInstructorOverview,
+  getInstructorRoster,
+  getInstructorLearner,
   createInstructorAssignments,
   overrideAttemptRecommendation,
   submitInstructorFeedback,
@@ -64,5 +66,20 @@ export function useCreateInstructorAssignments() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: instructorOverviewKey });
     },
+  });
+}
+
+export function useInstructorRoster() {
+  return useQuery({
+    queryKey: ["learning", "instructor", "roster"],
+    queryFn: getInstructorRoster,
+  });
+}
+
+export function useInstructorLearner(id: number) {
+  return useQuery({
+    queryKey: ["learning", "instructor", "learners", id],
+    queryFn: () => getInstructorLearner(id),
+    enabled: Number.isInteger(id) && id > 0,
   });
 }

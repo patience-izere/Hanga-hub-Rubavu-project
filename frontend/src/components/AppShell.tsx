@@ -6,6 +6,7 @@ import { authQueryKey, useSignOut } from "../auth/useAuth";
 import { roleCapabilities } from "../auth/useRoles";
 import { InstallAppButton } from "./InstallAppButton";
 import { useLocale } from "../i18n/LocaleProvider";
+import type { Locale } from "../i18n/messages";
 
 type AppShellProps = {
   user: User | null;
@@ -32,7 +33,7 @@ export function AppShell({ user }: AppShellProps) {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
-        Skip to main content
+        {t("shell.skipToContent")}
       </a>
       <header className="site-header">
         <Link className="brand" to="/" aria-label="OPedu home">
@@ -58,7 +59,7 @@ export function AppShell({ user }: AppShellProps) {
             {t("contact")}
           </Link>
           <Link className="public-nav-link nav-secondary" to="/support">
-            Support
+            {t("support")}
           </Link>
           {user ? (
             <Link className="nav-cta" to={roles.homePath}>
@@ -68,7 +69,7 @@ export function AppShell({ user }: AppShellProps) {
           <InstallAppButton />
           {user ? (
             <button className="button-link" onClick={handleLogout} disabled={logout.isPending}>
-              {logout.isPending ? "Signing out…" : t("signOut")}
+              {logout.isPending ? t("shell.signingOut") : t("signOut")}
             </button>
           ) : (
             <Link className="nav-cta" to="/login">
@@ -77,10 +78,7 @@ export function AppShell({ user }: AppShellProps) {
           )}
           <label className="locale-select">
             <span className="sr-only">{t("language")}</span>
-            <select
-              value={locale}
-              onChange={(event) => setLocale(event.target.value as "en" | "rw")}
-            >
+            <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
               <option value="en">EN</option>
               <option value="rw">RW</option>
             </select>

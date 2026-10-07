@@ -38,7 +38,9 @@ from .learning_serializers import (
     InstructorAttemptEvidenceSerializer,
     InstructorAttemptReviewSerializer,
     InstructorFeedbackSerializer,
+    InstructorLearnerDetailSerializer,
     InstructorOverviewSerializer,
+    InstructorRosterSerializer,
     KnowledgeCheckSubmissionSerializer,
     ProcedureStepSerializer,
     RecommendationOverrideSerializer,
@@ -354,11 +356,15 @@ class InstructorOverviewView(APIView):
                         "title": result.competency.title,
                         "attempts": 0,
                         "mastered": 0,
+                        "developing": 0,
+                        "notDemonstrated": 0,
                         "requiresReview": 0,
                     },
                 )
                 item["attempts"] += 1
                 item["mastered"] += int(result.mastery_state == "mastered")
+                item["developing"] += int(result.mastery_state == "developing")
+                item["notDemonstrated"] += int(result.mastery_state == "not_demonstrated")
                 item["requiresReview"] += int(result.mastery_state == "requires_review")
         now = timezone.now()
         return Response(
@@ -1526,3 +1532,252 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
                 payload={"evidencePreserved": True},
             )
         return Response({"attempt": AttemptDetailSerializer(attempt).data})
+
+
+class InstructorRosterView(APIView):
+    """Learner-centric view of the instructor's schools.
+
+    The overview endpoint is organised around attempts, which cannot answer "how is this
+    learner doing across the term". This aggregates the same school-scoped evidence per learner.
+    """
+
+    permission_classes = [IsInstructorOrSchoolAdmin]
+
+    @extend_schema(
+        operation_id="instructor_roster_list",
+        responses=InstructorRosterSerializer,
+    )
+    def get(self, request):
+        school_ids = _instructor_school_ids(request.user)
+        if not school_ids and not request.user.is_superuser:
+            raise PermissionDenied("An active instructor or school administrator role is required.")
+
+        memberships = (
+            SchoolMembership.objects.filter(
+                school_id__in=school_ids,
+                role=SchoolMembership.Role.LEARNER,
+                is_active=True,
+                user__is_active=True,
+            )
+            .select_related("user", "school")
+            .order_by("user__first_name", "user__last_name", "user__username")
+        )
+
+        assignments = Assignment.objects.filter(
+            learner__school_memberships__school_id__in=school_ids,
+            learner__school_memberships__is_active=True,
+        ).distinct()
+        attempts = list(_instructor_attempt_queryset(request.user))
+
+        now = timezone.now()
+        assignment_counts = {}
+        overdue_counts = {}
+        for assignment in assignments:
+            assignment_counts[assignment.learner_id] = (
+                assignment_counts.get(assignment.learner_id, 0) + 1
+            )
+            if assignment.due_at and assignment.due_at < now:
+                completed = any(
+                    attempt.assignment_id == assignment.pk
+                    and attempt.status == Attempt.Status.COMPLETED
+                    for attempt in attempts
+                )
+                if not completed:
+                    overdue_counts[assignment.learner_id] = (
+                        overdue_counts.get(assignment.learner_id, 0) + 1
+                    )
+
+        per_learner = {}
+        for attempt in attempts:
+            entry = per_learner.setdefault(
+                attempt.learner_id,
+                {"attempts": 0, "completed": 0, "safety": 0, "scores": [], "last": None},
+            )
+            entry["attempts"] += 1
+            entry["completed"] += int(attempt.status == Attempt.Status.COMPLETED)
+            entry["safety"] += sum(
+                event.event_type == "incorrect_action"
+                and event.payload.get("safetyCritical") is True
+                for event in attempt.events.all()
+            )
+            if attempt.score is not None:
+                entry["scores"].append(attempt.score)
+            if entry["last"] is None or attempt.updated_at > entry["last"]:
+                entry["last"] = attempt.updated_at
+
+        cohort_names = {}
+        for enrollment in Enrollment.objects.filter(
+            cohort__school_id__in=school_ids,
+            status=Enrollment.Status.ACTIVE,
+        ).select_related("cohort"):
+            cohort_names.setdefault(enrollment.learner_id, []).append(enrollment.cohort.name)
+
+        learners = []
+        for membership in memberships:
+            stats = per_learner.get(membership.user_id)
+            scores = stats["scores"] if stats else []
+            learners.append(
+                {
+                    "id": membership.user_id,
+                    "name": membership.user.get_full_name() or membership.user.get_username(),
+                    "email": membership.user.email,
+                    "school": membership.school.name,
+                    "cohorts": sorted(cohort_names.get(membership.user_id, [])),
+                    "assignments": assignment_counts.get(membership.user_id, 0),
+                    "attempts": stats["attempts"] if stats else 0,
+                    "completedAttempts": stats["completed"] if stats else 0,
+                    "safetyErrors": stats["safety"] if stats else 0,
+                    "overdueAssignments": overdue_counts.get(membership.user_id, 0),
+                    "averageScore": (sum(scores) / len(scores)) if scores else None,
+                    "lastActivityAt": stats["last"] if stats else None,
+                }
+            )
+        return Response({"learners": learners})
+
+
+class InstructorLearnerDetailView(APIView):
+    """One learner's assignments, attempts and competency profile.
+
+    Scoped exactly like the roster: a learner outside the caller's schools is a 404, never a
+    partial answer.
+    """
+
+    permission_classes = [IsInstructorOrSchoolAdmin]
+
+    @extend_schema(
+        operation_id="instructor_learner_retrieve",
+        responses=InstructorLearnerDetailSerializer,
+    )
+    def get(self, request, pk):
+        school_ids = _instructor_school_ids(request.user)
+        if not school_ids and not request.user.is_superuser:
+            raise PermissionDenied("An active instructor or school administrator role is required.")
+
+        membership = (
+            SchoolMembership.objects.filter(
+                user_id=pk,
+                school_id__in=school_ids,
+                role=SchoolMembership.Role.LEARNER,
+                is_active=True,
+                user__is_active=True,
+            )
+            .select_related("user", "school")
+            .first()
+        )
+        if membership is None:
+            return Response({"detail": "Learner not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        learner = membership.user
+        now = timezone.now()
+        attempts = [
+            attempt
+            for attempt in _instructor_attempt_queryset(request.user)
+            if attempt.learner_id == learner.pk
+        ]
+        attempts.sort(key=lambda attempt: attempt.updated_at, reverse=True)
+
+        attempts_by_assignment = {}
+        for attempt in attempts:
+            attempts_by_assignment.setdefault(attempt.assignment_id, []).append(attempt)
+
+        def safety_errors(attempt):
+            return sum(
+                event.event_type == "incorrect_action"
+                and event.payload.get("safetyCritical") is True
+                for event in attempt.events.all()
+            )
+
+        assignments = (
+            Assignment.objects.filter(learner=learner, lesson__course__school_id__in=school_ids)
+            .select_related("lesson", "lesson__course")
+            .order_by("due_at", "lesson__title")
+            .distinct()
+        )
+
+        assignment_rows = []
+        for assignment in assignments:
+            related = attempts_by_assignment.get(assignment.pk, [])
+            latest = related[0] if related else None
+            completed = any(attempt.status == Attempt.Status.COMPLETED for attempt in related)
+            assignment_rows.append(
+                {
+                    "id": assignment.pk,
+                    "lessonTitle": assignment.lesson.title,
+                    "courseTitle": assignment.lesson.course.title,
+                    "trade": assignment.lesson.course.trade,
+                    "dueAt": assignment.due_at,
+                    "availableAt": assignment.available_at,
+                    "attemptLimit": assignment.attempt_limit,
+                    "attemptsUsed": len(related),
+                    "isOverdue": bool(
+                        assignment.due_at and assignment.due_at < now and not completed
+                    ),
+                    "latestStatus": latest.status if latest else None,
+                    "latestScore": latest.score if latest else None,
+                }
+            )
+
+        competency_aggregation = {}
+        for attempt in attempts:
+            for result in attempt.competency_results.all():
+                item = competency_aggregation.setdefault(
+                    result.competency.code,
+                    {
+                        "code": result.competency.code,
+                        "title": result.competency.title,
+                        "masteryState": result.mastery_state,
+                        "masteryPercentage": str(result.mastery_percentage),
+                        "attempts": 0,
+                    },
+                )
+                item["attempts"] += 1
+                # Attempts are newest first, so the first result seen is the current state.
+
+        scores = [attempt.score for attempt in attempts if attempt.score is not None]
+        cohorts = sorted(
+            Enrollment.objects.filter(
+                learner=learner,
+                status=Enrollment.Status.ACTIVE,
+                cohort__school_id__in=school_ids,
+            ).values_list("cohort__name", flat=True)
+        )
+
+        return Response(
+            {
+                "learner": {
+                    "id": learner.pk,
+                    "name": learner.get_full_name() or learner.get_username(),
+                    "email": learner.email,
+                    "school": membership.school.name,
+                    "cohorts": cohorts,
+                    "assignments": len(assignment_rows),
+                    "attempts": len(attempts),
+                    "completedAttempts": sum(
+                        attempt.status == Attempt.Status.COMPLETED for attempt in attempts
+                    ),
+                    "safetyErrors": sum(safety_errors(attempt) for attempt in attempts),
+                    "overdueAssignments": sum(row["isOverdue"] for row in assignment_rows),
+                    "averageScore": (sum(scores) / len(scores)) if scores else None,
+                    "lastActivityAt": attempts[0].updated_at if attempts else None,
+                },
+                "assignments": assignment_rows,
+                "attempts": [
+                    {
+                        "id": attempt.pk,
+                        "lessonTitle": attempt.assignment.lesson.title,
+                        "status": attempt.status,
+                        "outcome": attempt.outcome,
+                        "score": attempt.score,
+                        "completedSteps": len(
+                            (attempt.resume_state or {}).get("completedSteps", [])
+                        ),
+                        "totalSteps": len(attempt.scenario.definition.get("steps", [])),
+                        "safetyErrors": safety_errors(attempt),
+                        "startedAt": attempt.started_at,
+                        "updatedAt": attempt.updated_at,
+                    }
+                    for attempt in attempts
+                ],
+                "competencies": list(competency_aggregation.values()),
+            }
+        )

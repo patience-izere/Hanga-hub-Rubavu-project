@@ -88,3 +88,34 @@ class SchoolInvitationAcceptSerializer(serializers.Serializer):
 
 class DetailSerializer(serializers.Serializer):
     detail = serializers.CharField()
+
+
+class AuditEventSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    eventType = serializers.CharField(source="event_type")
+    actorName = serializers.SerializerMethodField()
+    schoolName = serializers.SerializerMethodField()
+    targetType = serializers.CharField(source="target_type")
+    targetId = serializers.CharField(source="target_id")
+    payload = serializers.DictField()
+    occurredAt = serializers.DateTimeField(source="occurred_at")
+
+    def get_actorName(self, obj) -> str:
+        if obj.actor is None:
+            return "System"
+        return obj.actor.get_full_name() or obj.actor.get_username()
+
+    def get_schoolName(self, obj) -> str:
+        return obj.school.name if obj.school else ""
+
+
+class SchoolOverviewSerializer(serializers.Serializer):
+    """Counts a school administrator needs before drilling into any single list."""
+
+    schools = serializers.ListField(child=serializers.DictField())
+    membersByRole = serializers.DictField(child=serializers.IntegerField())
+    pendingInvitations = serializers.IntegerField()
+    expiredInvitations = serializers.IntegerField()
+    suspendedMembers = serializers.IntegerField()
+    cohorts = serializers.ListField(child=serializers.DictField())
+    recentAudit = AuditEventSerializer(many=True)

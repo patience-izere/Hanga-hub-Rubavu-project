@@ -17,6 +17,9 @@ from rest_framework.views import APIView
 
 from .audit import record_audit_event
 from .models import (
+    AuditEvent,
+    Cohort,
+    Enrollment,
     InstructorProfile,
     LearnerProfile,
     School,
@@ -25,6 +28,7 @@ from .models import (
 )
 from .permissions import IsSchoolAdmin
 from .school_serializers import (
+    AuditEventSerializer,
     DetailSerializer,
     SchoolInvitationAcceptSerializer,
     SchoolInvitationCreatedSerializer,
@@ -33,6 +37,7 @@ from .school_serializers import (
     SchoolInvitationSerializer,
     SchoolMemberSerializer,
     SchoolMemberUpdateSerializer,
+    SchoolOverviewSerializer,
 )
 
 
@@ -198,6 +203,37 @@ class SchoolInvitationListCreateView(APIView):
         )
 
 
+class SchoolInvitationDetailView(APIView):
+    """Revoke a pending invitation before it is accepted."""
+
+    permission_classes = [IsSchoolAdmin]
+
+    @extend_schema(responses=SchoolInvitationSerializer)
+    def delete(self, request, pk):
+        invitation = SchoolInvitation.objects.filter(
+            pk=pk, school_id__in=_admin_school_ids(request.user)
+        ).first()
+        if invitation is None:
+            return Response({"detail": "Invitation not found."}, status=status.HTTP_404_NOT_FOUND)
+        if invitation.accepted_at is not None:
+            # Revoking an accepted invitation would imply removing the membership it created,
+            # which is the member-deactivation path instead.
+            return Response(
+                {"detail": "This invitation was already accepted; suspend the member instead."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        invitation.is_active = False
+        invitation.save(update_fields=["is_active"])
+        record_audit_event(
+            event_type="membership.invitation_revoked",
+            actor=request.user,
+            school=invitation.school,
+            target=invitation,
+            payload={"email": invitation.email, "role": invitation.role},
+        )
+        return Response(SchoolInvitationSerializer(invitation).data)
+
+
 class SchoolInvitationAcceptView(APIView):
     permission_classes = [AllowAny]
 
@@ -272,3 +308,101 @@ class SchoolInvitationAcceptView(APIView):
             )
             login(request, user)
         return Response({"detail": "Invitation accepted."})
+
+
+class SchoolAuditView(APIView):
+    """Read-only governance trail for the administered schools.
+
+    Every membership, invitation, assignment, content and grading mutation already appends an
+    AuditEvent; until now those were reachable only through Django admin, which the person
+    accountable for governance may not have access to.
+    """
+
+    permission_classes = [IsSchoolAdmin]
+
+    @extend_schema(responses=AuditEventSerializer(many=True))
+    def get(self, request):
+        school_ids = _admin_school_ids(request.user)
+        events = AuditEvent.objects.filter(school_id__in=school_ids).select_related(
+            "actor", "school"
+        )
+
+        event_type = request.query_params.get("eventType", "").strip()
+        if event_type:
+            events = events.filter(event_type=event_type)
+        actor = request.query_params.get("actor", "").strip()
+        if actor:
+            events = events.filter(actor_id=actor)
+
+        try:
+            limit = min(int(request.query_params.get("limit", 100)), 500)
+        except ValueError:
+            limit = 100
+
+        page = list(events[:limit])
+        return Response(
+            {
+                "events": AuditEventSerializer(page, many=True).data,
+                "eventTypes": sorted(
+                    AuditEvent.objects.filter(school_id__in=school_ids)
+                    .values_list("event_type", flat=True)
+                    .distinct()
+                ),
+            }
+        )
+
+
+class SchoolOverviewView(APIView):
+    """Landing summary so an administrator is not sent to the instructor dashboard."""
+
+    permission_classes = [IsSchoolAdmin]
+
+    @extend_schema(responses=SchoolOverviewSerializer)
+    def get(self, request):
+        school_ids = _admin_school_ids(request.user)
+        now = timezone.now()
+
+        memberships = SchoolMembership.objects.filter(school_id__in=school_ids)
+        members_by_role = {}
+        suspended = 0
+        for membership in memberships:
+            if membership.is_active:
+                members_by_role[membership.role] = members_by_role.get(membership.role, 0) + 1
+            else:
+                suspended += 1
+
+        invitations = SchoolInvitation.objects.filter(school_id__in=school_ids, accepted_at=None)
+        pending = invitations.filter(is_active=True, expires_at__gt=now).count()
+        expired = invitations.filter(is_active=True, expires_at__lte=now).count()
+
+        cohorts = [
+            {
+                "id": cohort.pk,
+                "name": cohort.name,
+                "code": cohort.code,
+                "school": cohort.school.name,
+                "learnerCount": cohort.enrollments.filter(status=Enrollment.Status.ACTIVE).count(),
+            }
+            for cohort in Cohort.objects.filter(
+                school_id__in=school_ids, is_active=True
+            ).select_related("school")
+        ]
+
+        recent = AuditEvent.objects.filter(school_id__in=school_ids).select_related(
+            "actor", "school"
+        )[:10]
+
+        return Response(
+            {
+                "schools": [
+                    {"id": school.pk, "name": school.name, "code": school.code}
+                    for school in School.objects.filter(id__in=school_ids)
+                ],
+                "membersByRole": members_by_role,
+                "pendingInvitations": pending,
+                "expiredInvitations": expired,
+                "suspendedMembers": suspended,
+                "cohorts": cohorts,
+                "recentAudit": AuditEventSerializer(recent, many=True).data,
+            }
+        )

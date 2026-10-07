@@ -11,6 +11,7 @@ import type {
 import { detectCapabilities, recommendedRenderer, rendererAvailability } from "../ar/capabilities";
 import { BatteryWorkshopScene } from "../components/simulation/BatteryWorkshopScene";
 import { CameraArView } from "../components/simulation/CameraArView";
+import { AttemptResultBody } from "./AttemptResultPage";
 import { MarkerlessArView } from "../components/simulation/MarkerlessArView";
 import {
   useAttempt,
@@ -189,9 +190,6 @@ export function SimulationPage() {
   );
   const isReady =
     lesson.procedure_steps.length > 0 && completedCodes.length === lesson.procedure_steps.length;
-  const incorrectCount = attempt.events.filter(
-    (event) => event.event_type === "incorrect_action",
-  ).length;
   const isBusy = record.isPending || complete.isPending;
   const productionModelFile = attempt.assignment.scenario?.asset_package?.files.find(
     (file) =>
@@ -235,104 +233,11 @@ export function SimulationPage() {
   }
 
   if (attempt.status === "completed") {
+    // The result screen lives on its own route so it can be revisited; render its body here so
+    // finishing an attempt flows straight into the result without a redirect.
     return (
       <section className="result-page">
-        <div className="result-card">
-          <span className="result-kicker">Attempt complete</span>
-          <div className="result-score" aria-label={`Score ${attempt.score} percent`}>
-            <strong>{Number(attempt.score)}</strong>
-            <span>%</span>
-          </div>
-          <h1>{lesson.title}</h1>
-          <p>
-            You completed all {lesson.procedure_steps.length} procedure steps with {incorrectCount}{" "}
-            recorded incorrect {incorrectCount === 1 ? "action" : "actions"}.
-          </p>
-          <div className="result-evidence">
-            <div>
-              <strong>{completedCodes.length}</strong>
-              <span>steps evidenced</span>
-            </div>
-            <div>
-              <strong>{incorrectCount}</strong>
-              <span>actions to review</span>
-            </div>
-            <div>
-              <strong>{attempt.score === "100.00" ? "Mastered" : "Review"}</strong>
-              <span>recommendation</span>
-            </div>
-          </div>
-          <p className="result-note">
-            Scores are calculated by Django from the saved action sequence. Safety-order errors
-            carry a larger penalty.
-          </p>
-          {(attempt.competency_results ?? []).length > 0 ? (
-            <div className="result-feedback">
-              <strong>Competency evidence</strong>
-              <ul>
-                {attempt.competency_results.map((result) => (
-                  <li key={result.competency_code}>
-                    {result.competency_code}: {Number(result.mastery_percentage)}% ·{" "}
-                    {result.mastery_state.replaceAll("_", " ")}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          {(attempt.step_results ?? []).some(
-            (result) =>
-              result.outcome !== "passed" || result.hints_used > 0 || result.safety_violations > 0,
-          ) ? (
-            <div className="result-feedback">
-              <strong>Steps to review</strong>
-              <ul>
-                {attempt.step_results
-                  .filter(
-                    (result) =>
-                      result.outcome !== "passed" ||
-                      result.hints_used > 0 ||
-                      result.safety_violations > 0,
-                  )
-                  .map((result) => (
-                    <li key={result.step_code}>
-                      {result.step_code}: {result.outcome.replaceAll("_", " ")} ·{" "}
-                      {result.hints_used} hint(s) · {result.safety_violations} safety violation(s)
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          ) : null}
-          {attempt.recommendation && (
-            <div className="result-recommendation">
-              <strong>Recommended next action</strong>
-              <p>{attempt.recommendation.rationale}</p>
-              {attempt.recommendation.override_kind ? (
-                <p>
-                  Instructor decision: {attempt.recommendation.override_kind.replaceAll("_", " ")}.{" "}
-                  {attempt.recommendation.override_reason}
-                </p>
-              ) : null}
-              <small>Rule: {attempt.recommendation.rule_version}</small>
-            </div>
-          )}
-          {attempt.feedback.length > 0 && (
-            <div className="result-feedback">
-              <strong>Instructor feedback</strong>
-              {attempt.feedback.map((item) => (
-                <blockquote key={item.id}>{item.feedback}</blockquote>
-              ))}
-            </div>
-          )}
-          <Link className="button button-primary" to="/learn">
-            Return to my learning
-          </Link>
-          <Link
-            className="button button-secondary"
-            to={`/research/survey?scenarioVersion=${attempt.scenario_version}`}
-          >
-            Complete optional pilot evaluation
-          </Link>
-        </div>
+        <AttemptResultBody attempt={attempt} />
       </section>
     );
   }

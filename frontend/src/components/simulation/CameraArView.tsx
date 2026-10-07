@@ -1,6 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ProcedureStep, TelemetryEventInput } from "../../api/learning";
+import {
+  cameraErrorMessage,
+  describeCamera,
+  listCameras,
+  mediaDevicesSupported,
+  preferredCamera,
+  subscribeToCameraChanges,
+  type CameraDevice,
+} from "../../ar/cameras";
 
 type BarcodeResult = { rawValue: string };
 type BarcodeDetectorLike = {
@@ -34,6 +43,41 @@ export function CameraArView({
   const [manualAlignment, setManualAlignment] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workspaceConfirmed, setWorkspaceConfirmed] = useState(false);
+
+  const [cameras, setCameras] = useState<CameraDevice[]>([]);
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [scanning, setScanning] = useState(true);
+  const [starting, setStarting] = useState(false);
+
+  const supported = mediaDevicesSupported();
+
+  const refreshCameras = useCallback(async () => {
+    if (!supported) {
+      setScanning(false);
+      return [] as CameraDevice[];
+    }
+    setScanning(true);
+    const devices = await listCameras();
+    setCameras(devices);
+    setSelectedId((current) => {
+      // Keep the learner's choice if that camera is still attached.
+      if (current && devices.some((device) => device.deviceId === current)) return current;
+      return preferredCamera(devices)?.deviceId ?? "";
+    });
+    setScanning(false);
+    return devices;
+  }, [supported]);
+
+  // Initial scan, plus a live subscription so a USB camera attached after load is picked up
+  // without a reload.
+  useEffect(() => {
+    void refreshCameras();
+    return subscribeToCameraChanges(() => {
+      void refreshCameras().then((devices) => {
+        onTelemetry("ar_camera_devices_changed", { cameraCount: devices.length });
+      });
+    });
+  }, [refreshCameras, onTelemetry]);
 
   useEffect(() => {
     if (!active || !videoRef.current || !("BarcodeDetector" in window)) return;
@@ -82,13 +126,27 @@ export function CameraArView({
     [],
   );
 
-  async function startCamera() {
+  function releaseStream() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }
+
+  async function openStream(deviceId: string) {
+    // An exact deviceId honours the learner's pick; without one, ask for a rear camera so
+    // handheld devices do not open the selfie camera.
+    const video: MediaTrackConstraints = deviceId
+      ? { deviceId: { exact: deviceId }, width: { ideal: 1280 } }
+      : { facingMode: { ideal: "environment" }, width: { ideal: 1280 } };
+    return navigator.mediaDevices.getUserMedia({ video, audio: false });
+  }
+
+  async function startCamera(deviceId = selectedId) {
     setError(null);
+    setStarting(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
-        audio: false,
-      });
+      const stream = await openStream(deviceId);
+      releaseStream();
       streamRef.current = stream;
       stream.getVideoTracks().forEach((track) =>
         track.addEventListener(
@@ -98,6 +156,7 @@ export function CameraArView({
             setMarker(null);
             setError("The camera was interrupted. Re-enter AR or choose a fallback mode.");
             onTelemetry("ar_marker_lost", { reason: "camera-interrupted" });
+            void refreshCameras();
           },
           { once: true },
         ),
@@ -108,27 +167,43 @@ export function CameraArView({
       }
       setActive(true);
       sessionStartedAtRef.current = performance.now();
+
+      // Labels are withheld until permission is granted, so re-enumerate now that it is.
+      const devices = await refreshCameras();
+      const activeId = stream.getVideoTracks()[0]?.getSettings().deviceId ?? deviceId;
+      if (activeId) setSelectedId(activeId);
+      const activeCamera = devices.find((device) => device.deviceId === activeId);
+
       onTelemetry("ar_session_started", {
         mode: "camera-marker",
         markerDetector: "BarcodeDetector" in window,
+        cameraCount: devices.length,
+        cameraLabel: activeCamera?.label || null,
+        externalCamera: activeCamera?.isExternal ?? null,
       });
     } catch (cameraError) {
-      const denied = cameraError instanceof DOMException && cameraError.name === "NotAllowedError";
-      setError(
-        denied
-          ? "Camera permission was denied. Continue with desktop or accessible controls without losing progress."
-          : "The camera could not be started on this device. Choose another learning mode.",
-      );
-      onTelemetry(denied ? "ar_permission_denied" : "ar_fallback_used", {
-        reason: denied ? "permission-denied" : "camera-unavailable",
+      const { message, reason } = cameraErrorMessage(cameraError);
+      setError(message);
+      onTelemetry(reason === "permission-denied" ? "ar_permission_denied" : "ar_fallback_used", {
+        reason,
       });
+      // A failed start may itself reveal devices, and re-scanning keeps the picker honest.
+      void refreshCameras();
+    } finally {
+      setStarting(false);
     }
   }
 
+  /** Switch cameras without leaving AR — used when the rig camera is not the default. */
+  async function switchCamera(deviceId: string) {
+    setSelectedId(deviceId);
+    if (!active) return;
+    onTelemetry("ar_camera_switched", { deviceId: deviceId ? "selected" : "default" });
+    await startCamera(deviceId);
+  }
+
   function stopCamera() {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
+    releaseStream();
     setActive(false);
     setMarker(null);
     sessionStartedAtRef.current = null;
@@ -137,6 +212,11 @@ export function CameraArView({
   }
 
   const registered = Boolean(marker || manualAlignment);
+  const hasCamera = cameras.length > 0;
+  // Some browsers disclose no devices until permission is granted, so an empty list is only
+  // proof of absence once we have labels for something.
+  const listIsAuthoritative = cameras.some((device) => device.label !== "");
+
   return (
     <div className="camera-ar" aria-label="Camera augmented-reality workspace">
       <video ref={videoRef} muted playsInline aria-label="Live rear-camera view" />
@@ -144,6 +224,61 @@ export function CameraArView({
         <div className="camera-ar-start">
           <h2>Camera AR</h2>
           <p>Point the rear camera at the approved training rig or its printed QR marker.</p>
+
+          <div className="camera-detection" role="status" aria-live="polite">
+            {!supported ? (
+              <p className="camera-status is-warning">
+                This browser cannot access cameras. Choose desktop or accessible controls.
+              </p>
+            ) : scanning ? (
+              <p className="camera-status">Looking for connected cameras…</p>
+            ) : hasCamera ? (
+              <p className="camera-status is-ready">
+                {cameras.length === 1 ? "1 camera detected" : `${cameras.length} cameras detected`}
+              </p>
+            ) : (
+              <p className="camera-status is-warning">
+                No camera detected. Connect a USB camera — it is picked up automatically — or choose
+                Check again.
+              </p>
+            )}
+
+            {cameras.length > 1 ? (
+              <label className="camera-picker">
+                Camera
+                <select
+                  value={selectedId}
+                  onChange={(event) => void switchCamera(event.target.value)}
+                >
+                  {cameras.map((camera, index) => (
+                    <option key={camera.deviceId || index} value={camera.deviceId}>
+                      {describeCamera(camera, index)}
+                      {camera.isExternal ? " (external)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            {supported && !listIsAuthoritative ? (
+              <p className="camera-note">
+                Camera names appear after you grant permission. If the wrong camera opens, switch it
+                here once AR has started.
+              </p>
+            ) : null}
+
+            {supported ? (
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => void refreshCameras()}
+                disabled={scanning}
+              >
+                {scanning ? "Checking…" : "Check again"}
+              </button>
+            ) : null}
+          </div>
+
           <a href={`/markers/battery?value=${encodeURIComponent(expectedMarker)}`} target="_blank">
             Open printable training marker
           </a>
@@ -159,10 +294,10 @@ export function CameraArView({
           <button
             className="button button-primary"
             type="button"
-            onClick={startCamera}
-            disabled={!workspaceConfirmed}
+            onClick={() => void startCamera()}
+            disabled={!workspaceConfirmed || !supported || starting}
           >
-            Enable camera and enter AR
+            {starting ? "Starting camera…" : "Enable camera and enter AR"}
           </button>
           {error && <p role="alert">{error}</p>}
         </div>
@@ -181,6 +316,23 @@ export function CameraArView({
                 ? "The rig is registered. Use the independent action panel without ordered prompts."
                 : (currentStep?.instruction ?? "Submit the saved evidence when ready.")}
             </p>
+            {cameras.length > 1 ? (
+              <label className="camera-picker in-session">
+                <span className="sr-only">Active camera</span>
+                <select
+                  value={selectedId}
+                  onChange={(event) => void switchCamera(event.target.value)}
+                  disabled={starting}
+                >
+                  {cameras.map((camera, index) => (
+                    <option key={camera.deviceId || index} value={camera.deviceId}>
+                      {describeCamera(camera, index)}
+                      {camera.isExternal ? " (external)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             {!marker && (
               <button
                 className="button button-secondary"

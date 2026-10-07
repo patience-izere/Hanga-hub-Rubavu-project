@@ -4,7 +4,14 @@ export type RendererMode = "accessible_2d" | "desktop_3d" | "marker_ar" | "marke
 
 export type CapabilityProfile = {
   secureContext: boolean;
+  /** A real video input is attached — not merely that the browser exposes the camera API. */
   camera: boolean;
+  /** The browser exposes getUserMedia/enumerateDevices at all. */
+  cameraApi: boolean;
+  /** Video inputs the browser disclosed. Some browsers hide these until permission is granted. */
+  cameraCount: number;
+  /** At least one input looks like a USB or capture device rather than a built-in webcam. */
+  externalCamera: boolean;
   webgl: boolean;
   immersiveAr: boolean;
   hitTest: boolean;
@@ -272,6 +279,12 @@ export async function listAssignments(): Promise<Assignment[]> {
   return response.results;
 }
 
+/** The learner's own attempts, newest first. Server-scoped to the caller. */
+export async function listAttempts(): Promise<AttemptDetail[]> {
+  const response = await apiFetch<PaginatedResponse<AttemptDetail>>("/api/v1/attempts/");
+  return response.results;
+}
+
 export async function getAssignment(id: number): Promise<Assignment> {
   return apiFetch<Assignment>(`/api/v1/assignments/${id}/`);
 }
@@ -353,6 +366,8 @@ export type TelemetryEventInput = {
     | "ar_marker_mismatch"
     | "ar_tracking_recovered"
     | "ar_placement_confirmed"
+    | "ar_camera_devices_changed"
+    | "ar_camera_switched"
     | "ar_fallback_used"
     | "asset_load_completed"
     | "asset_load_failed"

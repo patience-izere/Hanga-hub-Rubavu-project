@@ -67,6 +67,11 @@ def _user_payload(request: HttpRequest) -> dict:
         "organization": membership.school.name if membership else "",
         "isStaff": user.is_staff,
         "roles": roles,
+        # Collected at invitation time; the interface uses it as the initial locale so a learner
+        # who chose Kinyarwanda does not have to switch on every device.
+        "preferredLanguage": getattr(
+            getattr(user, "learner_profile", None), "preferred_language", ""
+        ),
     }
 
 

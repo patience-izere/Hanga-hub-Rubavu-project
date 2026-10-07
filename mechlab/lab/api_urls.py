@@ -14,16 +14,21 @@ from .learning_views import (
     InstructorAssignmentView,
     InstructorAttemptReviewView,
     InstructorEvidenceExportView,
+    InstructorLearnerDetailView,
     InstructorOverviewView,
+    InstructorRosterView,
     ResearchConsentPolicyView,
     ResearchSurveyView,
 )
 from .pilot_views import PilotStudyViewSet
 from .school_views import (
+    SchoolAuditView,
     SchoolInvitationAcceptView,
+    SchoolInvitationDetailView,
     SchoolInvitationListCreateView,
     SchoolMemberDetailView,
     SchoolMemberListView,
+    SchoolOverviewView,
 )
 
 router = DefaultRouter()
@@ -59,6 +64,12 @@ urlpatterns = [
         name="api-password-reset-confirm",
     ),
     path("instructor/overview/", InstructorOverviewView.as_view(), name="instructor-overview"),
+    path("instructor/learners/", InstructorRosterView.as_view(), name="instructor-roster"),
+    path(
+        "instructor/learners/<int:pk>/",
+        InstructorLearnerDetailView.as_view(),
+        name="instructor-learner-detail",
+    ),
     path(
         "research/consent-policy/",
         ResearchConsentPolicyView.as_view(),
@@ -80,12 +91,19 @@ urlpatterns = [
         LessonTransitionView.as_view(),
         name="content-lesson-transition",
     ),
+    path("school/overview/", SchoolOverviewView.as_view(), name="school-overview"),
+    path("school/audit/", SchoolAuditView.as_view(), name="school-audit"),
     path("school/members/", SchoolMemberListView.as_view(), name="school-member-list"),
     path("school/members/<int:pk>/", SchoolMemberDetailView.as_view(), name="school-member-detail"),
     path(
         "school/invitations/",
         SchoolInvitationListCreateView.as_view(),
         name="school-invitation-list",
+    ),
+    path(
+        "school/invitations/<int:pk>/",
+        SchoolInvitationDetailView.as_view(),
+        name="school-invitation-detail",
     ),
     path(
         "school/invitations/accept/<str:token>/",
