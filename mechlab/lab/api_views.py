@@ -17,7 +17,6 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
 from django.utils.encoding import force_bytes
@@ -26,6 +25,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
 from .audit import record_audit_event
+from .notifications import send_email_safely
 
 health_logger = logging.getLogger("opedu.health")
 client_error_logger = logging.getLogger("opedu.client_errors")
@@ -301,10 +301,11 @@ def password_reset_request(request: HttpRequest) -> JsonResponse:
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}"
-        send_mail(
+        # The answer is identical whether or not delivery works, so the endpoint never reveals
+        # which addresses have accounts.
+        send_email_safely(
             "Reset your OPedu password",
             f"Use this link to reset your OPedu password: {reset_url}",
-            settings.DEFAULT_FROM_EMAIL,
             [user.email],
         )
     return JsonResponse(

@@ -71,6 +71,7 @@ class SchoolInvitationCreateSerializer(serializers.Serializer):
 class SchoolInvitationCreatedSerializer(serializers.Serializer):
     invitation = SchoolInvitationSerializer()
     acceptUrl = serializers.URLField()
+    emailSent = serializers.BooleanField()
 
 
 class SchoolInvitationPreviewSerializer(serializers.Serializer):

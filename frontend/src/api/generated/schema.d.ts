@@ -2550,6 +2550,7 @@ export interface components {
             invitation: components["schemas"]["SchoolInvitation"];
             /** Format: uri */
             acceptUrl: string;
+            emailSent: boolean;
         };
         SchoolInvitationPreview: {
             schoolName: string;

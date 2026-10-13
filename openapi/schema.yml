@@ -6464,8 +6464,11 @@ components:
         acceptUrl:
           type: string
           format: uri
+        emailSent:
+          type: boolean
       required:
       - acceptUrl
+      - emailSent
       - invitation
     SchoolInvitationPreview:
       type: object

@@ -246,9 +246,20 @@ CSRF_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+EMAIL_HOST = os.environ.get("DJANGO_EMAIL_HOST", "").strip()
+EMAIL_PORT = int(os.environ.get("DJANGO_EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("DJANGO_EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("DJANGO_EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("DJANGO_EMAIL_USE_TLS", EMAIL_PORT == 587)
+EMAIL_USE_SSL = env_bool("DJANGO_EMAIL_USE_SSL", EMAIL_PORT == 465)
+EMAIL_TIMEOUT = int(os.environ.get("DJANGO_EMAIL_TIMEOUT", "10"))
+# SMTP when a mail host is configured; the console backend is for local development only and is
+# flagged by `manage.py check --deploy` (opedu.W001).
 EMAIL_BACKEND = os.environ.get(
     "DJANGO_EMAIL_BACKEND",
-    "django.core.mail.backends.console.EmailBackend",
+    "django.core.mail.backends.smtp.EmailBackend"
+    if EMAIL_HOST
+    else "django.core.mail.backends.console.EmailBackend",
 )
 DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "no-reply@opedu.local")
 LRS_ENDPOINT = os.environ.get("OPEDU_LRS_ENDPOINT", "").strip()
@@ -283,8 +294,15 @@ LOGGING = {
             "level": "ERROR",
             "propagate": False,
         },
+        "opedu.email": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        # Unhandled exceptions: Django only prints these itself when DEBUG is on, so production
+        # 500s would otherwise leave no trace.
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
     },
 }
+
+# Serve /static/ (Django admin styles) from the ASGI app when no web server does it.
+SERVE_STATIC = env_bool("OPEDU_SERVE_STATIC", True)
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

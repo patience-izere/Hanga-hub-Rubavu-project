@@ -8,6 +8,7 @@ from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
@@ -3494,3 +3495,58 @@ class ResearchConsentTests(TestCase):
         response = self.client.options(f"/api/v1/research/pilots/{study.pk}/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.client.get("/api/v1/research/pilots/options/").status_code, 200)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class OperationsTests(TestCase):
+    """Delivery failures degrade gracefully and scheduled jobs run."""
+
+    setUp = LearningApiTests.setUp
+
+    def test_invitation_survives_a_mail_outage_and_tells_the_admin(self):
+        self.client.force_login(self.school_admin)
+        with mock.patch("lab.notifications.send_mail", side_effect=OSError("SMTP down")):
+            with self.assertLogs("opedu.email", level="ERROR"):
+                response = self.client.post(
+                    "/api/v1/school/invitations/",
+                    {"email": "late@example.com", "role": SchoolMembership.Role.LEARNER},
+                    content_type="application/json",
+                )
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertFalse(response.json()["emailSent"])
+        self.assertIn("/join/", response.json()["acceptUrl"])
+        invitation = SchoolInvitation.objects.get(email="late@example.com")
+        audit = AuditEvent.objects.get(event_type="membership.invitation_created")
+        self.assertEqual(audit.target_id, str(invitation.pk))
+        self.assertNotIn("late@example.com", json.dumps(audit.payload))
+
+        delivered = self.client.post(
+            "/api/v1/school/invitations/",
+            {"email": "on-time@example.com", "role": SchoolMembership.Role.LEARNER},
+            content_type="application/json",
+        )
+        self.assertTrue(delivered.json()["emailSent"])
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_password_reset_answers_the_same_whether_or_not_mail_works(self):
+        self.learner.email = "learner@example.com"
+        self.learner.save(update_fields=["email"])
+        client = Client()
+        answers = []
+        with mock.patch("lab.notifications.send_mail", side_effect=OSError("SMTP down")):
+            with self.assertLogs("opedu.email", level="ERROR"):
+                for email in ["learner@example.com", "nobody@example.com"]:
+                    response = client.post(
+                        "/api/v1/auth/password/reset/",
+                        {"email": email},
+                        content_type="application/json",
+                    )
+                    answers.append((response.status_code, response.json()))
+        self.assertEqual(answers[0], answers[1])
+        self.assertEqual(answers[0][0], 200)
+
+    def test_scheduled_jobs_run_and_report(self):
+        output = StringIO()
+        call_command("run_scheduled_jobs", stdout=output)
+        self.assertIn("LRS delivery is disabled", output.getvalue())
+        self.assertIn("consent receipt(s)", output.getvalue())

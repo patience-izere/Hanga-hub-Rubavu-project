@@ -43,7 +43,8 @@ jobs:
           --health-retries 10
     strategy:
       matrix:
-        python-version: [3.11]
+        # Matches the production image (mechlab/Dockerfile).
+        python-version: ["3.13"]
 
     steps:
       - name: Checkout
@@ -101,6 +102,7 @@ jobs:
           OPEDU_OBJECT_STORAGE_REGION: "eu-west-1"
           OPEDU_OBJECT_STORAGE_ACCESS_KEY: "ci-key"
           OPEDU_OBJECT_STORAGE_SECRET_KEY: "ci-secret"
+          DJANGO_EMAIL_HOST: "smtp.opedu.example"
         run: |
           python manage.py check --deploy --fail-level WARNING
           python manage.py shell -c "from django.core.files.storage import storages; storage=storages['default']; assert type(storage).__module__ == 'storages.backends.s3'; assert storage.bucket_name == 'opedu-ci-private-media'; assert storage.querystring_auth is True; assert storage.file_overwrite is False; assert storage.object_parameters['ServerSideEncryption'] == 'AES256'"
@@ -115,6 +117,7 @@ jobs:
           python manage.py validate_event_contracts
           python manage.py deliver_xapi --limit 1
           python manage.py purge_expired_research --dry-run
+          python manage.py run_scheduled_jobs
 
       - name: Run tests
         # python -m keeps the repository root importable so tools/test_postgres.py is collected.

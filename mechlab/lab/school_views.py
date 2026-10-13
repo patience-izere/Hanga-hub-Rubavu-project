@@ -7,7 +7,6 @@ from django.contrib.auth import get_user_model, login
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -27,6 +26,7 @@ from .models import (
     SchoolInvitation,
     SchoolMembership,
 )
+from .notifications import send_email_safely
 from .permissions import IsSchoolAdmin
 from .school_serializers import (
     AuditEventSerializer,
@@ -180,39 +180,42 @@ class SchoolInvitationListCreateView(APIView):
                 {"detail": "This person already belongs to the school."},
                 status=status.HTTP_409_CONFLICT,
             )
-        SchoolInvitation.objects.filter(
-            school=school,
-            email__iexact=email,
-            is_active=True,
-            accepted_at__isnull=True,
-        ).update(is_active=False)
         raw_token = token_urlsafe(32)
-        invitation = SchoolInvitation.objects.create(
-            school=school,
-            email=email,
-            role=role,
-            token_hash=sha256(raw_token.encode()).hexdigest(),
-            created_by=request.user,
-            expires_at=timezone.now() + timedelta(days=7),
-        )
+        with transaction.atomic():
+            SchoolInvitation.objects.filter(
+                school=school,
+                email__iexact=email,
+                is_active=True,
+                accepted_at__isnull=True,
+            ).update(is_active=False)
+            invitation = SchoolInvitation.objects.create(
+                school=school,
+                email=email,
+                role=role,
+                token_hash=sha256(raw_token.encode()).hexdigest(),
+                created_by=request.user,
+                expires_at=timezone.now() + timedelta(days=7),
+            )
+            record_audit_event(
+                event_type="membership.invitation_created",
+                actor=request.user,
+                school=school,
+                target=invitation,
+                payload={"role": role},
+            )
         accept_url = f"{settings.FRONTEND_URL}/join/{raw_token}"
-        send_mail(
+        # The invitation stands even if mail fails: the administrator can share the link.
+        email_sent = send_email_safely(
             f"Join {school.name} on OPedu",
-            f"You were invited as {invitation.get_role_display()}. Accept within seven days: {accept_url}",
-            settings.DEFAULT_FROM_EMAIL,
+            f"You were invited as {invitation.get_role_display()}. "
+            f"Accept within seven days: {accept_url}",
             [email],
-        )
-        record_audit_event(
-            event_type="membership.invitation_created",
-            actor=request.user,
-            school=school,
-            target=invitation,
-            payload={"email": email, "role": role},
         )
         return Response(
             {
                 "invitation": SchoolInvitationSerializer(invitation).data,
                 "acceptUrl": accept_url,
+                "emailSent": email_sent,
             },
             status=status.HTTP_201_CREATED,
         )

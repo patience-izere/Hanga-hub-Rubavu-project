@@ -276,6 +276,18 @@ async function installFakeCamera(page: Page, mode: "available" | "denied") {
           }
           return stream;
         },
+        // Camera selection lists devices before asking for a stream.
+        enumerateDevices: async () => [
+          {
+            deviceId: "fake-back-camera",
+            groupId: "fake",
+            kind: "videoinput",
+            label: cameraMode === "denied" ? "" : "Back camera",
+            toJSON: () => ({}),
+          },
+        ],
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
       },
     });
     HTMLMediaElement.prototype.play = async () => undefined;
@@ -305,6 +317,8 @@ test("a downloaded lesson completes through a full outage and replays every acti
 
   await page.goto("/assignments/7");
   await expect(page.getByRole("heading", { name: assignment.lesson.title })).toBeVisible();
+  // Offline preparation is a collapsed panel so it does not sit between learners and Start.
+  await page.getByText("Prepare this device for offline use").click();
   await page.getByRole("button", { name: "Prepare for offline use" }).click();
   await expect(page.getByText("3 files saved for offline use.")).toBeVisible();
   await page.getByRole("link", { name: "Open simulation" }).click();
