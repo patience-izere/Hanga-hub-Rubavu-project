@@ -63,6 +63,14 @@ class PilotStudySerializer(serializers.ModelSerializer):
         return pilot_collection_errors(obj) if obj.status == PilotStudy.Status.FROZEN else []
 
     def validate(self, attrs):
+        if (
+            self.instance is not None
+            and "school" in attrs
+            and attrs["school"] != self.instance.school
+        ):
+            raise serializers.ValidationError(
+                {"school": "A pilot cannot move to another school. Create a new pilot instead."}
+            )
         school = attrs.get("school", self.instance.school if self.instance else None)
         scenario = attrs.get("scenario", self.instance.scenario if self.instance else None)
         cohort = attrs.get("cohort", self.instance.cohort if self.instance else None)

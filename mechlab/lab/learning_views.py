@@ -1,6 +1,7 @@
 import csv
 import hashlib
 import io
+import json
 import uuid
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
@@ -233,6 +234,14 @@ def _xapi_statements(attempt):
     return statements
 
 
+PROCEDURE_EVENT_TYPES = {"step_completed", "incorrect_action", "tolerance_failed", "hint_used"}
+MAX_ACTION_METADATA_BYTES = 16 * 1024
+
+
+def _has_procedure_evidence(attempt):
+    return attempt.events.filter(event_type__in=PROCEDURE_EVENT_TYPES).exists()
+
+
 def _procedure_progress(attempt):
     steps = attempt.scenario.definition.get("steps", [])
     completed_codes = {
@@ -300,30 +309,47 @@ def _instructor_attempt_queryset(user):
     school_ids = _instructor_school_ids(user)
     if not school_ids and not user.is_superuser:
         raise PermissionDenied("An active instructor or school administrator role is required.")
+    # Evidence belongs to the school that owns the lesson. Scoping by the learner's memberships
+    # leaked attempts to every other school the learner also belonged to.
     return (
-        Attempt.objects.filter(
-            learner__school_memberships__school_id__in=school_ids,
-            learner__school_memberships__is_active=True,
-        )
+        Attempt.objects.filter(assignment__lesson__course__school_id__in=school_ids)
         .select_related(
             "learner",
             "assignment",
             "assignment__lesson",
             "assignment__lesson__course",
+            "assignment__lesson__course__program",
+            "assignment__lesson__module",
             "scenario",
             "grading_policy",
         )
         .prefetch_related(
             "events",
             "step_results",
-            "competency_results",
+            "competency_results__competency",
             "feedback__author",
             "recommendations",
             "xapi_deliveries",
             "scenario__asset_package__files",
         )
-        .distinct()
     )
+
+
+def _attempt_school(attempt):
+    """The school whose evidence trail an attempt belongs to."""
+
+    return attempt.assignment.lesson.course.school
+
+
+def _active_learner_school_ids(user):
+    """Schools where the user may currently practise as a learner."""
+
+    return SchoolMembership.objects.filter(
+        user=user,
+        role=SchoolMembership.Role.LEARNER,
+        is_active=True,
+        school__is_active=True,
+    ).values("school_id")
 
 
 class InstructorOverviewView(APIView):
@@ -335,10 +361,7 @@ class InstructorOverviewView(APIView):
         if not school_ids and not request.user.is_superuser:
             raise PermissionDenied("An active instructor or school administrator role is required.")
 
-        assignments = Assignment.objects.filter(
-            learner__school_memberships__school_id__in=school_ids,
-            learner__school_memberships__is_active=True,
-        ).distinct()
+        assignments = Assignment.objects.filter(lesson__course__school_id__in=school_ids)
         attempts = list(_instructor_attempt_queryset(request.user).order_by("-updated_at"))
         operational_events = [event for attempt in attempts for event in attempt.events.all()]
         safety_errors = sum(
@@ -545,7 +568,7 @@ class InstructorAssignmentView(APIView):
                 lesson__status=Lesson.Status.PUBLISHED,
                 lesson__course__school_id__in=school_ids,
             )
-            .select_related("lesson")
+            .select_related("lesson", "lesson__course__school")
             .first()
         )
         if scenario is None:
@@ -601,14 +624,10 @@ class InstructorAssignmentView(APIView):
                 assignment_ids.append(assignment.pk)
                 created_count += int(created)
                 if created:
-                    membership = request.user.school_memberships.filter(
-                        school_id__in=school_ids,
-                        is_active=True,
-                    ).first()
                     record_audit_event(
                         event_type="assignment.created",
                         actor=request.user,
-                        school=membership.school if membership else None,
+                        school=scenario.lesson.course.school,
                         target=assignment,
                         payload={"scenarioId": scenario.pk, "learnerId": learner_id},
                     )
@@ -714,13 +733,12 @@ class InstructorAttemptReviewView(APIView):
         serializer = InstructorFeedbackSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         feedback = serializer.save(attempt=attempt, author=request.user)
-        membership = request.user.school_memberships.filter(is_active=True).first()
         record_audit_event(
             event_type="assessment.feedback_published"
             if feedback.is_published
             else "assessment.feedback_saved",
             actor=request.user,
-            school=membership.school if membership else None,
+            school=_attempt_school(attempt),
             target=attempt,
             payload={"feedbackId": feedback.pk},
         )
@@ -749,11 +767,10 @@ class InstructorAttemptReviewView(APIView):
         recommendation.override_reason = serializer.validated_data["reason"]
         recommendation.overridden_by = request.user
         recommendation.save(update_fields=["override_kind", "override_reason", "overridden_by"])
-        membership = request.user.school_memberships.filter(is_active=True).first()
         record_audit_event(
             event_type="assessment.recommendation_overridden",
             actor=request.user,
-            school=membership.school if membership else None,
+            school=_attempt_school(attempt),
             target=attempt,
             payload={
                 "recommendationId": recommendation.pk,
@@ -902,6 +919,7 @@ class AssignmentViewSet(viewsets.ReadOnlyModelViewSet):
         return (
             Assignment.objects.filter(
                 learner=self.request.user,
+                lesson__course__school_id__in=_active_learner_school_ids(self.request.user),
                 lesson__status=Lesson.Status.PUBLISHED,
                 scenario__status=SimulationScenario.Status.PUBLISHED,
             )
@@ -965,11 +983,10 @@ class AssignmentViewSet(viewsets.ReadOnlyModelViewSet):
                         "gradingPolicyVersion": attempt.grading_policy.version,
                     },
                 )
-                membership = request.user.school_memberships.filter(is_active=True).first()
                 record_audit_event(
                     event_type="assessment.attempt_started",
                     actor=request.user,
-                    school=membership.school if membership else None,
+                    school=assignment.lesson.course.school,
                     target=attempt,
                     payload={
                         "assignmentId": assignment.pk,
@@ -1024,7 +1041,12 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return (
-            Attempt.objects.filter(learner=self.request.user)
+            Attempt.objects.filter(
+                learner=self.request.user,
+                assignment__lesson__course__school_id__in=_active_learner_school_ids(
+                    self.request.user
+                ),
+            )
             .select_related(
                 "assignment",
                 "assignment__lesson",
@@ -1052,10 +1074,22 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
             attempt = self.get_queryset().select_for_update().get(pk=self.get_object().pk)
+            if attempt.status != Attempt.Status.IN_PROGRESS:
+                return Response(
+                    {"detail": "This attempt is no longer active."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            requested_mode = serializer.validated_data.get("learningMode", attempt.learning_mode)
+            if requested_mode != attempt.learning_mode and _has_procedure_evidence(attempt):
+                return Response(
+                    {
+                        "detail": "The learning mode cannot change after the first procedure "
+                        "action. Start a new attempt to switch between practice and assessment."
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
             attempt.renderer_mode = serializer.validated_data["mode"]
-            attempt.learning_mode = serializer.validated_data.get(
-                "learningMode", attempt.learning_mode
-            )
+            attempt.learning_mode = requested_mode
             attempt.capability_profile = serializer.validated_data.get("capabilityProfile", {})
             attempt.save(
                 update_fields=[
@@ -1085,6 +1119,11 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
         deduplicated = 0
         with transaction.atomic():
             attempt = self.get_queryset().select_for_update().get(pk=self.get_object().pk)
+            if attempt.status != Attempt.Status.IN_PROGRESS:
+                return Response(
+                    {"detail": "This attempt is no longer active."},
+                    status=status.HTTP_409_CONFLICT,
+                )
             events = serializer.validated_data["events"]
             existing_events = {
                 item.event_id: item
@@ -1113,11 +1152,10 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
                         client_occurred_at=item["occurredAt"],
                     )
                 )
-            membership = request.user.school_memberships.filter(is_active=True).first()
             record_audit_event(
                 event_type="evidence.batch_ingested",
                 actor=request.user,
-                school=membership.school if membership else None,
+                school=_attempt_school(attempt),
                 target=attempt,
                 payload={
                     "received": len(events),
@@ -1154,11 +1192,10 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
             passed=not missing_ids and values["pendingCount"] == 0,
             client_created_at=values["clientCreatedAt"],
         )
-        membership = request.user.school_memberships.filter(is_active=True).first()
         record_audit_event(
             event_type="evidence.sync_reconciled",
             actor=request.user,
-            school=membership.school if membership else None,
+            school=_attempt_school(attempt),
             target=attempt,
             payload={
                 "auditId": str(audit.audit_id),
@@ -1206,6 +1243,11 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
         if not isinstance(metadata, dict):
             return Response(
                 {"detail": "Metadata must be an object."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(json.dumps(metadata, default=str)) > MAX_ACTION_METADATA_BYTES:
+            return Response(
+                {"detail": "Action metadata must be smaller than 16 KB."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if event_id:
@@ -1487,11 +1529,10 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
                     defaults={"attempt": attempt, "statement": statement},
                 )
             _recommendation_for(attempt)
-            membership = request.user.school_memberships.filter(is_active=True).first()
             record_audit_event(
                 event_type="assessment.attempt_completed",
                 actor=request.user,
-                school=membership.school if membership else None,
+                school=_attempt_school(attempt),
                 target=attempt,
                 payload={
                     "score": int(attempt.score),
@@ -1523,11 +1564,10 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
                     "evidencePreserved": True,
                 },
             )
-            membership = request.user.school_memberships.filter(is_active=True).first()
             record_audit_event(
                 event_type="assessment.attempt_abandoned",
                 actor=request.user,
-                school=membership.school if membership else None,
+                school=_attempt_school(attempt),
                 target=attempt,
                 payload={"evidencePreserved": True},
             )
@@ -1563,10 +1603,7 @@ class InstructorRosterView(APIView):
             .order_by("user__first_name", "user__last_name", "user__username")
         )
 
-        assignments = Assignment.objects.filter(
-            learner__school_memberships__school_id__in=school_ids,
-            learner__school_memberships__is_active=True,
-        ).distinct()
+        assignments = Assignment.objects.filter(lesson__course__school_id__in=school_ids)
         attempts = list(_instructor_attempt_queryset(request.user))
 
         now = timezone.now()
@@ -1669,12 +1706,11 @@ class InstructorLearnerDetailView(APIView):
 
         learner = membership.user
         now = timezone.now()
-        attempts = [
-            attempt
-            for attempt in _instructor_attempt_queryset(request.user)
-            if attempt.learner_id == learner.pk
-        ]
-        attempts.sort(key=lambda attempt: attempt.updated_at, reverse=True)
+        attempts = list(
+            _instructor_attempt_queryset(request.user)
+            .filter(learner_id=learner.pk)
+            .order_by("-updated_at")
+        )
 
         attempts_by_assignment = {}
         for attempt in attempts:

@@ -5,6 +5,7 @@ from secrets import token_urlsafe
 from django.conf import settings
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.db import transaction
@@ -52,6 +53,18 @@ def _admin_school_ids(user):
             school__is_active=True,
         ).values_list("school_id", flat=True)
     )
+
+
+def _end_sessions_for(user) -> int:
+    """Sign a person out everywhere once they have no school left to work in."""
+
+    ended = 0
+    user_id = str(user.pk)
+    for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator():
+        if session.get_decoded().get("_auth_user_id") == user_id:
+            session.delete()
+            ended += 1
+    return ended
 
 
 def _invitation_for_token(token: str, *, lock: bool = False):
@@ -113,14 +126,16 @@ class SchoolMemberDetailView(APIView):
                 )
         membership.is_active = is_active
         membership.save(update_fields=["is_active"])
-        should_activate_user = (
-            is_active
-            or membership.user.school_memberships.filter(is_active=True)
-            .exclude(pk=membership.pk)
-            .exists()
-        )
-        membership.user.is_active = should_activate_user
-        membership.user.save(update_fields=["is_active"])
+        # Suspension is school-scoped. The platform-wide account switch (User.is_active) belongs
+        # to platform administrators, so a school admin can neither lock out a superuser nor
+        # re-enable an account the platform disabled.
+        if (
+            not is_active
+            and not membership.user.school_memberships.filter(
+                is_active=True, school__is_active=True
+            ).exists()
+        ):
+            _end_sessions_for(membership.user)
         record_audit_event(
             event_type="membership.activation_changed",
             actor=request.user,

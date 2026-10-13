@@ -91,6 +91,20 @@ class ScenarioAuthoringSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         current = self.instance
+        lesson = attrs.get("lesson")
+        if current is not None and lesson is not None and lesson.pk != current.lesson_id:
+            raise serializers.ValidationError(
+                {
+                    "lesson": "A scenario cannot move to another lesson. Create a new scenario instead."
+                }
+            )
+        lesson = lesson or (current.lesson if current else None)
+        package = attrs.get("asset_package")
+        if lesson is not None and package is not None:
+            if package.course.school_id != lesson.course.school_id:
+                raise serializers.ValidationError(
+                    {"asset_package": "The asset package must belong to the lesson's school."}
+                )
         candidate = SimulationScenario(
             lesson=attrs.get("lesson", current.lesson if current else None),
             version=attrs.get("version", current.version if current else 1),
@@ -184,6 +198,13 @@ class AssetPackageAuthoringSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def validate_course(self, value):
+        if self.instance is not None and value.pk != self.instance.course_id:
+            raise serializers.ValidationError(
+                "An asset package cannot move to another course. Create a new package instead."
+            )
+        return value
 
     def create(self, validated_data):
         validated_data.setdefault("sha256", "0" * 64)

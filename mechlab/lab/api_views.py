@@ -51,7 +51,7 @@ def _user_payload(request: HttpRequest) -> dict:
         .first()
     )
     roles = list(
-        user.school_memberships.filter(is_active=True)
+        user.school_memberships.filter(is_active=True, school__is_active=True)
         .order_by("role")
         .values_list("role", flat=True)
         .distinct()
@@ -221,10 +221,34 @@ def login_api(request: HttpRequest) -> JsonResponse:
     username = email_user.get_username() if email_user is not None else identifier
     user = authenticate(request, username=username, password=password)
     if user is None:
+        disabled_user = email_user or user_model.objects.filter(username=identifier).first()
+        if (
+            disabled_user is not None
+            and not disabled_user.is_active
+            and disabled_user.check_password(password)
+        ):
+            return JsonResponse(
+                {"detail": "This account is disabled.", "code": "account_disabled"},
+                status=403,
+            )
         cache.set(cache_key, failures + 1, timeout=settings.LOGIN_LOCKOUT_SECONDS)
         return JsonResponse({"detail": "Invalid email or password."}, status=401)
     if not user.is_active:
         return JsonResponse({"detail": "This account is disabled."}, status=403)
+    memberships = user.school_memberships.all()
+    if (
+        not user.is_staff
+        and memberships.exists()
+        and not memberships.filter(is_active=True, school__is_active=True).exists()
+    ):
+        cache.delete(cache_key)
+        return JsonResponse(
+            {
+                "detail": "Your school access is suspended. Contact your school administrator.",
+                "code": "membership_suspended",
+            },
+            status=403,
+        )
 
     login(request, user)
     cache.delete(cache_key)

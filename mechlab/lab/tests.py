@@ -2286,7 +2286,8 @@ class LearningApiTests(TestCase):
         membership.refresh_from_db()
         self.learner.refresh_from_db()
         self.assertFalse(membership.is_active)
-        self.assertFalse(self.learner.is_active)
+        # Suspension is school-scoped; the platform-wide account switch is left alone.
+        self.assertTrue(self.learner.is_active)
 
         own_membership = SchoolMembership.objects.get(school=self.school, user=self.school_admin)
         self.assertEqual(
@@ -2614,3 +2615,296 @@ class PilotWorkflowTests(TestCase):
         self.assertIsNotNone(report["learning"]["cohensDz"])
         self.assertEqual(len(report["learning"]["meanChange95Ci"]), 2)
         self.assertIsNotNone(report["acceptance"]["susAlpha"])
+
+
+class TenantIsolationTests(TestCase):
+    """Regression tests for evidence, membership and content scoping across schools."""
+
+    setUp = LearningApiTests.setUp
+
+    def setUp_second_school(self):
+        self.school_b = School.objects.create(name="Gisenyi Test School", code="gisenyi-test")
+        self.instructor_b = User.objects.create_user("instructor-b@example.com", password="pw-123")
+        SchoolMembership.objects.create(
+            school=self.school_b, user=self.instructor_b, role=SchoolMembership.Role.INSTRUCTOR
+        )
+
+    def start_attempt(self):
+        self.client.force_login(self.learner)
+        response = self.client.post(f"/api/v1/assignments/{self.assignment.pk}/start/")
+        self.assertIn(response.status_code, {200, 201}, response.content)
+        return response.json()["attempt"]["id"]
+
+    def act(self, attempt_id, action):
+        return self.client.post(
+            f"/api/v1/attempts/{attempt_id}/actions/",
+            {"action": action, "metadata": {}},
+            content_type="application/json",
+        )
+
+    def complete_attempt(self):
+        attempt_id = self.start_attempt()
+        self.assertEqual(self.act(attempt_id, "confirm_ppe").status_code, 200)
+        self.assertEqual(self.act(attempt_id, "set_meter_dc").status_code, 200)
+        completed = self.client.post(f"/api/v1/attempts/{attempt_id}/complete/")
+        self.assertEqual(completed.status_code, 200, completed.content)
+        return attempt_id
+
+    def test_multi_school_learner_does_not_leak_evidence_to_their_other_school(self):
+        self.setUp_second_school()
+        SchoolMembership.objects.create(
+            school=self.school_b, user=self.learner, role=SchoolMembership.Role.CONTENT_AUTHOR
+        )
+        attempt_id = self.start_attempt()
+
+        self.client.force_login(self.instructor_b)
+        overview = self.client.get("/api/v1/instructor/overview/").json()
+        self.assertEqual(overview["metrics"]["attempts"], 0)
+        self.assertEqual(overview["attempts"], [])
+        review_url = f"/api/v1/instructor/attempts/{attempt_id}/"
+        self.assertEqual(self.client.get(review_url).status_code, 404)
+        feedback = self.client.post(
+            review_url,
+            {"feedback": "Planted from another school", "is_published": True},
+            content_type="application/json",
+        )
+        self.assertEqual(feedback.status_code, 404)
+        csv_rows = self.client.get("/api/v1/instructor/evidence.csv").content.decode().splitlines()
+        self.assertEqual(len(csv_rows), 1)
+
+        self.client.force_login(self.instructor)
+        self.assertEqual(self.client.get(review_url).status_code, 200)
+        overview = self.client.get("/api/v1/instructor/overview/").json()
+        self.assertEqual(overview["metrics"]["attempts"], 1)
+
+    def test_suspended_learner_loses_access_to_that_schools_work(self):
+        attempt_id = self.start_attempt()
+        SchoolMembership.objects.filter(user=self.learner, school=self.school).update(
+            is_active=False
+        )
+        self.client.force_login(self.learner)
+        self.assertEqual(self.client.get("/api/v1/assignments/").json()["count"], 0)
+        start = self.client.post(f"/api/v1/assignments/{self.assignment.pk}/start/")
+        self.assertEqual(start.status_code, 404)
+        self.assertEqual(self.act(attempt_id, "confirm_ppe").status_code, 404)
+
+        SchoolMembership.objects.filter(user=self.learner, school=self.school).update(
+            is_active=True
+        )
+        self.school.is_active = False
+        self.school.save(update_fields=["is_active"])
+        self.assertEqual(self.client.get("/api/v1/assignments/").json()["count"], 0)
+
+    def test_school_suspension_keeps_the_platform_account_switch_untouched(self):
+        superuser = User.objects.create_superuser(
+            "platform@example.com", "platform@example.com", "pw-123"
+        )
+        superuser_membership = SchoolMembership.objects.create(
+            school=self.school, user=superuser, role=SchoolMembership.Role.LEARNER
+        )
+        learner_membership = SchoolMembership.objects.get(user=self.learner, school=self.school)
+        learner_client = Client()
+        learner_client.force_login(self.learner)
+
+        self.client.force_login(self.school_admin)
+        for membership in [superuser_membership, learner_membership]:
+            response = self.client.patch(
+                f"/api/v1/school/members/{membership.pk}/",
+                {"isActive": False},
+                content_type="application/json",
+            )
+            self.assertEqual(response.status_code, 200, response.content)
+
+        superuser.refresh_from_db()
+        self.learner.refresh_from_db()
+        self.assertTrue(superuser.is_active)
+        self.assertTrue(self.learner.is_active)
+        # The suspended learner's existing session ends and sign-in explains why.
+        self.assertEqual(learner_client.get("/api/v1/auth/me/").status_code, 401)
+        login = Client().post(
+            "/api/v1/auth/login/",
+            {"email": "learner@example.com", "password": "password-123"},
+            content_type="application/json",
+        )
+        self.assertEqual(login.status_code, 403)
+        self.assertEqual(login.json()["code"], "membership_suspended")
+
+    def test_attempt_evidence_is_locked_once_the_attempt_ends(self):
+        attempt_id = self.complete_attempt()
+        renderer = self.client.post(
+            f"/api/v1/attempts/{attempt_id}/renderer/",
+            {"mode": "accessible_2d", "learningMode": "independent"},
+            content_type="application/json",
+        )
+        self.assertEqual(renderer.status_code, 409)
+        batch = self.client.post(
+            f"/api/v1/attempts/{attempt_id}/events/batch/",
+            {
+                "events": [
+                    {
+                        "eventId": str(uuid.uuid4()),
+                        "eventType": "performance_sample",
+                        "rendererMode": "desktop_3d",
+                        "occurredAt": timezone.now().isoformat(),
+                        "payload": {"framesPerSecond": 60},
+                    }
+                ]
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(batch.status_code, 409)
+        self.assertEqual(Attempt.objects.get(pk=attempt_id).learning_mode, "guided")
+
+    def test_learning_mode_cannot_change_after_the_first_action(self):
+        attempt_id = self.start_attempt()
+        self.assertEqual(self.act(attempt_id, "confirm_ppe").status_code, 200)
+        switched = self.client.post(
+            f"/api/v1/attempts/{attempt_id}/renderer/",
+            {"mode": "desktop_3d", "learningMode": "independent"},
+            content_type="application/json",
+        )
+        self.assertEqual(switched.status_code, 409)
+        same_mode = self.client.post(
+            f"/api/v1/attempts/{attempt_id}/renderer/",
+            {"mode": "accessible_2d", "learningMode": "guided"},
+            content_type="application/json",
+        )
+        self.assertEqual(same_mode.status_code, 200)
+
+    def test_client_supplied_json_is_bounded_and_validated(self):
+        attempt_id = self.start_attempt()
+        oversized = self.client.post(
+            f"/api/v1/attempts/{attempt_id}/events/batch/",
+            {
+                "events": [
+                    {
+                        "eventId": str(uuid.uuid4()),
+                        "eventType": "performance_sample",
+                        "rendererMode": "desktop_3d",
+                        "occurredAt": timezone.now().isoformat(),
+                        "payload": {"blob": "x" * 20000},
+                    }
+                ]
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(oversized.status_code, 400)
+        big_action = self.client.post(
+            f"/api/v1/attempts/{attempt_id}/actions/",
+            {"action": "confirm_ppe", "metadata": {"blob": "x" * 20000}},
+            content_type="application/json",
+        )
+        self.assertEqual(big_action.status_code, 400)
+        malformed = self.client.post(
+            f"/api/v1/assignments/{self.assignment.pk}/knowledge-check/",
+            {"answers": "nope"},
+            content_type="application/json",
+        )
+        self.assertEqual(malformed.status_code, 400)
+
+    def test_audit_events_belong_to_the_school_that_owns_the_attempt(self):
+        self.setUp_second_school()
+        # The learner's first membership is in school B, which used to receive the audit trail.
+        SchoolMembership.objects.filter(user=self.learner).delete()
+        SchoolMembership.objects.create(
+            school=self.school_b, user=self.learner, role=SchoolMembership.Role.LEARNER
+        )
+        SchoolMembership.objects.create(
+            school=self.school, user=self.learner, role=SchoolMembership.Role.LEARNER
+        )
+        attempt_id = self.complete_attempt()
+        events = AuditEvent.objects.filter(target_type="lab.attempt", target_id=str(attempt_id))
+        self.assertTrue(events.exists())
+        self.assertEqual(set(events.values_list("school_id", flat=True)), {self.school.pk})
+
+    def test_request_logs_do_not_contain_url_tokens(self):
+        with self.assertLogs("opedu.requests", level="INFO") as logs:
+            self.client.get("/api/v1/school/invitations/accept/secret-invitation-token-123456/")
+        self.assertTrue(logs.output)
+        self.assertNotIn("secret-invitation-token-123456", "\n".join(logs.output))
+
+
+class ContentTenantTests(TestCase):
+    def setUp(self):
+        self.school = School.objects.create(name="Author School", code="author-school")
+        self.other_school = School.objects.create(name="Other School", code="other-school")
+        self.author = User.objects.create_user("author@example.com", password="pw-123")
+        self.second_author = User.objects.create_user("author-2@example.com", password="pw-123")
+        for user in [self.author, self.second_author]:
+            SchoolMembership.objects.create(
+                school=self.school, user=user, role=SchoolMembership.Role.CONTENT_AUTHOR
+            )
+        self.course = Course.objects.create(
+            school=self.school, title="Electrical", slug="electrical", trade="Electrical"
+        )
+        self.other_course = Course.objects.create(
+            school=self.other_school, title="Other", slug="other", trade="Other"
+        )
+        self.lesson = Lesson.objects.create(
+            course=self.course, title="Wiring", slug="wiring", summary="Wire a circuit."
+        )
+        self.other_lesson = Lesson.objects.create(
+            course=self.other_course, title="Other", slug="other", summary="Other school."
+        )
+        ProcedureStep.objects.create(
+            lesson=self.lesson,
+            order=1,
+            code="isolate",
+            title="Isolate the supply",
+            instruction="Switch off and lock out the supply.",
+            action_code="isolate_supply",
+            safety_critical=True,
+        )
+        policy = GradingPolicy.objects.create(
+            code="wiring", version=1, name="Wiring", status=GradingPolicy.Status.PUBLISHED
+        )
+        self.scenario = SimulationScenario.objects.create(
+            lesson=self.lesson,
+            version=1,
+            title="Wiring v1",
+            definition=build_scenario_definition(self.lesson),
+            grading_policy=policy,
+            authored_by=self.author,
+        )
+        self.package = AssetPackage.objects.create(
+            course=self.course, code="wiring", version=1, name="Wiring", sha256="0" * 64
+        )
+
+    def test_drafts_cannot_move_into_another_school(self):
+        self.client.force_login(self.author)
+        moved = self.client.patch(
+            f"/api/v1/content/scenarios/{self.scenario.pk}/",
+            {"lesson": self.other_lesson.pk},
+            content_type="application/json",
+        )
+        self.assertEqual(moved.status_code, 400)
+        self.scenario.refresh_from_db()
+        self.assertEqual(self.scenario.lesson, self.lesson)
+        moved_package = self.client.patch(
+            f"/api/v1/content/asset-packages/{self.package.pk}/",
+            {"course": self.other_course.pk},
+            content_type="application/json",
+        )
+        self.assertEqual(moved_package.status_code, 400)
+        self.package.refresh_from_db()
+        self.assertEqual(self.package.course, self.course)
+
+    def test_only_the_author_or_an_admin_may_change_a_draft(self):
+        self.client.force_login(self.second_author)
+        edited = self.client.patch(
+            f"/api/v1/content/scenarios/{self.scenario.pk}/",
+            {"title": "Hijacked"},
+            content_type="application/json",
+        )
+        self.assertEqual(edited.status_code, 403)
+        deleted = self.client.delete(f"/api/v1/content/scenarios/{self.scenario.pk}/")
+        self.assertEqual(deleted.status_code, 403)
+
+        self.client.force_login(self.author)
+        renamed = self.client.patch(
+            f"/api/v1/content/scenarios/{self.scenario.pk}/",
+            {"title": "Wiring practice"},
+            content_type="application/json",
+        )
+        self.assertEqual(renamed.status_code, 200, renamed.content)
+        self.assertTrue(AuditEvent.objects.filter(event_type="content.scenario_updated").exists())

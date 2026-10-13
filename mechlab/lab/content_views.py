@@ -42,6 +42,23 @@ def _content_school_ids(user):
     )
 
 
+def _may_edit_draft(user, author_id, school):
+    """Drafts belong to their author; school administrators may step in."""
+
+    return (
+        author_id in {None, user.pk}
+        or user.is_superuser
+        or has_active_school_role(user, [SchoolMembership.Role.ADMIN], school=school)
+    )
+
+
+def _not_your_draft():
+    return Response(
+        {"detail": "Only this draft's author or a school administrator may change it."},
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
 class LessonTransitionView(APIView):
     permission_classes = [IsContentAuthorOrSchoolAdmin]
 
@@ -191,19 +208,44 @@ class ScenarioAuthoringViewSet(viewsets.ModelViewSet):
         )
 
     def update(self, request, *args, **kwargs):
-        if self.get_object().status != SimulationScenario.Status.DRAFT:
+        scenario = self.get_object()
+        if scenario.status != SimulationScenario.Status.DRAFT:
             return Response(
                 {"detail": "Published or retired scenario versions are immutable; clone a draft."},
                 status=status.HTTP_409_CONFLICT,
             )
-        return super().update(request, *args, **kwargs)
+        if not _may_edit_draft(
+            request.user, scenario.authored_by_id, scenario.lesson.course.school
+        ):
+            return _not_your_draft()
+        response = super().update(request, *args, **kwargs)
+        record_audit_event(
+            event_type="content.scenario_updated",
+            actor=request.user,
+            school=scenario.lesson.course.school,
+            target=scenario,
+            payload={"version": scenario.version, "fields": sorted(request.data.keys())},
+        )
+        return response
 
     def destroy(self, request, *args, **kwargs):
-        if self.get_object().status != SimulationScenario.Status.DRAFT:
+        scenario = self.get_object()
+        if scenario.status != SimulationScenario.Status.DRAFT:
             return Response(
                 {"detail": "Published or retired scenario versions cannot be deleted."},
                 status=status.HTTP_409_CONFLICT,
             )
+        if not _may_edit_draft(
+            request.user, scenario.authored_by_id, scenario.lesson.course.school
+        ):
+            return _not_your_draft()
+        record_audit_event(
+            event_type="content.scenario_deleted",
+            actor=request.user,
+            school=scenario.lesson.course.school,
+            target=scenario.lesson,
+            payload={"scenarioId": scenario.pk, "version": scenario.version},
+        )
         return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=["post"])
@@ -403,14 +445,30 @@ class AssetPackageAuthoringViewSet(viewsets.ModelViewSet):
         )
 
     def update(self, request, *args, **kwargs):
-        if self.get_object().status != AssetPackage.Status.DRAFT:
+        package = self.get_object()
+        if package.status != AssetPackage.Status.DRAFT:
             return self._conflict("Published asset packages are immutable.")
-        return super().update(request, *args, **kwargs)
+        response = super().update(request, *args, **kwargs)
+        record_audit_event(
+            event_type="content.asset_package_updated",
+            actor=request.user,
+            school=package.course.school,
+            target=package,
+            payload={"version": package.version, "fields": sorted(request.data.keys())},
+        )
+        return response
 
     def destroy(self, request, *args, **kwargs):
         package = self.get_object()
         if package.status != AssetPackage.Status.DRAFT:
             return self._conflict("Published asset packages cannot be deleted.")
+        record_audit_event(
+            event_type="content.asset_package_deleted",
+            actor=request.user,
+            school=package.course.school,
+            target=package.course,
+            payload={"packageId": package.pk, "code": package.code, "version": package.version},
+        )
         for asset in package.files.all():
             if not asset.path.startswith(("/", "http://", "https://")):
                 default_storage.delete(asset.path)
@@ -495,10 +553,18 @@ class AssetPackageAuthoringViewSet(viewsets.ModelViewSet):
         if asset is None:
             return Response({"detail": "Asset file not found."}, status=status.HTTP_404_NOT_FOUND)
         path = asset.path
+        sha256 = asset.sha256
         asset.delete()
         if not path.startswith(("/", "http://", "https://")):
             default_storage.delete(path)
         self._refresh_digest(package)
+        record_audit_event(
+            event_type="content.asset_removed",
+            actor=request.user,
+            school=package.course.school,
+            target=package,
+            payload={"path": path, "sha256": sha256},
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"])
@@ -531,6 +597,13 @@ class AssetPackageAuthoringViewSet(viewsets.ModelViewSet):
             return self._conflict("Only a published asset package can be retired.")
         package.status = AssetPackage.Status.RETIRED
         package.save()
+        record_audit_event(
+            event_type="content.asset_package_retired",
+            actor=request.user,
+            school=package.course.school,
+            target=package,
+            payload={"version": package.version},
+        )
         return Response(AssetPackageAuthoringSerializer(package).data)
 
     @staticmethod

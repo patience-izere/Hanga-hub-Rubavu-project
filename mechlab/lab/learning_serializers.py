@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 
 from django.conf import settings
@@ -24,6 +25,16 @@ from .models import (
     SimulationScenario,
     StepResult,
 )
+
+MAX_CLIENT_JSON_BYTES = 16 * 1024
+
+
+def bounded_json(value, label):
+    """Reject client-supplied JSON that would bloat the immutable evidence log."""
+
+    if len(json.dumps(value, default=str)) > MAX_CLIENT_JSON_BYTES:
+        raise serializers.ValidationError(f"{label} must be smaller than 16 KB.")
+    return value
 
 
 class CompetencySerializer(serializers.ModelSerializer):
@@ -355,6 +366,9 @@ class AttemptEventInputSerializer(serializers.Serializer):
     occurredAt = serializers.DateTimeField()
     payload = serializers.DictField(required=False, default=dict)
 
+    def validate_payload(self, value):
+        return bounded_json(value, "An event payload")
+
 
 class AttemptEventBatchSerializer(serializers.Serializer):
     events = AttemptEventInputSerializer(many=True, min_length=1, max_length=100)
@@ -404,12 +418,22 @@ class RendererSelectionSerializer(serializers.Serializer):
     )
     capabilityProfile = serializers.DictField(required=False, default=dict)
 
+    def validate_capabilityProfile(self, value):
+        return bounded_json(value, "The capability profile")
+
 
 class KnowledgeCheckSubmissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = KnowledgeCheckSubmission
         fields = ["id", "answers", "score", "submitted_at"]
         read_only_fields = ["id", "score", "submitted_at"]
+
+    def validate_answers(self, value):
+        if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+            raise serializers.ValidationError("Answers must be a list of objects.")
+        if len(value) > 50:
+            raise serializers.ValidationError("A knowledge check accepts at most 50 answers.")
+        return bounded_json(value, "Answers")
 
 
 class InstructorFeedbackSerializer(serializers.ModelSerializer):
