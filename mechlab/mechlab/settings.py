@@ -323,6 +323,9 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
+    # Automatic prefix detection differs between Windows and Linux, which made the committed
+    # schema drift from CI. Keep full paths in operation IDs and tags on every platform.
+    "SCHEMA_PATH_PREFIX": "",
     "ENUM_NAME_OVERRIDES": {
         "LessonPublicationStatusEnum": [
             ("draft", "Draft"),

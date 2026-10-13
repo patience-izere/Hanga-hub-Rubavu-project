@@ -117,7 +117,8 @@ jobs:
           python manage.py purge_expired_research --dry-run
 
       - name: Run tests
-        run: pytest
+        # python -m keeps the repository root importable so tools/test_postgres.py is collected.
+        run: python -m pytest
 
   frontend:
     needs: integrity
