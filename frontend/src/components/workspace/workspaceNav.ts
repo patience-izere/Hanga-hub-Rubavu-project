@@ -65,9 +65,9 @@ export function workspaceSections(roles: RoleCapabilities): WorkspaceSection[] {
       links: [
         {
           to: "/authoring",
-          label: "nav.scenarios",
+          label: "nav.studio",
           end: true,
-          alsoActiveFor: ["/authoring/scenarios"],
+          alsoActiveFor: ["/authoring/lessons", "/authoring/scenarios"],
         },
         { to: "/authoring/assets", label: "nav.assets" },
       ],

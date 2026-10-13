@@ -45,6 +45,7 @@ export const en = {
   "nav.competencies": "Competencies",
   "nav.operations": "Operations",
   "nav.scenarios": "Scenarios",
+  "nav.studio": "Module Studio",
   "nav.assets": "Asset packages",
   "nav.people": "People",
   "nav.invitations": "Invitations",

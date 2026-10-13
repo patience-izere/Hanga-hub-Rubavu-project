@@ -1,530 +1,797 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
-import type { AuthoredScenario } from "../api/content";
+import { describeApiError } from "../api/client";
+import type { AuthoredScenario, CompetencyOption } from "../api/content";
+import { ContentStatusBadge, ListEditor } from "../components/authoring/AuthoringFields";
+import { useCurrentUser } from "../auth/useAuth";
 import {
-  useAuthoredScenarios,
+  useAuthoredAssetPackages,
+  useAuthoredScenario,
+  useAuthoringCourses,
+  useAuthoringLesson,
   useCloneAuthoredScenario,
+  useGradingPolicies,
   usePublishAuthoredScenario,
   useTransitionAuthoredScenario,
   useUpdateAuthoredScenario,
 } from "../learning/useContentAuthoring";
 
-/** Draft first: a returned scenario is the thing an author must act on. */
-const STATUS_ORDER = ["draft", "review", "approved", "published", "retired"] as const;
+type Hint = { code: string; order?: number; text: string; points_penalty: number };
+type Action = { action_code: string; label: string; is_primary: boolean; tolerance?: unknown };
 
-const STATUS_LABELS: Record<(typeof STATUS_ORDER)[number], string> = {
-  draft: "Drafts",
-  review: "In review",
-  approved: "Approved",
-  published: "Published",
-  retired: "Retired",
+/** The fields the Studio edits; every other key on a step is preserved as authored. */
+type Step = Record<string, unknown> & {
+  order: number;
+  code: string;
+  title: string;
+  instruction: string;
+  action_code: string;
+  competency_codes: string[];
+  safety_critical: boolean;
+  points: number;
+  feedback: string;
+  feedback_rules: Record<string, string>;
+  hints: Hint[];
+  acceptable_actions: Action[];
 };
 
+type Definition = Record<string, unknown> & {
+  steps: Step[];
+  renderers?: Record<string, Record<string, unknown>>;
+};
+
+const SPATIAL = ["desktop_3d", "markerless_ar"] as const;
+const HINT_PENALTY = 2;
+
+function asStep(raw: Record<string, unknown>, index: number): Step {
+  const feedbackRules =
+    raw.feedback_rules && typeof raw.feedback_rules === "object"
+      ? (raw.feedback_rules as Record<string, string>)
+      : {};
+  return {
+    ...raw,
+    order: index + 1,
+    code: String(raw.code ?? `step-${index + 1}`),
+    title: String(raw.title ?? ""),
+    instruction: String(raw.instruction ?? ""),
+    action_code: String(raw.action_code ?? ""),
+    competency_codes: Array.isArray(raw.competency_codes) ? raw.competency_codes.map(String) : [],
+    safety_critical: raw.safety_critical === true,
+    points: typeof raw.points === "number" ? raw.points : 10,
+    feedback: String(raw.feedback ?? feedbackRules.correct ?? ""),
+    feedback_rules: feedbackRules,
+    hints: Array.isArray(raw.hints) ? (raw.hints as Hint[]) : [],
+    acceptable_actions: Array.isArray(raw.acceptable_actions)
+      ? (raw.acceptable_actions as Action[])
+      : [],
+  };
+}
+
+function asDefinition(raw: Record<string, unknown>): Definition {
+  const steps = Array.isArray(raw.steps) ? (raw.steps as Array<Record<string, unknown>>) : [];
+  return { ...raw, steps: steps.map(asStep) };
+}
+
+/** Renames the primary action in place so tolerances and alternates stay attached to it. */
+function withActionCode(step: Step, actionCode: string): Step {
+  const actions = step.acceptable_actions.length
+    ? step.acceptable_actions.map((action) =>
+        action.action_code === step.action_code || action.is_primary
+          ? { ...action, action_code: actionCode, is_primary: true }
+          : action,
+      )
+    : [{ action_code: actionCode, label: step.title || actionCode, is_primary: true }];
+  return { ...step, action_code: actionCode, acceptable_actions: actions };
+}
+
+function newStep(order: number, defaultCodes: string[]): Step {
+  return asStep(
+    {
+      code: `step-${order}`,
+      title: "",
+      instruction: "",
+      action_code: `complete_step_${order}`,
+      competency_codes: defaultCodes,
+      safety_critical: false,
+      points: 10,
+    },
+    order - 1,
+  );
+}
+
+function snapshot(input: {
+  title: string;
+  definition: Definition;
+  gradingPolicy: number;
+  assetPackage: number | null;
+}) {
+  return JSON.stringify(input);
+}
+
+type StepEditorProps = {
+  step: Step;
+  index: number;
+  total: number;
+  competencies: CompetencyOption[];
+  onChange: (step: Step) => void;
+  onMove: (direction: -1 | 1) => void;
+  onRemove: () => void;
+};
+
+function StepEditor({
+  step,
+  index,
+  total,
+  competencies,
+  onChange,
+  onMove,
+  onRemove,
+}: StepEditorProps) {
+  const unknownCodes = step.competency_codes.filter(
+    (code) => !competencies.some((competency) => competency.code === code),
+  );
+  const setRule = (outcome: string, message: string) =>
+    onChange({ ...step, feedback_rules: { ...step.feedback_rules, [outcome]: message } });
+
+  return (
+    <fieldset className={`studio-step${step.safety_critical ? " is-safety-critical" : ""}`}>
+      <legend>
+        Step {index + 1}
+        {step.safety_critical ? <span className="studio-safety-tag">Safety-critical</span> : null}
+      </legend>
+      <div className="studio-step-tools">
+        <button
+          type="button"
+          className="studio-icon-button"
+          disabled={index === 0}
+          onClick={() => onMove(-1)}
+        >
+          Move up
+        </button>
+        <button
+          type="button"
+          className="studio-icon-button"
+          disabled={index === total - 1}
+          onClick={() => onMove(1)}
+        >
+          Move down
+        </button>
+        <button
+          type="button"
+          className="studio-icon-button"
+          disabled={total === 1}
+          onClick={onRemove}
+        >
+          Remove step
+        </button>
+      </div>
+      <label>
+        What the learner does
+        <input
+          value={step.title}
+          onChange={(event) => onChange({ ...step, title: event.target.value })}
+          placeholder="Open the DC isolator"
+          required
+          maxLength={180}
+        />
+      </label>
+      <label>
+        Instruction shown to the learner
+        <textarea
+          rows={2}
+          value={step.instruction}
+          onChange={(event) => onChange({ ...step, instruction: event.target.value })}
+          placeholder="Switch the DC isolator beside the inverter to OFF."
+          required
+        />
+      </label>
+      <div className="studio-field-row">
+        <label>
+          Action code
+          <input
+            value={step.action_code}
+            onChange={(event) =>
+              onChange(
+                withActionCode(step, event.target.value.replace(/[^a-z0-9_]/gi, "_").toLowerCase()),
+              )
+            }
+            required
+            aria-describedby={`action-hint-${index}`}
+          />
+          <span className="field-note" id={`action-hint-${index}`}>
+            The identifier the 2D button or 3D object sends. In a 3D model, name the clickable part{" "}
+            <code>ACTION_{step.action_code || "code"}</code>.
+          </span>
+        </label>
+        <label>
+          Points
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={step.points}
+            onChange={(event) => onChange({ ...step, points: Number(event.target.value) })}
+          />
+        </label>
+      </div>
+      <fieldset className="studio-chip-group">
+        <legend>Competencies this step shows evidence for</legend>
+        {competencies.map((competency) => {
+          const checked = step.competency_codes.includes(competency.code);
+          return (
+            <label key={competency.code} className={`studio-chip${checked ? " is-checked" : ""}`}>
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(event) =>
+                  onChange({
+                    ...step,
+                    competency_codes: event.target.checked
+                      ? [...step.competency_codes, competency.code]
+                      : step.competency_codes.filter((code) => code !== competency.code),
+                  })
+                }
+              />
+              <span title={competency.title}>{competency.code}</span>
+            </label>
+          );
+        })}
+        {unknownCodes.length ? (
+          <p className="form-error">
+            Not in this course: {unknownCodes.join(", ")}.{" "}
+            <button
+              type="button"
+              className="studio-link-button"
+              onClick={() =>
+                onChange({
+                  ...step,
+                  competency_codes: step.competency_codes.filter(
+                    (code) => !unknownCodes.includes(code),
+                  ),
+                })
+              }
+            >
+              Remove them
+            </button>
+          </p>
+        ) : null}
+      </fieldset>
+      <label className="studio-check">
+        <input
+          type="checkbox"
+          checked={step.safety_critical}
+          onChange={(event) => onChange({ ...step, safety_critical: event.target.checked })}
+        />
+        <span>
+          Safety-critical: doing this out of order is a safety error and costs more points
+        </span>
+      </label>
+      <details className="studio-step-feedback">
+        <summary>Feedback and hints</summary>
+        <label>
+          When the learner gets it right
+          <input
+            value={step.feedback}
+            onChange={(event) =>
+              onChange({
+                ...step,
+                feedback: event.target.value,
+                feedback_rules: { ...step.feedback_rules, correct: event.target.value },
+              })
+            }
+            placeholder="DC isolator open. The array side is still live."
+          />
+        </label>
+        <label>
+          After a wrong action
+          <input
+            value={step.feedback_rules.incorrect ?? ""}
+            onChange={(event) => setRule("incorrect", event.target.value)}
+            placeholder="Check the instruction again before acting."
+          />
+        </label>
+        {step.safety_critical ? (
+          <label>
+            After a safety error
+            <input
+              value={step.feedback_rules.safety ?? ""}
+              onChange={(event) => setRule("safety", event.target.value)}
+              placeholder="Stop. Restore the safe sequence before continuing."
+            />
+          </label>
+        ) : null}
+        <ListEditor
+          label="Hints"
+          hint={`Learners may ask for each hint once; each costs ${HINT_PENALTY} points.`}
+          items={step.hints.map((hint) => hint.text)}
+          addLabel="Add hint"
+          onChange={(texts) =>
+            onChange({
+              ...step,
+              hints: texts.map((text, i) => ({
+                code: step.hints[i]?.code ?? `hint-${i + 1}`,
+                text,
+                points_penalty: step.hints[i]?.points_penalty ?? HINT_PENALTY,
+              })),
+            })
+          }
+        />
+      </details>
+    </fieldset>
+  );
+}
+
 export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
-  const scenarios = useAuthoredScenarios();
+  const scenarioId = Number(useParams().scenarioId ?? 0);
+  const navigate = useNavigate();
+  const currentUser = useCurrentUser().data;
+  const scenario = useAuthoredScenario(scenarioId);
+  const lesson = useAuthoringLesson(scenario.data?.lesson ?? 0);
+  const courses = useAuthoringCourses();
+  const policies = useGradingPolicies();
+  const packages = useAuthoredAssetPackages();
   const update = useUpdateAuthoredScenario();
   const clone = useCloneAuthoredScenario();
   const publish = usePublishAuthoredScenario();
   const transition = useTransitionAuthoredScenario();
-  const navigate = useNavigate();
-  const routeScenarioId = Number(useParams().scenarioId ?? 0);
-  const [selectedId, setSelectedId] = useState(routeScenarioId);
+
   const [title, setTitle] = useState("");
-  const [definition, setDefinition] = useState("");
-  const [validationError, setValidationError] = useState("");
+  const [definition, setDefinition] = useState<Definition>({ steps: [] });
+  const [gradingPolicy, setGradingPolicy] = useState(0);
+  const [assetPackage, setAssetPackage] = useState<number | null>(null);
+  const [saved, setSaved] = useState("");
+  const [rawJson, setRawJson] = useState("");
+  const [rawError, setRawError] = useState("");
   const [reviewNotes, setReviewNotes] = useState("");
 
-  const selected = scenarios.data?.find((scenario) => scenario.id === selectedId);
-  let previewSteps: Array<Record<string, unknown>> = [];
-  let parsedDefinition: Record<string, unknown> = {};
-  try {
-    const parsed = JSON.parse(definition) as Record<string, unknown> & {
-      steps?: Array<Record<string, unknown>>;
-    };
-    parsedDefinition = parsed;
-    previewSteps = Array.isArray(parsed.steps) ? parsed.steps : [];
-  } catch {
-    previewSteps = [];
-  }
-  const firstAnchor =
-    Array.isArray(parsedDefinition.anchors) && parsedDefinition.anchors.length
-      ? (parsedDefinition.anchors[0] as Record<string, unknown>)
-      : { code: "rig-origin", x: 0, y: 0, z: 0 };
   useEffect(() => {
-    if (!selected) return;
-    setTitle(selected.title);
-    setDefinition(JSON.stringify(selected.definition, null, 2));
-    setValidationError("");
-    setReviewNotes(selected.reviewNotes);
-  }, [selected]);
+    const data = scenario.data;
+    if (!data) return;
+    const parsed = asDefinition(data.definition);
+    setTitle(data.title);
+    setDefinition(parsed);
+    setGradingPolicy(data.grading_policy);
+    setAssetPackage(data.asset_package);
+    setSaved(
+      snapshot({
+        title: data.title,
+        definition: parsed,
+        gradingPolicy: data.grading_policy,
+        assetPackage: data.asset_package,
+      }),
+    );
+    setRawJson(JSON.stringify(data.definition, null, 2));
+  }, [scenario.data]);
 
-  // Selection lives in the URL so a scenario under review can be linked to and bookmarked.
+  const isDirty = snapshot({ title, definition, gradingPolicy, assetPackage }) !== saved;
   useEffect(() => {
-    if (routeScenarioId && routeScenarioId !== selectedId) setSelectedId(routeScenarioId);
-  }, [routeScenarioId, selectedId]);
+    if (!isDirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty]);
 
-  const chooseScenario = (scenario: AuthoredScenario) => {
-    setSelectedId(scenario.id);
-    navigate(`/authoring/scenarios/${scenario.id}`);
-  };
+  const course = courses.data?.find((item) => item.id === lesson.data?.course);
+  const competencies = useMemo(() => course?.competencies ?? [], [course]);
+  const lessonCodes = useMemo(
+    () =>
+      competencies
+        .filter((competency) => lesson.data?.competencies.includes(competency.id))
+        .map((competency) => competency.code),
+    [competencies, lesson.data],
+  );
+  const coursePackages = (packages.data ?? []).filter(
+    (item) => item.course === lesson.data?.course && item.status === "published",
+  );
 
-  function changeDefinition(change: (current: Record<string, unknown>) => void) {
-    try {
-      const current = JSON.parse(definition) as Record<string, unknown>;
-      change(current);
-      setDefinition(JSON.stringify(current, null, 2));
-      setValidationError("");
-    } catch {
-      setValidationError("Fix the JSON definition before using the structured editor.");
-    }
+  if (scenario.isPending) return <p className="panel-status dashboard">Loading the practical…</p>;
+  if (scenario.isError || !scenario.data) {
+    return (
+      <section className="dashboard studio-page">
+        <p className="form-error" role="alert">
+          This practical could not be loaded. It may belong to another school.
+        </p>
+        <Link to="/authoring">Back to the Studio</Link>
+      </section>
+    );
   }
 
-  function changeStep(index: number, field: string, value: unknown) {
-    changeDefinition((current) => {
-      const steps = Array.isArray(current.steps)
-        ? (current.steps as Array<Record<string, unknown>>)
-        : [];
-      steps[index] = { ...steps[index], [field]: value };
-      current.steps = steps;
-    });
-  }
+  const data: AuthoredScenario = scenario.data;
+  const editable = data.status === "draft";
+  const renderers = definition.renderers ?? {};
+  const spatialEnabled = SPATIAL.some((name) => renderers[name]?.enabled === true);
+  const markerEnabled = renderers.marker_ar?.enabled === true;
+  const isOwnWork = data.authoredBy === currentUser?.id;
 
-  function changeAnchor(field: "x" | "y" | "z", value: number) {
-    changeDefinition((current) => {
-      const anchors = Array.isArray(current.anchors)
-        ? (current.anchors as Array<Record<string, unknown>>)
-        : [{ code: "rig-origin", x: 0, y: 0, z: 0 }];
-      anchors[0] = { ...anchors[0], [field]: value };
-      current.anchors = anchors;
-    });
-  }
+  const setSteps = (steps: Step[]) =>
+    setDefinition((current) => ({
+      ...current,
+      steps: steps.map((step, index) => ({ ...step, order: index + 1 })),
+    }));
+  const setRenderer = (name: string, values: Record<string, unknown>) =>
+    setDefinition((current) => ({
+      ...current,
+      renderers: {
+        ...(current.renderers ?? {}),
+        [name]: { ...(current.renderers?.[name] ?? {}), ...values },
+      },
+    }));
+
+  const save = () =>
+    update.mutate(
+      {
+        id: data.id,
+        title,
+        definition,
+        grading_policy: gradingPolicy,
+        asset_package: assetPackage,
+      },
+      {
+        onSuccess: (result) => {
+          setRawJson(JSON.stringify(result.definition, null, 2));
+        },
+      },
+    );
+
+  const mutationError = update.error ?? transition.error ?? publish.error ?? clone.error;
 
   return (
-    <section className="dashboard authoring-page">
+    <section className="dashboard studio-page">
+      <Link
+        className="studio-back-link"
+        to={lesson.data ? `/authoring/lessons/${lesson.data.id}` : "/authoring"}
+      >
+        ← {lesson.data ? lesson.data.title : "All lessons"}
+      </Link>
       <div className="dashboard-heading">
         <div>
-          <div className="eyebrow">Validated content workflow</div>
-          <h1>Scenario authoring</h1>
+          <div className="eyebrow">Practical scenario · version {data.version}</div>
+          <h1>{data.title}</h1>
           <p>
-            Clone an approved version, edit its renderer-neutral definition, preview the data, and
-            submit a complete draft for administrator publication.
+            <ContentStatusBadge status={data.status} />{" "}
+            {lesson.data && lesson.data.status !== "published"
+              ? "The lesson must be published before this practical can be."
+              : null}
           </p>
         </div>
       </div>
-      {scenarios.isPending ? <p className="panel-status">Loading scenarios…</p> : null}
-      {scenarios.isError ? (
-        <p className="form-error" role="alert">
-          Scenario content could not be loaded.
+
+      {data.status === "draft" && data.reviewNotes ? (
+        <div className="returned-banner" role="status">
+          <strong>Returned for revision</strong>
+          <p>{data.reviewNotes}</p>
+        </div>
+      ) : null}
+      {!editable ? (
+        <p className="studio-locked-note" role="status">
+          Submitted and published versions are locked so learners' evidence always matches what they
+          practised. Start a new version to make changes.{" "}
+          <button
+            type="button"
+            className="studio-link-button"
+            disabled={clone.isPending}
+            onClick={() =>
+              clone.mutate(data.id, {
+                onSuccess: (result) =>
+                  navigate(`/authoring/scenarios/${(result as AuthoredScenario).id}`),
+              })
+            }
+          >
+            Start a new version
+          </button>
         </p>
       ) : null}
-      <div className="authoring-grid">
-        <aside className="lesson-panel" aria-label="Scenario versions">
-          <h2>School scenarios</h2>
-          {STATUS_ORDER.map((status) => {
-            const group = (scenarios.data ?? []).filter((item) => item.status === status);
-            if (group.length === 0) return null;
-            return (
-              <div className="authoring-group" key={status}>
-                <h3>{STATUS_LABELS[status]}</h3>
-                {group.map((scenario) => (
-                  <button
-                    className={
-                      scenario.id === selectedId ? "authoring-item active" : "authoring-item"
-                    }
-                    key={scenario.id}
-                    onClick={() => chooseScenario(scenario)}
-                    type="button"
-                  >
-                    <strong>{scenario.title}</strong>
-                    <span>Version {scenario.version}</span>
-                    {status === "draft" && scenario.reviewNotes ? (
-                      <span className="returned-flag">Returned for revision</span>
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-        </aside>
-        <article className="lesson-panel">
-          {!selected ? (
-            <p>Select a scenario version to inspect or clone it into a safe draft.</p>
-          ) : (
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                try {
-                  const parsed = JSON.parse(definition) as Record<string, unknown>;
-                  setValidationError("");
-                  update.mutate({ id: selected.id, title, definition: parsed });
-                } catch {
-                  setValidationError("The scenario definition must be valid JSON.");
-                }
-              }}
-            >
-              {/* Review notes are mandatory when an administrator returns a scenario, and are the
-                  one thing the author must read before doing anything else. */}
-              {selected.status === "draft" && selected.reviewNotes ? (
-                <div className="returned-banner" role="status">
-                  <strong>Returned for revision</strong>
-                  <p>{selected.reviewNotes}</p>
-                </div>
-              ) : null}
 
-              <div className="authoring-actions">
-                <span className="status-badge">{selected.status}</span>
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  disabled={clone.isPending}
-                  onClick={() => clone.mutate(selected.id)}
-                >
-                  Clone as new draft
-                </button>
-                {selected.status === "draft" ? (
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    disabled={transition.isPending || !selected.publicationChecks.ready}
-                    onClick={() => transition.mutate({ id: selected.id, action: "submit" })}
-                  >
-                    Submit for review
-                  </button>
-                ) : null}
-                {selected.status === "review" && canPublish ? (
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    disabled={transition.isPending || !selected.publicationChecks.ready}
-                    onClick={() =>
-                      transition.mutate({ id: selected.id, action: "approve", reviewNotes })
-                    }
-                  >
-                    Approve validated scenario
-                  </button>
-                ) : null}
-                {selected.status === "approved" && canPublish ? (
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    disabled={publish.isPending}
-                    onClick={() => publish.mutate(selected.id)}
-                  >
-                    Publish approved scenario
-                  </button>
-                ) : null}
-                {selected.status === "published" && canPublish ? (
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    disabled={transition.isPending}
-                    onClick={() => transition.mutate({ id: selected.id, action: "retire" })}
-                  >
-                    Retire version
-                  </button>
-                ) : null}
-              </div>
-              <label>
-                Scenario title
+      <div className="studio-editor-grid">
+        <form
+          className="studio-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            save();
+          }}
+        >
+          <fieldset disabled={!editable} className="studio-plain-fieldset">
+            <label>
+              Practical title
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                required
+                maxLength={180}
+              />
+            </label>
+
+            <h2 className="studio-form-heading">Procedure steps</h2>
+            <p className="field-note">
+              Steps run in this order. A learner completes each one before the next unlocks.
+            </p>
+            {definition.steps.map((step, index) => (
+              <StepEditor
+                key={`${step.code}-${index}`}
+                step={step}
+                index={index}
+                total={definition.steps.length}
+                competencies={competencies}
+                onChange={(next) =>
+                  setSteps(definition.steps.map((item, i) => (i === index ? next : item)))
+                }
+                onMove={(direction) => {
+                  const steps = [...definition.steps];
+                  const [moved] = steps.splice(index, 1);
+                  steps.splice(index + direction, 0, moved);
+                  setSteps(steps);
+                }}
+                onRemove={() => setSteps(definition.steps.filter((_, i) => i !== index))}
+              />
+            ))}
+            {editable ? (
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() =>
+                  setSteps([...definition.steps, newStep(definition.steps.length + 1, lessonCodes)])
+                }
+              >
+                Add step
+              </button>
+            ) : null}
+
+            <h2 className="studio-form-heading">Delivery</h2>
+            <fieldset className="studio-delivery">
+              <legend>How learners practise</legend>
+              <label className="studio-check">
                 <input
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  disabled={selected.status !== "draft"}
+                  type="radio"
+                  name="delivery"
+                  checked={!spatialEnabled}
+                  onChange={() => {
+                    SPATIAL.forEach((name) => setRenderer(name, { enabled: false }));
+                    setRenderer("marker_ar", { enabled: false });
+                  }}
                 />
+                <span>
+                  <strong>Accessible 2D only.</strong> Works on any phone and needs no 3D model.
+                </span>
               </label>
-              {selected.status === "draft" ? (
-                <section className="authoring-preview" aria-label="Structured scenario editor">
-                  <span className="eyebrow">Low-code editor</span>
-                  <h3>Steps, evidence, safety, and fallback</h3>
-                  {previewSteps.map((step, index) => (
-                    <fieldset key={String(step.code ?? index)}>
-                      <legend>Step {index + 1}</legend>
-                      <label>
-                        Stable step code
-                        <input
-                          value={String(step.code ?? "")}
-                          onChange={(event) => changeStep(index, "code", event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        Learner title
-                        <input
-                          value={String(step.title ?? "")}
-                          onChange={(event) => changeStep(index, "title", event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        Instruction
-                        <textarea
-                          rows={3}
-                          value={String(step.instruction ?? "")}
-                          onChange={(event) => changeStep(index, "instruction", event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        Stable action code
-                        <input
-                          value={String(step.action_code ?? "")}
-                          onChange={(event) => {
-                            const actionCode = event.target.value;
-                            changeDefinition((current) => {
-                              const steps = current.steps as Array<Record<string, unknown>>;
-                              steps[index] = {
-                                ...steps[index],
-                                action_code: actionCode,
-                                acceptable_actions: [
-                                  {
-                                    action_code: actionCode,
-                                    label: String(steps[index].title ?? actionCode),
-                                    is_primary: true,
-                                  },
-                                ],
-                              };
-                            });
-                          }}
-                        />
-                      </label>
-                      <label>
-                        Competency codes (comma separated)
-                        <input
-                          value={
-                            Array.isArray(step.competency_codes)
-                              ? step.competency_codes.join(", ")
-                              : ""
-                          }
-                          onChange={(event) =>
-                            changeStep(
-                              index,
-                              "competency_codes",
-                              event.target.value
-                                .split(",")
-                                .map((value) => value.trim())
-                                .filter(Boolean),
-                            )
-                          }
-                        />
-                      </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={step.safety_critical === true}
-                          onChange={(event) =>
-                            changeStep(index, "safety_critical", event.target.checked)
-                          }
-                        />
-                        Safety-critical action
-                      </label>
-                      <button
-                        className="button button-secondary"
-                        type="button"
-                        onClick={() =>
-                          changeDefinition((current) => {
-                            const steps = current.steps as Array<Record<string, unknown>>;
-                            current.steps = steps
-                              .filter((_, stepIndex) => stepIndex !== index)
-                              .map((item, stepIndex) => ({ ...item, order: stepIndex + 1 }));
-                          })
-                        }
-                      >
-                        Remove step
-                      </button>
-                    </fieldset>
-                  ))}
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    onClick={() =>
-                      changeDefinition((current) => {
-                        const steps = Array.isArray(current.steps)
-                          ? (current.steps as Array<Record<string, unknown>>)
-                          : [];
-                        const order = steps.length + 1;
-                        steps.push({
-                          order,
-                          code: `step-${order}`,
-                          title: `Procedure step ${order}`,
-                          instruction: "Describe the observable learner action.",
-                          action_code: `complete_step_${order}`,
-                          acceptable_actions: [
-                            {
-                              action_code: `complete_step_${order}`,
-                              label: `Complete step ${order}`,
-                              is_primary: true,
-                            },
-                          ],
-                          tools: [],
-                          hazards: [],
-                          hints: [],
-                          competency_codes: [],
-                          safety_critical: false,
-                        });
-                        current.steps = steps;
-                      })
-                    }
-                  >
-                    Add procedure step
-                  </button>
-                  <h3>Marker and anchor configuration</h3>
+              <label className="studio-check">
+                <input
+                  type="radio"
+                  name="delivery"
+                  checked={spatialEnabled}
+                  onChange={() => SPATIAL.forEach((name) => setRenderer(name, { enabled: true }))}
+                />
+                <span>
+                  <strong>2D plus 3D and AR.</strong> Needs a published 3D asset package. 2D stays
+                  available as the fallback.
+                </span>
+              </label>
+              {spatialEnabled ? (
+                <>
                   <label>
-                    Marker target value
-                    <input
-                      value={String(
-                        (
-                          (parsedDefinition.renderers as Record<string, unknown> | undefined)
-                            ?.marker_ar as Record<string, unknown> | undefined
-                        )?.targetValue ?? "",
-                      )}
+                    3D asset package
+                    <select
+                      value={assetPackage ?? ""}
                       onChange={(event) =>
-                        changeDefinition((current) => {
-                          const renderers = (current.renderers ?? {}) as Record<string, unknown>;
-                          const marker = (renderers.marker_ar ?? {}) as Record<string, unknown>;
-                          marker.targetValue = event.target.value;
-                          marker.targetType = "qr-fiducial";
-                          marker.enabled = true;
-                          marker.manualControlledRigFallback = true;
-                          renderers.marker_ar = marker;
-                          current.renderers = renderers;
+                        setAssetPackage(event.target.value ? Number(event.target.value) : null)
+                      }
+                    >
+                      <option value="">Choose a published package</option>
+                      {coursePackages.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name} v{item.version}
+                        </option>
+                      ))}
+                    </select>
+                    {!coursePackages.length ? (
+                      <span className="field-note">
+                        No published package for this course yet.{" "}
+                        <Link to="/authoring/assets">Upload one</Link>.
+                      </span>
+                    ) : null}
+                  </label>
+                  <label className="studio-check">
+                    <input
+                      type="checkbox"
+                      checked={markerEnabled}
+                      onChange={(event) =>
+                        setRenderer("marker_ar", {
+                          enabled: event.target.checked,
+                          targetType: "qr-fiducial",
+                          manualControlledRigFallback: true,
                         })
                       }
                     />
+                    <span>Also allow printed-marker AR on the training rig</span>
                   </label>
-                  <div className="anchor-editor-grid">
-                    {(["x", "y", "z"] as const).map((axis) => (
-                      <label key={axis}>
-                        Anchor {axis.toUpperCase()} offset ·{" "}
-                        {Number(firstAnchor[axis] ?? 0).toFixed(2)} m
-                        <input
-                          type="range"
-                          min={-1}
-                          max={1}
-                          step={0.05}
-                          value={Number(firstAnchor[axis] ?? 0)}
-                          onChange={(event) => changeAnchor(axis, Number(event.target.value))}
-                        />
-                      </label>
-                    ))}
-                  </div>
-                  <div className="anchor-placement-preview" aria-label="Anchor placement preview">
-                    <span>Printed marker · controlled-rig origin</span>
-                    <i
-                      aria-hidden="true"
-                      style={{
-                        left: `${50 + Number(firstAnchor.x ?? 0) * 35}%`,
-                        top: `${50 - Number(firstAnchor.y ?? 0) * 35}%`,
-                        transform: `scale(${1 + Number(firstAnchor.z ?? 0) * 0.25})`,
-                      }}
-                    />
-                  </div>
-                  <p>
-                    Drag the axis controls to preview the guidance origin. Final physical alignment
-                    still requires the approved rig and instructor review.
-                  </p>
-                </section>
+                  {markerEnabled ? (
+                    <label>
+                      Marker code printed on the rig
+                      <input
+                        value={String(renderers.marker_ar?.targetValue ?? "")}
+                        onChange={(event) =>
+                          setRenderer("marker_ar", { targetValue: event.target.value })
+                        }
+                      />
+                    </label>
+                  ) : null}
+                </>
               ) : null}
-              <section className="authoring-preview" aria-label="Non-assessment scenario preview">
-                <span className="eyebrow">Preview · no assessment evidence recorded</span>
-                <h3>Procedure sequence</h3>
-                {previewSteps.length ? (
-                  <ol>
-                    {previewSteps.map((step, index) => (
-                      <li key={String(step.code ?? index)}>
-                        <strong>{String(step.title ?? step.code ?? `Step ${index + 1}`)}</strong>
-                        <p>{String(step.instruction ?? "No learner instruction supplied.")}</p>
-                        <small>Action: {String(step.action_code ?? "missing")}</small>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p>Add valid scenario steps to see the safe preview.</p>
-                )}
-              </section>
-              {/* The structured editor above is the primary surface. Raw JSON stays available
-                  for cases it cannot express, but demoting it keeps a stray keystroke from
-                  disabling the structured controls, which was the previous trap. */}
-              <details className="authoring-advanced">
-                <summary>
-                  Advanced: edit the raw scenario definition
-                  {validationError ? <span className="advanced-warning">JSON error</span> : null}
-                </summary>
-                <p className="field-note">
-                  This is the same data the structured editor writes. Invalid JSON disables the
-                  structured controls until it is fixed.
-                </p>
-                <label>
-                  Renderer-neutral scenario definition
-                  <textarea
-                    rows={24}
-                    value={definition}
-                    onChange={(event) => setDefinition(event.target.value)}
-                    disabled={selected.status !== "draft"}
-                    spellCheck={false}
-                  />
-                </label>
-              </details>
-              <p>
-                Grading policy {selected.grading_policy} · asset package{" "}
-                {selected.asset_package ?? "fallback only"}
+            </fieldset>
+            <label>
+              Grading policy
+              <select
+                value={gradingPolicy}
+                onChange={(event) => setGradingPolicy(Number(event.target.value))}
+              >
+                {(policies.data ?? []).map((policy) => (
+                  <option key={policy.id} value={policy.id}>
+                    {policy.name} (pass at {policy.passThreshold}%)
+                  </option>
+                ))}
+              </select>
+            </label>
+          </fieldset>
+
+          {mutationError ? (
+            <p className="form-error" role="alert">
+              {describeApiError(mutationError, "That change could not be saved.")}
+            </p>
+          ) : null}
+          {editable ? (
+            <div className="studio-form-actions studio-sticky-actions">
+              <button className="button button-primary" disabled={update.isPending || !isDirty}>
+                {update.isPending ? "Saving…" : "Save draft"}
+              </button>
+              {isDirty ? (
+                <span className="studio-unsaved">Unsaved changes</span>
+              ) : update.isSuccess ? (
+                <span className="form-success">Saved and re-checked</span>
+              ) : null}
+            </div>
+          ) : null}
+
+          <details className="authoring-advanced">
+            <summary>Advanced: view or paste the scenario definition</summary>
+            <p className="field-note">
+              The same data the form edits. Paste a definition and apply it to replace the form.
+            </p>
+            <textarea
+              rows={16}
+              value={rawJson}
+              disabled={!editable}
+              spellCheck={false}
+              onChange={(event) => setRawJson(event.target.value)}
+              aria-label="Scenario definition JSON"
+            />
+            {editable ? (
+              <button
+                type="button"
+                className="button button-secondary studio-small-button"
+                onClick={() => {
+                  try {
+                    setDefinition(asDefinition(JSON.parse(rawJson) as Record<string, unknown>));
+                    setRawError("");
+                  } catch {
+                    setRawError("This is not valid JSON, so nothing was changed.");
+                  }
+                }}
+              >
+                Apply to the form
+              </button>
+            ) : null}
+            {rawError ? (
+              <p className="form-error" role="alert">
+                {rawError}
               </p>
-              <section className="authoring-preview" aria-live="polite">
-                <strong>
-                  Publication validation: {selected.publicationChecks.ready ? "ready" : "blocked"}
-                </strong>
-                {selected.publicationChecks.errors.length ? (
-                  <ul>
-                    {selected.publicationChecks.errors.map((error) => (
-                      <li key={error}>{error}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>All automated publication checks pass.</p>
-                )}
-              </section>
-              {canPublish && ["review", "approved"].includes(selected.status) ? (
+            ) : null}
+          </details>
+        </form>
+
+        <aside className="studio-side">
+          <section className="studio-side-panel" aria-live="polite">
+            <h2>Publication checks</h2>
+            {isDirty ? (
+              <p className="field-note">Save to re-run the checks on your changes.</p>
+            ) : null}
+            {data.publicationChecks.ready ? (
+              <p className="form-success">Every automated check passes.</p>
+            ) : (
+              <ul className="studio-check-errors">
+                {data.publicationChecks.errors.map((error) => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
+            )}
+            {data.status === "draft" ? (
+              <button
+                type="button"
+                className="button button-primary button-full"
+                disabled={transition.isPending || isDirty || !data.publicationChecks.ready}
+                onClick={() => transition.mutate({ id: data.id, action: "submit" })}
+              >
+                Submit for review
+              </button>
+            ) : null}
+            {canPublish && (data.status === "review" || data.status === "approved") ? (
+              <div className="studio-review-actions">
                 <label>
                   Review notes
                   <textarea
-                    rows={4}
+                    rows={3}
                     value={reviewNotes}
                     onChange={(event) => setReviewNotes(event.target.value)}
+                    placeholder="What you checked, or what must change."
                   />
                 </label>
-              ) : null}
-              {canPublish && ["review", "approved"].includes(selected.status) ? (
+                {data.status === "review" ? (
+                  <button
+                    type="button"
+                    className="button button-primary button-full"
+                    disabled={transition.isPending || isOwnWork || !data.publicationChecks.ready}
+                    onClick={() =>
+                      transition.mutate({ id: data.id, action: "approve", reviewNotes })
+                    }
+                  >
+                    Approve practical
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="button button-primary button-full"
+                    disabled={publish.isPending}
+                    onClick={() => publish.mutate(data.id)}
+                  >
+                    Publish practical
+                  </button>
+                )}
+                {isOwnWork && data.status === "review" ? (
+                  <p className="field-note">
+                    You built this practical, so another reviewer must approve it.
+                  </p>
+                ) : null}
                 <button
-                  className="button button-secondary"
                   type="button"
+                  className="button button-secondary button-full"
                   disabled={transition.isPending || !reviewNotes.trim()}
                   onClick={() =>
-                    transition.mutate({
-                      id: selected.id,
-                      action: "return_to_draft",
-                      reviewNotes,
-                    })
+                    transition.mutate({ id: data.id, action: "return_to_draft", reviewNotes })
                   }
                 >
-                  Return to draft with notes
+                  Return to author with notes
                 </button>
-              ) : null}
-              {validationError ? (
-                <p className="form-error" role="alert">
-                  {validationError}
-                </p>
-              ) : null}
-              {update.isError || publish.isError || clone.isError || transition.isError ? (
-                <p className="form-error" role="alert">
-                  The server rejected this change. Confirm safety, fallback, action, asset, and
-                  competency requirements before publication.
-                </p>
-              ) : null}
-              {selected.status === "draft" ? (
-                <button className="button button-primary" disabled={update.isPending}>
-                  {update.isPending ? "Saving…" : "Save draft"}
-                </button>
-              ) : null}
-            </form>
-          )}
-        </article>
+              </div>
+            ) : null}
+            {canPublish && data.status === "published" ? (
+              <button
+                type="button"
+                className="button button-secondary button-full"
+                disabled={transition.isPending}
+                onClick={() => transition.mutate({ id: data.id, action: "retire" })}
+              >
+                Retire this version
+              </button>
+            ) : null}
+          </section>
+
+          <section className="studio-side-panel" aria-label="Learner preview">
+            <h2>Learner preview</h2>
+            <p className="field-note">
+              What learners see in accessible 2D. No evidence is recorded.
+            </p>
+            <ol className="studio-preview-steps">
+              {definition.steps.map((step, index) => (
+                <li key={`${step.code}-${index}`}>
+                  <strong>{step.title || "Untitled step"}</strong>
+                  <span>{step.instruction || "No instruction yet."}</span>
+                  {step.safety_critical ? (
+                    <span className="studio-safety-tag">Safety-critical</span>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </section>
+        </aside>
       </div>
     </section>
   );

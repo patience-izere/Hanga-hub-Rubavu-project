@@ -2,7 +2,10 @@
 
 from django.core.exceptions import ValidationError
 
-from .models import AssetPackage, Lesson
+from .models import AssetPackage, Competency, Lesson
+
+# The battery workshop scene is drawn in code; packages declaring this renderer need no GLB.
+PROCEDURAL_RENDERER = "procedural-r3f"
 
 
 def _non_empty_text(value):
@@ -40,6 +43,9 @@ def validate_scenario_for_publication(scenario):
     if not isinstance(steps, list) or not steps:
         errors.append("Add at least one complete procedure step.")
         steps = []
+    course_competencies = set(
+        Competency.objects.filter(course=scenario.lesson.course).values_list("code", flat=True)
+    )
     step_codes = set()
     orders = set()
     for index, step in enumerate(steps, start=1):
@@ -63,6 +69,12 @@ def validate_scenario_for_publication(scenario):
                 errors.append(f"{prefix} must define {field}, even when it is empty.")
         if not step.get("competency_codes"):
             errors.append(f"{prefix} requires at least one competency mapping.")
+        elif isinstance(step.get("competency_codes"), list):
+            for code in step["competency_codes"]:
+                if code not in course_competencies:
+                    errors.append(
+                        f"{prefix} maps to {code!r}, which is not a competency of this course."
+                    )
         actions = step.get("acceptable_actions")
         if not isinstance(actions, list) or not actions:
             errors.append(f"{prefix} requires at least one equivalent fallback action.")
@@ -87,7 +99,11 @@ def validate_scenario_for_publication(scenario):
         for field in ("schemaVersion", "curriculumOwner", "license"):
             if not manifest.get(field):
                 errors.append(f"The asset manifest requires {field}.")
-        if enabled_spatial and not package.files.filter(role="primary-scene").exists():
+        if (
+            enabled_spatial
+            and manifest.get("renderer") != PROCEDURAL_RENDERER
+            and not package.files.filter(role="primary-scene").exists()
+        ):
             errors.append("The asset package requires a primary-scene file.")
 
     marker = renderers.get("marker_ar", {})

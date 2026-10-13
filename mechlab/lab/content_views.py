@@ -7,6 +7,7 @@ from django.core.files.storage import default_storage
 from django.db import transaction
 from django.db.models import Max
 from django.utils import timezone
+from django.utils.text import slugify
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -19,13 +20,29 @@ from .audit import record_audit_event
 from .content_serializers import (
     AssetPackageAuthoringSerializer,
     AssetUploadSerializer,
+    AuthoringCourseSerializer,
+    AuthoringLessonSerializer,
+    CompetencyOptionSerializer,
+    GradingPolicyOptionSerializer,
     LessonTransitionSerializer,
     LessonWorkflowSerializer,
+    ModuleOptionSerializer,
     ScenarioAuthoringSerializer,
     ScenarioTransitionSerializer,
 )
-from .models import AssetFile, AssetPackage, Lesson, School, SchoolMembership, SimulationScenario
+from .models import (
+    AssetFile,
+    AssetPackage,
+    Competency,
+    Course,
+    GradingPolicy,
+    Lesson,
+    School,
+    SchoolMembership,
+    SimulationScenario,
+)
 from .permissions import IsContentAuthorOrSchoolAdmin, has_active_school_role
+from .scenario_snapshots import starter_definition
 from .scenario_validation import validate_scenario_for_publication
 
 
@@ -635,3 +652,230 @@ class AssetPackageAuthoringViewSet(viewsets.ModelViewSet):
             {"detail": "A school administrator must approve this asset transition."},
             status=status.HTTP_403_FORBIDDEN,
         )
+
+
+def _unique_slug(queryset, text, *, field="slug", max_length=60):
+    base = slugify(text)[: max_length - 4] or "item"
+    candidate = base
+    suffix = 2
+    while queryset.filter(**{field: candidate}).exists():
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+    return candidate
+
+
+class GradingPolicyOptionsView(APIView):
+    """Published grading policies an author may attach to a practical scenario."""
+
+    permission_classes = [IsContentAuthorOrSchoolAdmin]
+
+    @extend_schema(responses=GradingPolicyOptionSerializer(many=True))
+    def get(self, request):
+        policies = GradingPolicy.objects.filter(status=GradingPolicy.Status.PUBLISHED)
+        return Response(GradingPolicyOptionSerializer(policies, many=True).data)
+
+
+class AuthoringCourseViewSet(viewsets.ModelViewSet):
+    """Courses, with their modules and competencies, that an author can build lessons in."""
+
+    queryset = Course.objects.none()
+    serializer_class = AuthoringCourseSerializer
+    permission_classes = [IsContentAuthorOrSchoolAdmin]
+    http_method_names = ["get", "post", "patch", "head", "options"]
+    pagination_class = None
+    ordering = ["title"]
+
+    def get_queryset(self):
+        return (
+            Course.objects.filter(school_id__in=_content_school_ids(self.request.user))
+            .select_related("school")
+            .prefetch_related("modules", "competencies", "lessons")
+        )
+
+    def perform_create(self, serializer):
+        school_ids = _content_school_ids(self.request.user)
+        school = serializer.validated_data.get("school")
+        if school is None and len(school_ids) == 1:
+            school = School.objects.get(pk=school_ids[0])
+        if school is None or school.pk not in school_ids:
+            raise PermissionDenied("Choose one of your schools for this course.")
+        title = serializer.validated_data["title"]
+        course = serializer.save(
+            school=school,
+            slug=_unique_slug(Course.objects.all(), f"{school.code}-{title}", max_length=180),
+        )
+        record_audit_event(
+            event_type="content.course_created",
+            actor=self.request.user,
+            school=school,
+            target=course,
+            payload={"title": course.title},
+        )
+
+    def perform_update(self, serializer):
+        if "school" in serializer.validated_data and (
+            serializer.validated_data["school"] != serializer.instance.school
+        ):
+            raise PermissionDenied("A course cannot move to another school.")
+        serializer.save()
+
+    @extend_schema(request=CompetencyOptionSerializer, responses=CompetencyOptionSerializer)
+    @action(detail=True, methods=["post"])
+    def competencies(self, request, pk=None):
+        course = self.get_object()
+        serializer = CompetencyOptionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        code = serializer.validated_data["code"].strip().upper()
+        if Competency.objects.filter(course=course, code=code).exists():
+            return Response(
+                {"detail": f"This course already has a competency coded {code}."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        competency = serializer.save(course=course, code=code)
+        record_audit_event(
+            event_type="content.competency_created",
+            actor=request.user,
+            school=course.school,
+            target=competency,
+            payload={"code": competency.code},
+        )
+        return Response(CompetencyOptionSerializer(competency).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(request=ModuleOptionSerializer, responses=ModuleOptionSerializer)
+    @action(detail=True, methods=["post"])
+    def modules(self, request, pk=None):
+        course = self.get_object()
+        serializer = ModuleOptionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        order = (course.modules.aggregate(latest=Max("order"))["latest"] or 0) + 1
+        module = serializer.save(
+            course=course,
+            order=order,
+            code=_unique_slug(
+                course.modules.all(), serializer.validated_data["title"], field="code"
+            ),
+        )
+        record_audit_event(
+            event_type="content.module_created",
+            actor=request.user,
+            school=course.school,
+            target=module,
+            payload={"title": module.title},
+        )
+        return Response(ModuleOptionSerializer(module).data, status=status.HTTP_201_CREATED)
+
+
+class AuthoringLessonViewSet(viewsets.ModelViewSet):
+    """Draft lessons an author writes before building the practical scenario."""
+
+    queryset = Lesson.objects.none()
+    serializer_class = AuthoringLessonSerializer
+    permission_classes = [IsContentAuthorOrSchoolAdmin]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+    search_fields = ["title", "course__title"]
+    ordering_fields = ["updated_at", "title"]
+    ordering = ["-updated_at"]
+
+    def get_queryset(self):
+        lessons = (
+            Lesson.objects.filter(course__school_id__in=_content_school_ids(self.request.user))
+            .select_related("course", "course__school", "module", "authored_by")
+            .prefetch_related("competencies", "scenarios")
+        )
+        course_id = self.request.query_params.get("course")
+        if course_id and course_id.isdigit():
+            lessons = lessons.filter(course_id=int(course_id))
+        return lessons
+
+    def perform_create(self, serializer):
+        course = serializer.validated_data["course"]
+        if course.school_id not in _content_school_ids(self.request.user):
+            raise PermissionDenied("The course must belong to one of your schools.")
+        lesson = serializer.save(
+            authored_by=self.request.user,
+            status=Lesson.Status.DRAFT,
+            slug=_unique_slug(course.lessons.all(), serializer.validated_data["title"]),
+        )
+        record_audit_event(
+            event_type="content.lesson_created",
+            actor=self.request.user,
+            school=course.school,
+            target=lesson,
+            payload={"title": lesson.title},
+        )
+
+    def update(self, request, *args, **kwargs):
+        lesson = self.get_object()
+        if lesson.status != Lesson.Status.DRAFT:
+            return Response(
+                {"detail": "Only a draft lesson can be edited. Ask a reviewer to return it."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if not _may_edit_draft(request.user, lesson.authored_by_id, lesson.course.school):
+            return _not_your_draft()
+        response = super().update(request, *args, **kwargs)
+        record_audit_event(
+            event_type="content.lesson_updated",
+            actor=request.user,
+            school=lesson.course.school,
+            target=lesson,
+            payload={"fields": sorted(request.data.keys())},
+        )
+        return response
+
+    def destroy(self, request, *args, **kwargs):
+        lesson = self.get_object()
+        if lesson.status != Lesson.Status.DRAFT or lesson.scenarios.exists():
+            return Response(
+                {"detail": "Only a draft lesson without scenarios can be deleted."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if not _may_edit_draft(request.user, lesson.authored_by_id, lesson.course.school):
+            return _not_your_draft()
+        record_audit_event(
+            event_type="content.lesson_deleted",
+            actor=request.user,
+            school=lesson.course.school,
+            target=lesson.course,
+            payload={"lessonId": lesson.pk, "title": lesson.title},
+        )
+        return super().destroy(request, *args, **kwargs)
+
+    @extend_schema(request=None, responses={status.HTTP_201_CREATED: ScenarioAuthoringSerializer})
+    @action(detail=True, methods=["post"])
+    def scenarios(self, request, pk=None):
+        """Start a new draft practical scenario for this lesson."""
+
+        lesson = self.get_object()
+        policy_id = request.data.get("gradingPolicy") if isinstance(request.data, dict) else None
+        policies = GradingPolicy.objects.filter(status=GradingPolicy.Status.PUBLISHED)
+        policy = (
+            policies.filter(pk=policy_id).first()
+            if policy_id
+            else policies.order_by("-published_at", "-pk").first()
+        )
+        if policy is None:
+            return Response(
+                {
+                    "detail": "No published grading policy is available. Ask a platform administrator."
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        version = (lesson.scenarios.aggregate(latest=Max("version"))["latest"] or 0) + 1
+        scenario = SimulationScenario.objects.create(
+            lesson=lesson,
+            version=version,
+            title=f"{lesson.title} practical v{version}",
+            definition=starter_definition(lesson),
+            grading_policy=policy,
+            status=SimulationScenario.Status.DRAFT,
+            authored_by=request.user,
+        )
+        record_audit_event(
+            event_type="content.scenario_created",
+            actor=request.user,
+            school=lesson.course.school,
+            target=scenario,
+            payload={"version": scenario.version, "fromLesson": lesson.pk},
+        )
+        return Response(ScenarioAuthoringSerializer(scenario).data, status=status.HTTP_201_CREATED)

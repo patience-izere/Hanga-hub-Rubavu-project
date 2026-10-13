@@ -340,6 +340,147 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/content/courses/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        get: operations["api_v1_content_courses_list"];
+        put?: never;
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        post: operations["api_v1_content_courses_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/courses/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        get: operations["api_v1_content_courses_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        patch: operations["api_v1_content_courses_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/content/courses/{id}/competencies/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        post: operations["api_v1_content_courses_competencies_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/courses/{id}/modules/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        post: operations["api_v1_content_courses_modules_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/grading-policies/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Published grading policies an author may attach to a practical scenario. */
+        get: operations["api_v1_content_grading_policies_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/lessons/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Draft lessons an author writes before building the practical scenario. */
+        get: operations["api_v1_content_lessons_list"];
+        put?: never;
+        /** @description Draft lessons an author writes before building the practical scenario. */
+        post: operations["api_v1_content_lessons_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/lessons/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Draft lessons an author writes before building the practical scenario. */
+        get: operations["api_v1_content_lessons_retrieve"];
+        put?: never;
+        post?: never;
+        /** @description Draft lessons an author writes before building the practical scenario. */
+        delete: operations["api_v1_content_lessons_destroy"];
+        options?: never;
+        head?: never;
+        /** @description Draft lessons an author writes before building the practical scenario. */
+        patch: operations["api_v1_content_lessons_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/content/lessons/{id}/scenarios/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Start a new draft practical scenario for this lesson. */
+        post: operations["api_v1_content_lessons_scenarios_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/content/lessons/{id}/transition/": {
         parameters: {
             query?: never;
@@ -1139,6 +1280,64 @@ export interface components {
             /** Format: date-time */
             occurredAt: string;
         };
+        AuthoringCourse: {
+            readonly id: number;
+            /** @description Leave empty for platform-wide content. */
+            school?: number | null;
+            /** @default  */
+            readonly schoolName: string;
+            title: string;
+            readonly slug: string;
+            trade: string;
+            description?: string;
+            readonly modules: components["schemas"]["ModuleOption"][];
+            readonly competencies: components["schemas"]["CompetencyOption"][];
+            readonly lessonCount: number;
+        };
+        AuthoringCourseRequest: {
+            /** @description Leave empty for platform-wide content. */
+            school?: number | null;
+            title: string;
+            trade: string;
+            description?: string;
+        };
+        AuthoringLesson: {
+            readonly id: number;
+            course: number;
+            readonly courseTitle: string;
+            module?: number | null;
+            title: string;
+            readonly slug: string;
+            summary: string;
+            objectives?: string[];
+            safetyNotes?: string[];
+            estimatedMinutes?: number;
+            language?: components["schemas"]["LanguageEnum"];
+            competencies?: number[];
+            readonly status: components["schemas"]["LessonPublicationStatusEnum"];
+            readonly contentVersion: number;
+            readonly authoredBy: number | null;
+            readonly authorName: string;
+            readonly reviewNotes: string;
+            /** Format: date-time */
+            readonly submittedAt: string | null;
+            /** Format: date-time */
+            readonly publishedAt: string | null;
+            readonly scenarios: components["schemas"]["LessonScenarioSummary"][];
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        AuthoringLessonRequest: {
+            course: number;
+            module?: number | null;
+            title: string;
+            summary: string;
+            objectives?: string[];
+            safetyNotes?: string[];
+            estimatedMinutes?: number;
+            language?: components["schemas"]["LanguageEnum"];
+            competencies?: number[];
+        };
         /** @enum {unknown} */
         BlankEnum: "";
         Competency: {
@@ -1151,6 +1350,19 @@ export interface components {
             evidence_rules?: unknown;
             mastery_criteria?: unknown;
             mastery_threshold?: number;
+        };
+        CompetencyOption: {
+            readonly id: number;
+            code: string;
+            title: string;
+            description?: string;
+            masteryThreshold?: number;
+        };
+        CompetencyOptionRequest: {
+            code: string;
+            title: string;
+            description?: string;
+            masteryThreshold?: number;
         };
         CompetencyResult: {
             competency_code: string;
@@ -1203,6 +1415,13 @@ export interface components {
          * @enum {string}
          */
         DomainEnum: "ethics" | "privacy" | "safeguarding" | "instructor" | "safety" | "device" | "accessibility" | "security" | "operations" | "recovery" | "evidence";
+        GradingPolicyOption: {
+            readonly id: number;
+            readonly code: string;
+            readonly version: number;
+            readonly name: string;
+            readonly passThreshold: number;
+        };
         GradingPolicyReference: {
             code: string;
             version: number;
@@ -1468,6 +1687,14 @@ export interface components {
          * @enum {string}
          */
         LessonPublicationStatusEnum: "draft" | "review" | "approved" | "published" | "retired";
+        LessonScenarioSummary: {
+            readonly id: number;
+            readonly version: number;
+            readonly title: string;
+            readonly status: components["schemas"]["LessonPublicationStatusEnum"];
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
         LessonSummary: {
             readonly id: number;
             title: string;
@@ -1524,6 +1751,17 @@ export interface components {
          * @enum {string}
          */
         MasteryStateEnum: "not_demonstrated" | "developing" | "mastered" | "requires_review";
+        ModuleOption: {
+            readonly id: number;
+            readonly code: string;
+            title: string;
+            description?: string;
+            readonly order: number;
+        };
+        ModuleOptionRequest: {
+            title: string;
+            description?: string;
+        };
         /** @enum {unknown} */
         NullEnum: null;
         /**
@@ -1577,6 +1815,21 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["AttemptDetail"][];
+        };
+        PaginatedAuthoringLessonList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["AuthoringLesson"][];
         };
         PaginatedPilotApprovalList: {
             /** @example 123 */
@@ -1674,6 +1927,24 @@ export interface components {
             version?: number;
             name?: string;
             manifest?: unknown;
+        };
+        PatchedAuthoringCourseRequest: {
+            /** @description Leave empty for platform-wide content. */
+            school?: number | null;
+            title?: string;
+            trade?: string;
+            description?: string;
+        };
+        PatchedAuthoringLessonRequest: {
+            course?: number;
+            module?: number | null;
+            title?: string;
+            summary?: string;
+            objectives?: string[];
+            safetyNotes?: string[];
+            estimatedMinutes?: number;
+            language?: components["schemas"]["LanguageEnum"];
+            competencies?: number[];
         };
         PatchedPilotStudyRequest: {
             school?: number;
@@ -2285,6 +2556,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -2411,6 +2684,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -2699,6 +2974,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -2948,6 +3225,326 @@ export interface operations {
             };
         };
     };
+    api_v1_content_courses_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringCourse"][];
+                };
+            };
+        };
+    };
+    api_v1_content_courses_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthoringCourseRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AuthoringCourseRequest"];
+                "multipart/form-data": components["schemas"]["AuthoringCourseRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringCourse"];
+                };
+            };
+        };
+    };
+    api_v1_content_courses_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringCourse"];
+                };
+            };
+        };
+    };
+    api_v1_content_courses_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedAuthoringCourseRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedAuthoringCourseRequest"];
+                "multipart/form-data": components["schemas"]["PatchedAuthoringCourseRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringCourse"];
+                };
+            };
+        };
+    };
+    api_v1_content_courses_competencies_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompetencyOptionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["CompetencyOptionRequest"];
+                "multipart/form-data": components["schemas"]["CompetencyOptionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompetencyOption"];
+                };
+            };
+        };
+    };
+    api_v1_content_courses_modules_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModuleOptionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ModuleOptionRequest"];
+                "multipart/form-data": components["schemas"]["ModuleOptionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleOption"];
+                };
+            };
+        };
+    };
+    api_v1_content_grading_policies_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradingPolicyOption"][];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedAuthoringLessonList"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthoringLessonRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AuthoringLessonRequest"];
+                "multipart/form-data": components["schemas"]["AuthoringLessonRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringLesson"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this lesson. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringLesson"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this lesson. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_v1_content_lessons_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this lesson. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedAuthoringLessonRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedAuthoringLessonRequest"];
+                "multipart/form-data": components["schemas"]["PatchedAuthoringLessonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringLesson"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_scenarios_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this lesson. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioAuthoring"];
+                };
+            };
+        };
+    };
     api_v1_content_lessons_transition_create: {
         parameters: {
             query?: never;
@@ -2982,6 +3579,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3432,6 +4031,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3582,6 +4183,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3611,6 +4214,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3646,6 +4251,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3675,6 +4282,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3710,6 +4319,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3739,6 +4350,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3774,6 +4387,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3803,6 +4418,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };

@@ -13,16 +13,59 @@ export type User = {
 
 type ApiErrorBody = {
   detail?: string;
+  code?: string;
+  errors?: unknown;
 };
+
+/** Field name → messages, as returned by DRF validation or model `message_dict` errors. */
+export type FieldErrors = Record<string, string[]>;
 
 export class ApiError extends Error {
   readonly status: number;
+  readonly code: string;
+  readonly fieldErrors: FieldErrors;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code = "", fieldErrors: FieldErrors = {}) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
+    this.fieldErrors = fieldErrors;
   }
+}
+
+function flattenMessages(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(flattenMessages);
+  if (value && typeof value === "object") return Object.values(value).flatMap(flattenMessages);
+  return [];
+}
+
+/** Reads field errors from either the API's `{errors: {...}}` envelope or a bare message dict. */
+function fieldErrorsFrom(body: Record<string, unknown>): FieldErrors {
+  const source =
+    body.errors && typeof body.errors === "object"
+      ? (body.errors as Record<string, unknown>)
+      : body.detail === undefined
+        ? body
+        : {};
+  const result: FieldErrors = {};
+  for (const [field, value] of Object.entries(source)) {
+    const messages = flattenMessages(value);
+    if (messages.length) result[field] = messages;
+  }
+  return result;
+}
+
+/**
+ * The most useful sentence to show a person for a failed request: specific field messages when
+ * the server sent them, otherwise its detail, otherwise the caller's fallback.
+ */
+export function describeApiError(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiError)) return fallback;
+  const messages = Object.values(error.fieldErrors).flat();
+  if (messages.length) return messages.join(" ");
+  return error.message || fallback;
 }
 
 function cookie(name: string): string | undefined {
@@ -52,15 +95,23 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
   const body = (await response.json().catch(() => ({}))) as T & ApiErrorBody;
   if (!response.ok) {
+    // DRF answers an expired session with 403 `not_authenticated`, not 401.
+    const sessionEnded =
+      response.status === 401 || (response.status === 403 && body.code === "not_authenticated");
     if (
-      response.status === 401 &&
+      sessionEnded &&
       !path.startsWith("/api/v1/auth/") &&
       !path.startsWith("/api/v1/monitoring/")
     ) {
       sessionStorage.setItem("opedu:session-expired", "true");
       window.dispatchEvent(new Event("opedu:session-expired"));
     }
-    throw new ApiError(response.status, body.detail || "The request could not be completed.");
+    throw new ApiError(
+      response.status,
+      body.detail || "The request could not be completed.",
+      body.code ?? "",
+      fieldErrorsFrom(body as Record<string, unknown>),
+    );
   }
   return body;
 }

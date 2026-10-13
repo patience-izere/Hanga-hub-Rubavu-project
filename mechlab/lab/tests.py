@@ -948,6 +948,8 @@ class ContentWorkflowTests(TestCase):
             name="Workflow policy",
             status=GradingPolicy.Status.PUBLISHED,
         )
+        # Publication requires step competency codes to exist in the course.
+        Competency.objects.create(course=self.course, code="safe-working", title="Work safely")
         payload = {
             "lesson": self.lesson.pk,
             "version": 1,
@@ -2908,3 +2910,239 @@ class ContentTenantTests(TestCase):
         )
         self.assertEqual(renamed.status_code, 200, renamed.content)
         self.assertTrue(AuditEvent.objects.filter(event_type="content.scenario_updated").exists())
+
+
+class ModuleStudioTests(TestCase):
+    """An author can build a module from course to learner-ready practical without Django admin."""
+
+    def setUp(self):
+        self.school = School.objects.create(name="Studio School", code="studio-school")
+        self.other_school = School.objects.create(name="Elsewhere School", code="elsewhere")
+        self.author = User.objects.create_user("studio-author@example.com", password="pw-123")
+        self.admin = User.objects.create_user("studio-admin@example.com", password="pw-123")
+        self.instructor = User.objects.create_user("studio-teacher@example.com", password="pw-123")
+        self.learner = User.objects.create_user("studio-learner@example.com", password="pw-123")
+        for user, role in [
+            (self.author, SchoolMembership.Role.CONTENT_AUTHOR),
+            (self.admin, SchoolMembership.Role.ADMIN),
+            (self.instructor, SchoolMembership.Role.INSTRUCTOR),
+            (self.learner, SchoolMembership.Role.LEARNER),
+        ]:
+            SchoolMembership.objects.create(school=self.school, user=user, role=role)
+        self.policy = GradingPolicy.objects.create(
+            code="studio-standard",
+            version=1,
+            name="Standard",
+            status=GradingPolicy.Status.PUBLISHED,
+        )
+
+    def post(self, user, url, data):
+        self.client.force_login(user)
+        return self.client.post(url, data, content_type="application/json")
+
+    def patch(self, user, url, data):
+        self.client.force_login(user)
+        return self.client.patch(url, data, content_type="application/json")
+
+    def build_lesson(self):
+        course = self.post(
+            self.author,
+            "/api/v1/content/courses/",
+            {"title": "Solar installation", "trade": "Electrical", "description": ""},
+        )
+        self.assertEqual(course.status_code, 201, course.content)
+        course_id = course.json()["id"]
+        competency = self.post(
+            self.author,
+            f"/api/v1/content/courses/{course_id}/competencies/",
+            {"code": "sol-01", "title": "Isolate a PV array safely"},
+        )
+        self.assertEqual(competency.status_code, 201, competency.content)
+        self.assertEqual(competency.json()["code"], "SOL-01")
+        module = self.post(
+            self.author, f"/api/v1/content/courses/{course_id}/modules/", {"title": "PV safety"}
+        )
+        self.assertEqual(module.status_code, 201, module.content)
+        lesson = self.post(
+            self.author,
+            "/api/v1/content/lessons/",
+            {
+                "course": course_id,
+                "module": module.json()["id"],
+                "title": "Isolate a PV array",
+                "summary": "Make a rooftop array safe before maintenance.",
+                "objectives": ["Identify the DC isolator", "Verify zero voltage"],
+                "safetyNotes": ["Treat every conductor as live until proven dead"],
+                "competencies": [competency.json()["id"]],
+                "language": "en",
+            },
+        )
+        self.assertEqual(lesson.status_code, 201, lesson.content)
+        return lesson.json()
+
+    def publish_lesson(self, lesson_id):
+        url = f"/api/v1/content/lessons/{lesson_id}/transition/"
+        self.assertEqual(self.post(self.author, url, {"action": "submit"}).status_code, 200)
+        self.assertEqual(self.post(self.admin, url, {"action": "approve"}).status_code, 200)
+        self.assertEqual(self.post(self.admin, url, {"action": "publish"}).status_code, 200)
+
+    def test_author_builds_a_module_that_a_learner_can_complete(self):
+        lesson = self.build_lesson()
+        self.assertEqual(lesson["status"], "draft")
+        scenario = self.post(self.author, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {})
+        self.assertEqual(scenario.status_code, 201, scenario.content)
+        scenario_id = scenario.json()["id"]
+        definition = scenario.json()["definition"]
+        self.assertFalse(definition["renderers"]["desktop_3d"]["enabled"])
+
+        # Exactly the shape the Studio's "Add procedure step" button writes.
+        definition["steps"] = [
+            {
+                "order": 1,
+                "code": "isolate",
+                "title": "Open the DC isolator",
+                "instruction": "Switch the DC isolator to OFF.",
+                "action_code": "open_dc_isolator",
+                "acceptable_actions": [
+                    {"action_code": "open_dc_isolator", "label": "Open", "is_primary": True}
+                ],
+                "tools": [],
+                "hazards": [],
+                "hints": [{"text": "The isolator is beside the inverter."}],
+                "competency_codes": ["SOL-01"],
+                "safety_critical": True,
+            },
+            {
+                "order": 2,
+                "code": "verify",
+                "title": "Verify zero voltage",
+                "instruction": "Measure across the DC terminals.",
+                "action_code": "verify_zero",
+                "competency_codes": ["SOL-01"],
+            },
+        ]
+        saved = self.patch(
+            self.author, f"/api/v1/content/scenarios/{scenario_id}/", {"definition": definition}
+        )
+        self.assertEqual(saved.status_code, 200, saved.content)
+        stored = SimulationScenario.objects.get(pk=scenario_id).definition
+        for step in stored["steps"]:
+            for key in ["id", "feedback", "points", "metadata", "feedback_rules", "hints"]:
+                self.assertIn(key, step)
+        self.assertEqual(stored["steps"][0]["hints"][0]["code"], "hint-1")
+        self.assertEqual([item["code"] for item in stored["competencies"]], ["SOL-01"])
+
+        self.publish_lesson(lesson["id"])
+        transition = f"/api/v1/content/scenarios/{scenario_id}/transition/"
+        submitted = self.post(self.author, transition, {"action": "submit"})
+        self.assertEqual(submitted.status_code, 200, submitted.content)
+        approved = self.post(self.admin, transition, {"action": "approve"})
+        self.assertEqual(approved.status_code, 200, approved.content)
+        published = self.post(self.admin, f"/api/v1/content/scenarios/{scenario_id}/publish/", {})
+        self.assertEqual(published.status_code, 200, published.content)
+
+        assigned = self.post(
+            self.instructor,
+            "/api/v1/instructor/assignments/",
+            {"scenarioId": scenario_id, "learnerIds": [self.learner.pk], "cohortIds": []},
+        )
+        self.assertEqual(assigned.status_code, 201, assigned.content)
+        self.client.force_login(self.learner)
+        listing = self.client.get("/api/v1/assignments/")
+        self.assertEqual(listing.status_code, 200, listing.content)
+        assignment_id = listing.json()["results"][0]["id"]
+        attempt_id = self.client.post(f"/api/v1/assignments/{assignment_id}/start/").json()[
+            "attempt"
+        ]["id"]
+        for action_code in ["open_dc_isolator", "verify_zero"]:
+            response = self.post(
+                self.learner,
+                f"/api/v1/attempts/{attempt_id}/actions/",
+                {"action": action_code, "metadata": {}},
+            )
+            self.assertTrue(response.json()["correct"], response.content)
+        completed = self.post(self.learner, f"/api/v1/attempts/{attempt_id}/complete/", {})
+        self.assertEqual(completed.status_code, 200, completed.content)
+        attempt = Attempt.objects.get(pk=attempt_id)
+        self.assertEqual(attempt.competency_results.get().competency.code, "SOL-01")
+
+    def test_unknown_competency_codes_block_publication(self):
+        lesson = self.build_lesson()
+        scenario = self.post(self.author, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {})
+        definition = scenario.json()["definition"]
+        definition["steps"][0]["competency_codes"] = ["NOT-A-REAL-CODE"]
+        saved = self.patch(
+            self.author,
+            f"/api/v1/content/scenarios/{scenario.json()['id']}/",
+            {"definition": definition},
+        )
+        errors = saved.json()["publicationChecks"]["errors"]
+        self.assertTrue(any("NOT-A-REAL-CODE" in error for error in errors), errors)
+
+    def test_published_snapshots_missing_optional_step_keys_still_render(self):
+        lesson = self.build_lesson()
+        self.publish_lesson(lesson["id"])
+        scenario = SimulationScenario.objects.create(
+            lesson_id=lesson["id"],
+            version=1,
+            title="Legacy snapshot",
+            definition={
+                "steps": [
+                    {
+                        "order": 1,
+                        "code": "legacy",
+                        "title": "Legacy step",
+                        "instruction": "Do it.",
+                        "action_code": "do_it",
+                    }
+                ]
+            },
+            grading_policy=self.policy,
+            status=SimulationScenario.Status.PUBLISHED,
+        )
+        Assignment.objects.create(
+            lesson_id=lesson["id"],
+            scenario=scenario,
+            learner=self.learner,
+            assigned_by=self.instructor,
+        )
+        self.client.force_login(self.learner)
+        response = self.client.get("/api/v1/assignments/")
+        self.assertEqual(response.status_code, 200, response.content)
+
+    def test_authoring_is_scoped_to_the_authors_school(self):
+        foreign_course = Course.objects.create(
+            school=self.other_school, title="Foreign", slug="foreign", trade="Other"
+        )
+        lesson = self.post(
+            self.author,
+            "/api/v1/content/lessons/",
+            {"course": foreign_course.pk, "title": "Planted", "summary": "Not allowed."},
+        )
+        self.assertEqual(lesson.status_code, 403)
+        course = self.post(
+            self.author,
+            "/api/v1/content/courses/",
+            {"school": self.other_school.pk, "title": "Planted", "trade": "Other"},
+        )
+        self.assertEqual(course.status_code, 403)
+        self.client.force_login(self.author)
+        self.assertEqual(
+            self.client.get(f"/api/v1/content/courses/{foreign_course.pk}/").status_code, 404
+        )
+        self.client.force_login(self.learner)
+        self.assertEqual(self.client.get("/api/v1/content/lessons/").status_code, 403)
+
+    def test_only_draft_lessons_can_be_edited_by_their_author(self):
+        lesson = self.build_lesson()
+        url = f"/api/v1/content/lessons/{lesson['id']}/"
+        second_author = User.objects.create_user("second@example.com", password="pw-123")
+        SchoolMembership.objects.create(
+            school=self.school, user=second_author, role=SchoolMembership.Role.CONTENT_AUTHOR
+        )
+        self.assertEqual(self.patch(second_author, url, {"title": "Mine now"}).status_code, 403)
+        self.assertEqual(
+            self.patch(self.author, url, {"title": "Isolate a PV string"}).status_code, 200
+        )
+        self.publish_lesson(lesson["id"])
+        self.assertEqual(self.patch(self.author, url, {"title": "Changed live"}).status_code, 409)

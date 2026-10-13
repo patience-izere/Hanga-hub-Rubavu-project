@@ -5,6 +5,9 @@ from rest_framework.routers import DefaultRouter
 from . import api_views
 from .content_views import (
     AssetPackageAuthoringViewSet,
+    AuthoringCourseViewSet,
+    AuthoringLessonViewSet,
+    GradingPolicyOptionsView,
     LessonTransitionView,
     ScenarioAuthoringViewSet,
 )
@@ -35,6 +38,8 @@ router = DefaultRouter()
 router.register("assignments", AssignmentViewSet, basename="assignment")
 router.register("attempts", AttemptViewSet, basename="attempt")
 router.register("content/scenarios", ScenarioAuthoringViewSet, basename="content-scenario")
+router.register("content/courses", AuthoringCourseViewSet, basename="content-course")
+router.register("content/lessons", AuthoringLessonViewSet, basename="content-lesson")
 router.register(
     "content/asset-packages",
     AssetPackageAuthoringViewSet,
@@ -86,6 +91,11 @@ urlpatterns = [
         name="instructor-assignments",
     ),
     path("research/surveys/", ResearchSurveyView.as_view(), name="research-surveys"),
+    path(
+        "content/grading-policies/",
+        GradingPolicyOptionsView.as_view(),
+        name="content-grading-policies",
+    ),
     path(
         "content/lessons/<int:pk>/transition/",
         LessonTransitionView.as_view(),

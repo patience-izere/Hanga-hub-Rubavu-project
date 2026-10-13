@@ -20,6 +20,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -156,6 +162,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -479,6 +491,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -742,6 +760,367 @@ paths:
               schema:
                 $ref: '#/components/schemas/AssetPackageAuthoring'
           description: ''
+  /api/v1/content/courses/:
+    get:
+      operationId: api_v1_content_courses_list
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuthoringCourse'
+          description: ''
+    post:
+      operationId: api_v1_content_courses_create
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthoringCourseRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AuthoringCourseRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AuthoringCourseRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringCourse'
+          description: ''
+  /api/v1/content/courses/{id}/:
+    get:
+      operationId: api_v1_content_courses_retrieve
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringCourse'
+          description: ''
+    patch:
+      operationId: api_v1_content_courses_partial_update
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAuthoringCourseRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAuthoringCourseRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAuthoringCourseRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringCourse'
+          description: ''
+  /api/v1/content/courses/{id}/competencies/:
+    post:
+      operationId: api_v1_content_courses_competencies_create
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompetencyOptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CompetencyOptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CompetencyOptionRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompetencyOption'
+          description: ''
+  /api/v1/content/courses/{id}/modules/:
+    post:
+      operationId: api_v1_content_courses_modules_create
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModuleOptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ModuleOptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ModuleOptionRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleOption'
+          description: ''
+  /api/v1/content/grading-policies/:
+    get:
+      operationId: api_v1_content_grading_policies_list
+      description: Published grading policies an author may attach to a practical
+        scenario.
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GradingPolicyOption'
+          description: ''
+  /api/v1/content/lessons/:
+    get:
+      operationId: api_v1_content_lessons_list
+      description: Draft lessons an author writes before building the practical scenario.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAuthoringLessonList'
+          description: ''
+    post:
+      operationId: api_v1_content_lessons_create
+      description: Draft lessons an author writes before building the practical scenario.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthoringLessonRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AuthoringLessonRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AuthoringLessonRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringLesson'
+          description: ''
+  /api/v1/content/lessons/{id}/:
+    get:
+      operationId: api_v1_content_lessons_retrieve
+      description: Draft lessons an author writes before building the practical scenario.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this lesson.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringLesson'
+          description: ''
+    patch:
+      operationId: api_v1_content_lessons_partial_update
+      description: Draft lessons an author writes before building the practical scenario.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this lesson.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAuthoringLessonRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAuthoringLessonRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAuthoringLessonRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringLesson'
+          description: ''
+    delete:
+      operationId: api_v1_content_lessons_destroy
+      description: Draft lessons an author writes before building the practical scenario.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this lesson.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/content/lessons/{id}/scenarios/:
+    post:
+      operationId: api_v1_content_lessons_scenarios_create
+      description: Start a new draft practical scenario for this lesson.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this lesson.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioAuthoring'
+          description: ''
   /api/v1/content/lessons/{id}/transition/:
     post:
       operationId: api_v1_content_lessons_transition_create
@@ -788,6 +1167,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -1254,6 +1639,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -1418,6 +1809,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -1454,6 +1851,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -1507,6 +1910,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -1543,6 +1952,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -1596,6 +2011,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -1632,6 +2053,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -1685,6 +2112,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -1721,6 +2154,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -2873,6 +3312,214 @@ components:
       - schoolName
       - targetId
       - targetType
+    AuthoringCourse:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        school:
+          type: integer
+          nullable: true
+          description: Leave empty for platform-wide content.
+        schoolName:
+          type: string
+          readOnly: true
+          default: ''
+        title:
+          type: string
+          maxLength: 180
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        trade:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleOption'
+          readOnly: true
+        competencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetencyOption'
+          readOnly: true
+        lessonCount:
+          type: integer
+          readOnly: true
+      required:
+      - competencies
+      - id
+      - lessonCount
+      - modules
+      - schoolName
+      - slug
+      - title
+      - trade
+    AuthoringCourseRequest:
+      type: object
+      properties:
+        school:
+          type: integer
+          nullable: true
+          description: Leave empty for platform-wide content.
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        trade:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+      required:
+      - title
+      - trade
+    AuthoringLesson:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        course:
+          type: integer
+        courseTitle:
+          type: string
+          readOnly: true
+        module:
+          type: integer
+          nullable: true
+        title:
+          type: string
+          maxLength: 180
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        summary:
+          type: string
+        objectives:
+          type: array
+          items:
+            type: string
+            maxLength: 500
+          maxItems: 30
+        safetyNotes:
+          type: array
+          items:
+            type: string
+            maxLength: 500
+          maxItems: 30
+        estimatedMinutes:
+          type: integer
+          maximum: 480
+          minimum: 5
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+        competencies:
+          type: array
+          items:
+            type: integer
+        status:
+          allOf:
+          - $ref: '#/components/schemas/LessonPublicationStatusEnum'
+          readOnly: true
+        contentVersion:
+          type: integer
+          readOnly: true
+        authoredBy:
+          type: integer
+          readOnly: true
+          nullable: true
+        authorName:
+          type: string
+          readOnly: true
+        reviewNotes:
+          type: string
+          readOnly: true
+        submittedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        publishedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        scenarios:
+          type: array
+          items:
+            $ref: '#/components/schemas/LessonScenarioSummary'
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - authorName
+      - authoredBy
+      - contentVersion
+      - course
+      - courseTitle
+      - id
+      - publishedAt
+      - reviewNotes
+      - scenarios
+      - slug
+      - status
+      - submittedAt
+      - summary
+      - title
+      - updated_at
+    AuthoringLessonRequest:
+      type: object
+      properties:
+        course:
+          type: integer
+        module:
+          type: integer
+          nullable: true
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        summary:
+          type: string
+          minLength: 1
+        objectives:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+          maxItems: 30
+        safetyNotes:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+          maxItems: 30
+        estimatedMinutes:
+          type: integer
+          maximum: 480
+          minimum: 5
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+        competencies:
+          type: array
+          items:
+            type: integer
+      required:
+      - course
+      - summary
+      - title
     BlankEnum:
       enum:
       - ''
@@ -2906,6 +3553,48 @@ components:
       required:
       - code
       - id
+      - title
+    CompetencyOption:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          maxLength: 60
+        title:
+          type: string
+          maxLength: 180
+        description:
+          type: string
+        masteryThreshold:
+          type: integer
+          maximum: 100
+          minimum: 1
+      required:
+      - code
+      - id
+      - title
+    CompetencyOptionRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 60
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        description:
+          type: string
+        masteryThreshold:
+          type: integer
+          maximum: 100
+          minimum: 1
+      required:
+      - code
       - title
     CompetencyResult:
       type: object
@@ -3020,6 +3709,31 @@ components:
         * `operations` - School operations
         * `recovery` - Recovery
         * `evidence` - Research evidence
+    GradingPolicyOption:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        version:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        passThreshold:
+          type: integer
+          readOnly: true
+      required:
+      - code
+      - id
+      - name
+      - passThreshold
+      - version
     GradingPolicyReference:
       type: object
       properties:
@@ -3771,6 +4485,32 @@ components:
         * `approved` - Approved
         * `published` - Published
         * `retired` - Retired
+    LessonScenarioSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        version:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/LessonPublicationStatusEnum'
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - id
+      - status
+      - title
+      - updated_at
+      - version
     LessonSummary:
       type: object
       properties:
@@ -3933,6 +4673,40 @@ components:
         * `developing` - Developing
         * `mastered` - Mastered
         * `requires_review` - Requires review
+    ModuleOption:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        title:
+          type: string
+          maxLength: 180
+        description:
+          type: string
+        order:
+          type: integer
+          readOnly: true
+      required:
+      - code
+      - id
+      - order
+      - title
+    ModuleOptionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        description:
+          type: string
+      required:
+      - title
     NullEnum:
       enum:
       - null
@@ -4015,6 +4789,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AttemptDetail'
+    PaginatedAuthoringLessonList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthoringLesson'
     PaginatedPilotApprovalList:
       type: object
       required:
@@ -4172,6 +4969,62 @@ components:
           minLength: 1
           maxLength: 180
         manifest: {}
+    PatchedAuthoringCourseRequest:
+      type: object
+      properties:
+        school:
+          type: integer
+          nullable: true
+          description: Leave empty for platform-wide content.
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        trade:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+    PatchedAuthoringLessonRequest:
+      type: object
+      properties:
+        course:
+          type: integer
+        module:
+          type: integer
+          nullable: true
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        summary:
+          type: string
+          minLength: 1
+        objectives:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+          maxItems: 30
+        safetyNotes:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+          maxItems: 30
+        estimatedMinutes:
+          type: integer
+          maximum: 480
+          minimum: 5
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+        competencies:
+          type: array
+          items:
+            type: integer
     PatchedPilotStudyRequest:
       type: object
       properties:

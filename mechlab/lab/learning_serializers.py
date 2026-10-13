@@ -25,6 +25,7 @@ from .models import (
     SimulationScenario,
     StepResult,
 )
+from .scenario_snapshots import normalize_step
 
 MAX_CLIENT_JSON_BYTES = 16 * 1024
 
@@ -122,6 +123,12 @@ class ProcedureStepSerializer(serializers.ModelSerializer):
             "feedback_rules",
             "competency_codes",
         ]
+
+    def to_representation(self, instance):
+        if isinstance(instance, dict):
+            # Published snapshots written before steps were normalised may lack optional keys.
+            instance = normalize_step(instance, instance.get("order") or 1)
+        return super().to_representation(instance)
 
     @staticmethod
     def _snapshot_value(obj, key, default):

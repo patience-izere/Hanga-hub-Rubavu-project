@@ -38,6 +38,8 @@ import { ContactPage } from "./pages/ContactPage";
 import { PrivacyPage, TermsPage } from "./pages/LegalPages";
 import { ResearchSurveyPage } from "./pages/ResearchSurveyPage";
 import { ContentAuthoringPage } from "./pages/ContentAuthoringPage";
+import { LessonEditorPage } from "./pages/LessonEditorPage";
+import { StudioHomePage } from "./pages/StudioHomePage";
 import { AuthoringAssetsPage } from "./pages/AuthoringAssetsPage";
 import { TrainingMarkerPage } from "./pages/TrainingMarkerPage";
 
@@ -214,7 +216,23 @@ export function App() {
           path="/authoring"
           element={
             <RequireRole user={user} capability="canAuthorContent">
-              <ContentAuthoringPage canPublish={roles.canPublishContent} />
+              <StudioHomePage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/authoring/lessons/new"
+          element={
+            <RequireRole user={user} capability="canAuthorContent">
+              <LessonEditorPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/authoring/lessons/:lessonId"
+          element={
+            <RequireRole user={user} capability="canAuthorContent">
+              <LessonEditorPage />
             </RequireRole>
           }
         />

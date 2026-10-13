@@ -414,6 +414,9 @@ class Command(BaseCommand):
         )
         asset_manifest = {
             "format": "opedu-asset-package/v2",
+            "schemaVersion": "2",
+            "curriculumOwner": school.name,
+            "license": "LicenseRef-OPedu-Prototype",
             "renderer": "procedural-r3f",
             "files": [],
             "licenseStatus": "prototype-generated-geometry",
@@ -442,7 +445,9 @@ class Command(BaseCommand):
             },
             "productionReplacementRequired": True,
         }
-        asset_package, _ = AssetPackage.objects.update_or_create(
+        # Create-only: a published package is immutable, so re-seeding an older database keeps
+        # the manifest it was published with.
+        asset_package, _ = AssetPackage.objects.get_or_create(
             course=course,
             code="battery-workshop",
             version=1,
