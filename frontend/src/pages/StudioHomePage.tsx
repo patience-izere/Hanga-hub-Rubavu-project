@@ -2,12 +2,15 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { describeApiError } from "../api/client";
-import type { AuthoringCourse, AuthoringLesson } from "../api/content";
+import type { AuthoredScenario, AuthoringCourse, AuthoringLesson } from "../api/content";
+import { useCurrentUser } from "../auth/useAuth";
+import { useRoles } from "../auth/useRoles";
 import { ContentStatusBadge } from "../components/authoring/AuthoringFields";
 import { CONTENT_STATUS_LABELS, type ContentStatus } from "../components/authoring/authoringLabels";
 import { EmptyState } from "../components/ui/EmptyState";
 import { QueryBoundary } from "../components/ui/QueryBoundary";
 import {
+  useAuthoredScenarios,
   useAddCourseCompetency,
   useAddCourseModule,
   useAuthoringCourses,
@@ -47,6 +50,92 @@ function LessonRow({ lesson }: { lesson: AuthoringLesson }) {
         </span>
       </Link>
     </li>
+  );
+}
+
+type QueueItem = {
+  key: string;
+  to: string;
+  title: string;
+  kind: "Lesson" | "Practical";
+  status: "review" | "approved";
+  authorName: string;
+  isOwnWork: boolean;
+  submittedAt: string | null;
+};
+
+function ReviewQueue({
+  lessons,
+  scenarios,
+  userId,
+}: {
+  lessons: AuthoringLesson[];
+  scenarios: AuthoredScenario[];
+  userId: number | undefined;
+}) {
+  const waiting = (status: string): status is "review" | "approved" =>
+    status === "review" || status === "approved";
+  const items: QueueItem[] = [
+    ...lessons
+      .filter((lesson) => waiting(lesson.status))
+      .map((lesson) => ({
+        key: `lesson-${lesson.id}`,
+        to: `/authoring/lessons/${lesson.id}`,
+        title: lesson.title,
+        kind: "Lesson" as const,
+        status: lesson.status as "review" | "approved",
+        authorName: lesson.authorName,
+        isOwnWork: lesson.authoredBy === userId,
+        submittedAt: lesson.submittedAt,
+      })),
+    ...scenarios
+      .filter((scenario) => waiting(scenario.status))
+      .map((scenario) => ({
+        key: `scenario-${scenario.id}`,
+        to: `/authoring/scenarios/${scenario.id}`,
+        title: `${scenario.lessonTitle} · practical v${scenario.version}`,
+        kind: "Practical" as const,
+        status: scenario.status as "review" | "approved",
+        authorName: scenario.authorName,
+        isOwnWork: scenario.authoredBy === userId,
+        submittedAt: scenario.submittedAt,
+      })),
+  ].sort((a, b) => (a.submittedAt ?? "").localeCompare(b.submittedAt ?? ""));
+
+  if (!items.length) return null;
+  return (
+    <section className="studio-review-queue" aria-labelledby="review-queue-heading">
+      <div className="studio-section-heading">
+        <h2 id="review-queue-heading">Waiting for review</h2>
+        <span className="studio-count">{items.length}</span>
+      </div>
+      <ul className="studio-lesson-list">
+        {items.map((item) => (
+          <li key={item.key}>
+            <Link className="studio-lesson-row" to={item.to}>
+              <span className="studio-lesson-main">
+                <strong>{item.title}</strong>
+                <span>
+                  {item.kind}
+                  {item.authorName ? ` by ${item.authorName}` : ""}
+                  {item.submittedAt ? ` · submitted ${formatDate(item.submittedAt)}` : ""}
+                </span>
+              </span>
+              <span className="studio-lesson-meta">
+                <ContentStatusBadge status={item.status} />
+                <span>
+                  {item.isOwnWork
+                    ? "Your work: another reviewer decides"
+                    : item.status === "review"
+                      ? "Needs your review"
+                      : "Ready to publish"}
+                </span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -225,6 +314,9 @@ function NewCourseForm({ onDone }: { onDone: () => void }) {
 export function StudioHomePage() {
   const lessons = useAuthoringLessons();
   const courses = useAuthoringCourses();
+  const roles = useRoles();
+  const userId = useCurrentUser().data?.id;
+  const scenarios = useAuthoredScenarios();
   const [courseFilter, setCourseFilter] = useState(0);
   const [addingCourse, setAddingCourse] = useState(false);
 
@@ -275,6 +367,14 @@ export function StudioHomePage() {
           <span>Instructors can assign it</span>
         </li>
       </ol>
+
+      {roles.canPublishContent ? (
+        <ReviewQueue
+          lessons={lessons.data ?? []}
+          scenarios={scenarios.data ?? []}
+          userId={userId}
+        />
+      ) : null}
 
       <div className="studio-home-grid">
         <div className="studio-lessons">

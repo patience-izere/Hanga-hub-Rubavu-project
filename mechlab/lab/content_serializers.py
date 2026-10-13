@@ -212,6 +212,9 @@ class ScenarioAuthoringSerializer(serializers.ModelSerializer):
     reviewNotes = serializers.CharField(source="review_notes", read_only=True)
     submittedAt = serializers.DateTimeField(source="submitted_at", read_only=True, allow_null=True)
     reviewedAt = serializers.DateTimeField(source="reviewed_at", read_only=True, allow_null=True)
+    lessonTitle = serializers.CharField(source="lesson.title", read_only=True)
+    lessonStatus = serializers.CharField(source="lesson.status", read_only=True)
+    authorName = serializers.SerializerMethodField()
     publicationChecks = serializers.SerializerMethodField()
 
     class Meta:
@@ -219,6 +222,9 @@ class ScenarioAuthoringSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "lesson",
+            "lessonTitle",
+            "lessonStatus",
+            "authorName",
             "version",
             "title",
             "definition",
@@ -270,10 +276,15 @@ class ScenarioAuthoringSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(error.message_dict) from error
         return attrs
 
+    @extend_schema_field(serializers.CharField())
+    def get_authorName(self, obj):
+        author = obj.authored_by
+        return (author.get_full_name() or author.get_username()) if author else ""
+
     @extend_schema_field(serializers.DictField())
     def get_publicationChecks(self, obj):
         try:
-            validate_scenario_for_publication(obj)
+            validate_scenario_for_publication(obj, for_publish=False)
         except DjangoValidationError as error:
             messages = error.message_dict.get("publication", error.messages)
             return {"ready": False, "errors": messages}
@@ -377,3 +388,13 @@ class AssetUploadSerializer(serializers.Serializer):
         if mime_type.startswith("video/") and not attrs.get("transcript", "").strip():
             raise serializers.ValidationError("Fallback video requires a transcript.")
         return attrs
+
+
+class ContentHistoryEntrySerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    eventType = serializers.CharField()
+    summary = serializers.CharField()
+    subject = serializers.CharField()
+    actorName = serializers.CharField()
+    reviewNotes = serializers.CharField(allow_blank=True)
+    occurredAt = serializers.DateTimeField()

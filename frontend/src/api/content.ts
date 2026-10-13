@@ -3,6 +3,9 @@ import { apiFetch, ensureCsrf } from "./client";
 export type AuthoredScenario = {
   id: number;
   lesson: number;
+  lessonTitle: string;
+  lessonStatus: "draft" | "review" | "approved" | "published" | "retired";
+  authorName: string;
   version: number;
   title: string;
   definition: Record<string, unknown>;
@@ -49,7 +52,9 @@ export type AuthoredAssetPackage = {
 type AssetPackagePage = { results: AuthoredAssetPackage[] } | AuthoredAssetPackage[];
 
 export async function listAuthoredScenarios(): Promise<AuthoredScenario[]> {
-  const response = await apiFetch<ScenarioPage>("/api/v1/content/scenarios/?ordering=-updated_at");
+  const response = await apiFetch<ScenarioPage>(
+    "/api/v1/content/scenarios/?ordering=-updated_at&page_size=200",
+  );
   return Array.isArray(response) ? response : response.results;
 }
 
@@ -100,7 +105,7 @@ export async function transitionAuthoredScenario(
 
 export async function listAuthoredAssetPackages() {
   const response = await apiFetch<AssetPackagePage>(
-    "/api/v1/content/asset-packages/?ordering=-updated_at",
+    "/api/v1/content/asset-packages/?ordering=-updated_at&page_size=200",
   );
   return Array.isArray(response) ? response : response.results;
 }
@@ -289,4 +294,22 @@ export function createLessonScenario(lessonId: number, gradingPolicy?: number) {
 
 export function listGradingPolicies() {
   return apiFetch<GradingPolicyOption[]>("/api/v1/content/grading-policies/");
+}
+
+export function reviseAuthoringLesson(id: number) {
+  return send<AuthoringLesson>(`/api/v1/content/lessons/${id}/revise/`, "POST", {});
+}
+
+export type ContentHistoryEntry = {
+  id: number;
+  eventType: string;
+  summary: string;
+  subject: string;
+  actorName: string;
+  reviewNotes: string;
+  occurredAt: string;
+};
+
+export function getLessonHistory(id: number) {
+  return apiFetch<ContentHistoryEntry[]>(`/api/v1/content/lessons/${id}/history/`);
 }

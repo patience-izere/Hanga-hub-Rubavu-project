@@ -9,7 +9,7 @@ from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -516,6 +516,14 @@ class InstructorAssignmentView(APIView):
             .select_related("lesson", "lesson__course")
             .order_by("lesson__title", "-version")
         )
+        # Only the newest published version of each lesson's practical is offered, so two
+        # learners in one class are not given different versions by accident.
+        latest_by_lesson = {}
+        for item in scenarios:
+            current = latest_by_lesson.get(item.lesson_id)
+            if current is None or item.version > current.version:
+                latest_by_lesson[item.lesson_id] = item
+        scenarios = sorted(latest_by_lesson.values(), key=lambda item: item.lesson.title)
         cohorts = Cohort.objects.filter(school_id__in=school_ids, is_active=True).order_by("name")
         return Response(
             {
@@ -920,8 +928,19 @@ class AssignmentViewSet(viewsets.ReadOnlyModelViewSet):
             Assignment.objects.filter(
                 learner=self.request.user,
                 lesson__course__school_id__in=_active_learner_school_ids(self.request.user),
-                lesson__status=Lesson.Status.PUBLISHED,
-                scenario__status=SimulationScenario.Status.PUBLISHED,
+            )
+            .filter(
+                # Retiring content must not strand a learner part-way through: an attempt already
+                # in progress stays reachable until it is finished or ended.
+                Q(
+                    lesson__status=Lesson.Status.PUBLISHED,
+                    scenario__status=SimulationScenario.Status.PUBLISHED,
+                )
+                | Q(
+                    pk__in=Attempt.objects.filter(
+                        learner=self.request.user, status=Attempt.Status.IN_PROGRESS
+                    ).values("assignment_id")
+                )
             )
             .select_related(
                 "lesson",

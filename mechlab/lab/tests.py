@@ -887,6 +887,11 @@ class ContentWorkflowTests(TestCase):
             title="Workflow Lesson",
             slug="workflow-lesson",
             summary="A governed lesson.",
+            objectives=["Follow the governed procedure"],
+            safety_notes=["Isolate the rig before starting"],
+        )
+        self.lesson.competencies.add(
+            Competency.objects.create(course=course, code="WF-01", title="Work to procedure")
         )
         self.url = f"/api/v1/content/lessons/{self.lesson.pk}/transition/"
 
@@ -1058,19 +1063,21 @@ class ContentWorkflowTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         scenario_id = response.json()["id"]
-        self.client.post(
+        # Incomplete evidence is now refused at submission, before a reviewer's time is spent.
+        submission = self.client.post(
             f"/api/v1/content/scenarios/{scenario_id}/transition/",
             {"action": "submit"},
             content_type="application/json",
         )
+        self.assertEqual(submission.status_code, 400)
+        self.assertIn("publication", submission.json())
         self.client.force_login(self.admin)
         approval = self.client.post(
             f"/api/v1/content/scenarios/{scenario_id}/transition/",
             {"action": "approve"},
             content_type="application/json",
         )
-        self.assertEqual(approval.status_code, 400)
-        self.assertIn("publication", approval.json())
+        self.assertEqual(approval.status_code, 409)
 
     def test_asset_upload_validates_glb_license_checksum_and_admin_publication(self):
         temporary_media = tempfile.TemporaryDirectory()
@@ -3146,3 +3153,162 @@ class ModuleStudioTests(TestCase):
         )
         self.publish_lesson(lesson["id"])
         self.assertEqual(self.patch(self.author, url, {"title": "Changed live"}).status_code, 409)
+
+
+class ApprovalWorkflowTests(TestCase):
+    """Separation of duties, immutability and review history for governed content."""
+
+    setUp = ModuleStudioTests.setUp
+    build_lesson = ModuleStudioTests.build_lesson
+    post = ModuleStudioTests.post
+    patch = ModuleStudioTests.patch
+
+    def add_admin(self, email):
+        user = User.objects.create_user(email, password="pw-123")
+        SchoolMembership.objects.create(
+            school=self.school, user=user, role=SchoolMembership.Role.ADMIN
+        )
+        return user
+
+    def lesson_url(self, lesson_id):
+        return f"/api/v1/content/lessons/{lesson_id}/transition/"
+
+    def test_an_administrator_cannot_approve_their_own_lesson(self):
+        self.author = self.admin  # the administrator writes the lesson themselves
+        lesson = self.build_lesson()
+        url = self.lesson_url(lesson["id"])
+        self.assertEqual(self.post(self.admin, url, {"action": "submit"}).status_code, 200)
+        own = self.post(self.admin, url, {"action": "approve"})
+        self.assertEqual(own.status_code, 403)
+        self.assertEqual(own.json()["code"], "self_approval_blocked")
+
+        second_admin = self.add_admin("second-admin@example.com")
+        self.assertEqual(self.post(second_admin, url, {"action": "approve"}).status_code, 200)
+
+    def test_a_one_reviewer_school_can_opt_in_to_self_approval(self):
+        self.school.allow_self_approval = True
+        self.school.save(update_fields=["allow_self_approval"])
+        self.author = self.admin
+        lesson = self.build_lesson()
+        url = self.lesson_url(lesson["id"])
+        self.post(self.admin, url, {"action": "submit"})
+        self.assertEqual(self.post(self.admin, url, {"action": "approve"}).status_code, 200)
+
+    def test_an_author_cannot_approve_their_own_practical(self):
+        self.author = self.admin
+        lesson = self.build_lesson()
+        scenario = self.post(self.admin, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {})
+        transition = f"/api/v1/content/scenarios/{scenario.json()['id']}/transition/"
+        submitted = self.post(self.admin, transition, {"action": "submit"})
+        self.assertEqual(submitted.status_code, 200, submitted.content)
+        self.assertEqual(self.post(self.admin, transition, {"action": "approve"}).status_code, 403)
+        second_admin = self.add_admin("reviewer@example.com")
+        self.assertEqual(
+            self.post(second_admin, transition, {"action": "approve"}).status_code, 200
+        )
+
+    def test_incomplete_content_cannot_be_submitted(self):
+        lesson = self.build_lesson()
+        self.patch(self.author, f"/api/v1/content/lessons/{lesson['id']}/", {"safetyNotes": []})
+        refused = self.post(self.author, self.lesson_url(lesson["id"]), {"action": "submit"})
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("Add at least one safety note.", refused.json()["publication"])
+
+        scenario = self.post(self.author, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {})
+        definition = scenario.json()["definition"]
+        definition["steps"][0]["competency_codes"] = []
+        self.patch(
+            self.author,
+            f"/api/v1/content/scenarios/{scenario.json()['id']}/",
+            {"definition": definition},
+        )
+        not_ready = self.post(
+            self.author,
+            f"/api/v1/content/scenarios/{scenario.json()['id']}/transition/",
+            {"action": "submit"},
+        )
+        self.assertEqual(not_ready.status_code, 400)
+
+    def test_published_lessons_are_frozen_and_revised_as_a_new_version(self):
+        lesson = self.build_lesson()
+        scenario = self.post(self.author, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {})
+        ModuleStudioTests.publish_lesson(self, lesson["id"])
+        record = Lesson.objects.get(pk=lesson["id"])
+        record.safety_notes = ["Quietly changed"]
+        with self.assertRaises(ValidationError):
+            record.save()
+
+        revision = self.post(self.author, f"/api/v1/content/lessons/{lesson['id']}/revise/", {})
+        self.assertEqual(revision.status_code, 201, revision.content)
+        self.assertEqual(revision.json()["status"], "draft")
+        self.assertEqual(revision.json()["contentVersion"], 2)
+        self.assertEqual(revision.json()["scenarios"][0]["status"], "draft")
+        copied = SimulationScenario.objects.get(pk=revision.json()["scenarios"][0]["id"])
+        self.assertEqual(
+            copied.definition["steps"],
+            SimulationScenario.objects.get(pk=scenario.json()["id"]).definition["steps"],
+        )
+        self.assertEqual(
+            self.post(
+                self.author, f"/api/v1/content/lessons/{revision.json()['id']}/revise/", {}
+            ).status_code,
+            409,
+        )
+
+    def test_review_notes_survive_resubmission_in_the_history(self):
+        lesson = self.build_lesson()
+        url = self.lesson_url(lesson["id"])
+        self.post(self.author, url, {"action": "submit"})
+        self.post(
+            self.admin,
+            url,
+            {"action": "return_to_draft", "reviewNotes": "Add the lock-out tag step."},
+        )
+        self.post(self.author, url, {"action": "submit"})
+        self.client.force_login(self.author)
+        history = self.client.get(f"/api/v1/content/lessons/{lesson['id']}/history/").json()
+        self.assertEqual(history[0]["summary"], "Submitted for review")
+        returned = next(item for item in history if item["eventType"].endswith("return_to_draft"))
+        self.assertEqual(returned["reviewNotes"], "Add the lock-out tag step.")
+        self.assertEqual(returned["actorName"], self.admin.get_username())
+
+    def test_retiring_cannot_strand_dependent_content_or_learners(self):
+        lesson = self.build_lesson()
+        scenario_id = self.post(
+            self.author, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {}
+        ).json()["id"]
+        ModuleStudioTests.publish_lesson(self, lesson["id"])
+        transition = f"/api/v1/content/scenarios/{scenario_id}/transition/"
+        self.post(self.author, transition, {"action": "submit"})
+        self.post(self.admin, transition, {"action": "approve"})
+        self.post(self.admin, f"/api/v1/content/scenarios/{scenario_id}/publish/", {})
+
+        blocked = self.post(self.admin, self.lesson_url(lesson["id"]), {"action": "retire"})
+        self.assertEqual(blocked.status_code, 409)
+
+        self.post(
+            self.instructor,
+            "/api/v1/instructor/assignments/",
+            {"scenarioId": scenario_id, "learnerIds": [self.learner.pk], "cohortIds": []},
+        )
+        self.client.force_login(self.learner)
+        assignment_id = self.client.get("/api/v1/assignments/").json()["results"][0]["id"]
+        self.client.post(f"/api/v1/assignments/{assignment_id}/start/")
+        self.assertEqual(self.post(self.admin, transition, {"action": "retire"}).status_code, 200)
+        self.client.force_login(self.learner)
+        self.assertEqual(self.client.get("/api/v1/assignments/").json()["count"], 1)
+
+    def test_instructors_are_offered_only_the_newest_published_version(self):
+        lesson = self.build_lesson()
+        ModuleStudioTests.publish_lesson(self, lesson["id"])
+        for _ in range(2):
+            scenario_id = self.post(
+                self.author, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {}
+            ).json()["id"]
+            transition = f"/api/v1/content/scenarios/{scenario_id}/transition/"
+            self.post(self.author, transition, {"action": "submit"})
+            self.post(self.admin, transition, {"action": "approve"})
+            self.post(self.admin, f"/api/v1/content/scenarios/{scenario_id}/publish/", {})
+        self.client.force_login(self.instructor)
+        options = self.client.get("/api/v1/instructor/assignments/").json()["scenarios"]
+        self.assertEqual([item["version"] for item in options], [2])

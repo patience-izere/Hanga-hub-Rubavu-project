@@ -2,7 +2,7 @@
 
 from django.core.exceptions import ValidationError
 
-from .models import AssetPackage, Competency, Lesson
+from .models import AssetPackage, Competency, GradingPolicy, Lesson
 
 # The battery workshop scene is drawn in code; packages declaring this renderer need no GLB.
 PROCEDURAL_RENDERER = "procedural-r3f"
@@ -12,11 +12,19 @@ def _non_empty_text(value):
     return isinstance(value, str) and bool(value.strip())
 
 
-def validate_scenario_for_publication(scenario):
+def validate_scenario_for_publication(scenario, *, for_publish=True):
+    """Raise with every problem that blocks review (``for_publish=False``) or publication.
+
+    Submission and approval use the review checks, so a lesson and its practical can be reviewed
+    side by side; only publication waits for the lesson itself to be published.
+    """
+
     definition = scenario.definition
     errors = []
-    if scenario.lesson.status != Lesson.Status.PUBLISHED:
+    if for_publish and scenario.lesson.status != Lesson.Status.PUBLISHED:
         errors.append("Publish the reviewed lesson before publishing its scenario.")
+    if scenario.grading_policy.status != GradingPolicy.Status.PUBLISHED:
+        errors.append("Choose a published grading policy so reviewers approve the final rules.")
     if definition.get("format") != "opedu-scenario/v2":
         errors.append("Use the opedu-scenario/v2 definition format.")
 

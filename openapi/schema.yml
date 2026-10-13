@@ -1099,6 +1099,76 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/content/lessons/{id}/history/:
+    get:
+      operationId: api_v1_content_lessons_history_list
+      description: Every authoring and review decision on the lesson and its practicals,
+        newest first.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this lesson.
+        required: true
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedContentHistoryEntryList'
+          description: ''
+  /api/v1/content/lessons/{id}/revise/:
+    post:
+      operationId: api_v1_content_lessons_revise_create
+      description: Copy a published lesson, and its latest practical, into a new draft
+        revision.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this lesson.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringLesson'
+          description: ''
   /api/v1/content/lessons/{id}/scenarios/:
     post:
       operationId: api_v1_content_lessons_scenarios_create
@@ -3666,6 +3736,32 @@ components:
       - mastery_percentage
       - mastery_state
       - mastery_threshold
+    ContentHistoryEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventType:
+          type: string
+        summary:
+          type: string
+        subject:
+          type: string
+        actorName:
+          type: string
+        reviewNotes:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+      required:
+      - actorName
+      - eventType
+      - id
+      - occurredAt
+      - reviewNotes
+      - subject
+      - summary
     DecisionEnum:
       enum:
       - expand
@@ -4812,6 +4908,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AuthoringLesson'
+    PaginatedContentHistoryEntryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentHistoryEntry'
     PaginatedPilotApprovalList:
       type: object
       required:
@@ -5994,6 +6113,15 @@ components:
           readOnly: true
         lesson:
           type: integer
+        lessonTitle:
+          type: string
+          readOnly: true
+        lessonStatus:
+          type: string
+          readOnly: true
+        authorName:
+          type: string
+          readOnly: true
         version:
           type: integer
           maximum: 2147483647
@@ -6050,11 +6178,14 @@ components:
           format: date-time
           readOnly: true
       required:
+      - authorName
       - authoredBy
       - created_at
       - grading_policy
       - id
       - lesson
+      - lessonStatus
+      - lessonTitle
       - publicationChecks
       - published_at
       - reviewNotes

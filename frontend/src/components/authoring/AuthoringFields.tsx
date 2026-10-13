@@ -55,15 +55,17 @@ export function ListEditor({
                   onChange(items.map((value, i) => (i === index ? event.target.value : value)))
                 }
               />
-              <button
-                type="button"
-                className="studio-icon-button"
-                disabled={disabled}
-                onClick={() => onChange(items.filter((_, i) => i !== index))}
-                aria-label={`Remove ${label.toLowerCase()} ${index + 1}`}
-              >
-                Remove
-              </button>
+              {!disabled ? (
+                <button
+                  type="button"
+                  className="studio-icon-button"
+                  disabled={disabled}
+                  onClick={() => onChange(items.filter((_, i) => i !== index))}
+                  aria-label={`Remove ${label.toLowerCase()} ${index + 1}`}
+                >
+                  Remove
+                </button>
+              ) : null}
             </li>
           ))}
         </ol>

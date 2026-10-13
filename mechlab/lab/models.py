@@ -49,6 +49,13 @@ class School(models.Model):
     name = models.CharField(max_length=180)
     code = models.SlugField(max_length=60, unique=True)
     is_active = models.BooleanField(default=True)
+    allow_self_approval = models.BooleanField(
+        default=False,
+        help_text=(
+            "Let a school administrator approve content they authored. Leave off unless the "
+            "school has only one person able to review safety-critical procedures."
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -454,9 +461,45 @@ class Lesson(models.Model):
                     {field_name: f"{field_name.replace('_', ' ').title()} must be a list of text."}
                 )
 
+    # Text learners read. Once a lesson is published it is evidence context for every attempt
+    # made against it, so changes go into a new revision instead.
+    LEARNER_FACING_FIELDS = (
+        "course_id",
+        "module_id",
+        "title",
+        "slug",
+        "summary",
+        "objectives",
+        "safety_notes",
+        "estimated_minutes",
+        "language",
+        "content_version",
+    )
+
     def save(self, *args, **kwargs):
         self.full_clean()
+        self._prevent_published_changes()
         return super().save(*args, **kwargs)
+
+    def _prevent_published_changes(self):
+        if not self.pk:
+            return
+        previous = type(self).objects.filter(pk=self.pk).first()
+        if previous is None or previous.status not in {self.Status.PUBLISHED, self.Status.RETIRED}:
+            return
+        if any(
+            getattr(previous, field) != getattr(self, field) for field in self.LEARNER_FACING_FIELDS
+        ):
+            raise ValidationError(
+                "Published lessons cannot be edited in place. Start a revision instead."
+            )
+        if previous.status == self.Status.RETIRED and self.status != self.Status.RETIRED:
+            raise ValidationError("A retired lesson cannot be reactivated.")
+        if previous.status == self.Status.PUBLISHED and self.status not in {
+            self.Status.PUBLISHED,
+            self.Status.RETIRED,
+        }:
+            raise ValidationError("A published lesson can only be retired.")
 
     def __str__(self):
         return self.title

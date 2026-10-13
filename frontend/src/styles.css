@@ -5681,6 +5681,39 @@ textarea {
   color: #4a3b00;
 }
 
+.studio-review-queue {
+  margin-bottom: 32px;
+  padding: 18px;
+  border: 1px solid var(--green-650);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.studio-history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+.studio-history li {
+  display: grid;
+  gap: 2px;
+  padding-left: 12px;
+  border-left: 3px solid var(--line);
+  font-size: 0.88rem;
+}
+.studio-history-who {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.studio-history q {
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--sand);
+  font-style: italic;
+}
+
 @media (max-width: 900px) {
   .studio-home-grid,
   .studio-editor-grid {

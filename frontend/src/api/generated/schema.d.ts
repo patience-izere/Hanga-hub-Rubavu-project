@@ -464,6 +464,40 @@ export interface paths {
         patch: operations["api_v1_content_lessons_partial_update"];
         trace?: never;
     };
+    "/api/v1/content/lessons/{id}/history/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Every authoring and review decision on the lesson and its practicals, newest first. */
+        get: operations["api_v1_content_lessons_history_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/lessons/{id}/revise/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Copy a published lesson, and its latest practical, into a new draft revision. */
+        post: operations["api_v1_content_lessons_revise_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/content/lessons/{id}/scenarios/": {
         parameters: {
             query?: never;
@@ -1390,6 +1424,16 @@ export interface components {
             mastery_state: components["schemas"]["MasteryStateEnum"];
             evidence?: unknown;
         };
+        ContentHistoryEntry: {
+            id: number;
+            eventType: string;
+            summary: string;
+            subject: string;
+            actorName: string;
+            reviewNotes: string;
+            /** Format: date-time */
+            occurredAt: string;
+        };
         /**
          * @description * `expand` - Approve expansion
          *     * `limit` - Continue with limits
@@ -1830,6 +1874,21 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["AuthoringLesson"][];
+        };
+        PaginatedContentHistoryEntryList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["ContentHistoryEntry"][];
         };
         PaginatedPilotApprovalList: {
             /** @example 123 */
@@ -2364,6 +2423,9 @@ export interface components {
         ScenarioAuthoring: {
             readonly id: number;
             lesson: number;
+            readonly lessonTitle: string;
+            readonly lessonStatus: string;
+            readonly authorName: string;
             version: number;
             title: string;
             definition?: unknown;
@@ -3514,6 +3576,59 @@ export interface operations {
         };
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringLesson"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_history_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this lesson. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedContentHistoryEntryList"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_revise_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this lesson. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

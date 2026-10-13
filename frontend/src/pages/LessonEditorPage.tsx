@@ -12,6 +12,8 @@ import {
   useAuthoringLesson,
   useCreateAuthoringLesson,
   useCreateLessonScenario,
+  useLessonHistory,
+  useReviseAuthoringLesson,
   useTransitionAuthoringLesson,
   useUpdateAuthoringLesson,
 } from "../learning/useContentAuthoring";
@@ -62,6 +64,8 @@ export function LessonEditorPage() {
   const update = useUpdateAuthoringLesson();
   const transition = useTransitionAuthoringLesson();
   const createScenario = useCreateLessonScenario();
+  const revise = useReviseAuthoringLesson();
+  const history = useLessonHistory(lessonId);
 
   const [form, setForm] = useState<LessonInput>(EMPTY_LESSON);
   const [savedSnapshot, setSavedSnapshot] = useState("");
@@ -427,7 +431,8 @@ export function LessonEditorPage() {
                   )}
                   {isOwnWork && status === "review" ? (
                     <p className="field-note">
-                      You wrote this lesson, so another reviewer must approve it.
+                      You wrote this lesson, so another reviewer must approve it. A school with a
+                      single reviewer can ask its platform administrator to allow self-approval.
                     </p>
                   ) : null}
                   <button
@@ -451,6 +456,31 @@ export function LessonEditorPage() {
                 >
                   Retire lesson
                 </button>
+              ) : null}
+              {status === "published" || status === "retired" ? (
+                <>
+                  <p className="field-note">
+                    Learners' evidence refers to this exact text, so it stays as published. Start a
+                    revision to change it; the current version stays live until you retire it.
+                  </p>
+                  <button
+                    type="button"
+                    className="button button-primary button-full"
+                    disabled={revise.isPending}
+                    onClick={() =>
+                      revise.mutate(lessonId, {
+                        onSuccess: (revision) => navigate(`/authoring/lessons/${revision.id}`),
+                      })
+                    }
+                  >
+                    {revise.isPending ? "Starting…" : "Start a revision"}
+                  </button>
+                  {revise.isError ? (
+                    <p className="form-error" role="alert">
+                      {describeApiError(revise.error, "The revision could not be started.")}
+                    </p>
+                  ) : null}
+                </>
               ) : null}
               {transition.isError ? (
                 <p className="form-error" role="alert">
@@ -503,6 +533,34 @@ export function LessonEditorPage() {
                   {describeApiError(createScenario.error, "The practical could not be created.")}
                 </p>
               ) : null}
+            </section>
+            <section className="studio-side-panel" aria-labelledby="lesson-history-heading">
+              <h2 id="lesson-history-heading">Review history</h2>
+              {history.data?.length ? (
+                <ol className="studio-history">
+                  {history.data.map((entry) => (
+                    <li key={entry.id}>
+                      <span className="studio-history-what">
+                        <strong>{entry.summary}</strong> · {entry.subject}
+                      </span>
+                      <span className="studio-history-who">
+                        {entry.actorName} ·{" "}
+                        {new Date(entry.occurredAt).toLocaleString(undefined, {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      {entry.reviewNotes ? <q>{entry.reviewNotes}</q> : null}
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="field-note">
+                  {history.isError ? "History could not be loaded." : "No activity yet."}
+                </p>
+              )}
             </section>
           </aside>
         ) : null}

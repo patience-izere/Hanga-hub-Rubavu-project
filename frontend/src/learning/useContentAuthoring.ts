@@ -9,6 +9,7 @@ import {
   createLessonScenario,
   getAuthoredScenario,
   getAuthoringLesson,
+  getLessonHistory,
   listAuthoredScenarios,
   listAuthoredAssetPackages,
   listAuthoringCourses,
@@ -16,6 +17,7 @@ import {
   listGradingPolicies,
   publishAuthoredAssetPackage,
   publishAuthoredScenario,
+  reviseAuthoringLesson,
   transitionAuthoredScenario,
   transitionAuthoringLesson,
   updateAuthoredScenario,
@@ -200,4 +202,16 @@ export function usePublishAuthoredAssetPackage() {
     mutationFn: publishAuthoredAssetPackage,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: assetsKey }),
   });
+}
+
+export function useLessonHistory(id: number) {
+  return useQuery({
+    queryKey: [...lessonsKey, id, "history"],
+    queryFn: () => getLessonHistory(id),
+    enabled: id > 0,
+  });
+}
+
+export function useReviseAuthoringLesson() {
+  return useRefreshAfter((id: number) => reviseAuthoringLesson(id));
 }
