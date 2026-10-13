@@ -68,7 +68,11 @@ from .models import (
     XApiDelivery,
 )
 from .permissions import IsInstructorOrSchoolAdmin
-from .research import research_participant_code
+from .research import (
+    consenting_participant_codes,
+    research_attempt_code,
+    research_participant_code,
+)
 from .xapi_validation import validate_xapi_statement
 
 
@@ -656,11 +660,16 @@ class InstructorEvidenceExportView(APIView):
     def get(self, request):
         research_export = request.query_params.get("scope") == "research"
         attempts = _instructor_attempt_queryset(request.user).order_by("id")
+        consented = (
+            consenting_participant_codes(_instructor_school_ids(request.user))
+            if research_export
+            else set()
+        )
         stream = io.StringIO()
         writer = csv.writer(stream)
         writer.writerow(
             [
-                "attempt_id",
+                "attempt_code" if research_export else "attempt_id",
                 "learner",
                 "lesson",
                 "scenario_version",
@@ -677,14 +686,16 @@ class InstructorEvidenceExportView(APIView):
             ]
         )
         for attempt in attempts:
-            learner = (
-                research_participant_code(
-                    attempt.assignment.lesson.course.school_id,
-                    attempt.learner_id,
-                )
-                if research_export
-                else attempt.learner.get_full_name() or attempt.learner.get_username()
-            )
+            school_id = attempt.assignment.lesson.course.school_id
+            if research_export:
+                learner = research_participant_code(school_id, attempt.learner_id)
+                # Only learners who gave active research consent appear in research data.
+                if (school_id, learner) not in consented:
+                    continue
+                attempt_key = research_attempt_code(school_id, attempt.pk)
+            else:
+                learner = attempt.learner.get_full_name() or attempt.learner.get_username()
+                attempt_key = attempt.pk
             events = list(attempt.events.all())
             completed_at = attempt.completed_at
             duration = (
@@ -696,7 +707,7 @@ class InstructorEvidenceExportView(APIView):
             )
             writer.writerow(
                 [
-                    attempt.pk,
+                    attempt_key,
                     learner,
                     attempt.assignment.lesson.title,
                     attempt.scenario.version,

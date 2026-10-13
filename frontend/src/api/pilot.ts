@@ -199,3 +199,32 @@ export async function recordPilotReview(
     body: JSON.stringify(input),
   });
 }
+
+export type PilotParticipant = {
+  learnerId: number;
+  name: string;
+  consented: boolean;
+  recordedInstruments: PilotInstrument[];
+};
+
+export function getPilotParticipants(id: number): Promise<PilotParticipant[]> {
+  return apiFetch(`/api/v1/research/pilots/${id}/participants/`);
+}
+
+export type PilotConsent = {
+  consented: boolean;
+  consentVersion: string;
+  expiresAt: string | null;
+};
+
+export function getPilotConsent(id: number): Promise<PilotConsent> {
+  return apiFetch(`/api/v1/research/pilots/${id}/consent/`);
+}
+
+export async function givePilotConsent(id: number): Promise<PilotConsent> {
+  await ensureCsrf();
+  return apiFetch(`/api/v1/research/pilots/${id}/consent/`, {
+    method: "POST",
+    body: JSON.stringify({ consentAccepted: true }),
+  });
+}

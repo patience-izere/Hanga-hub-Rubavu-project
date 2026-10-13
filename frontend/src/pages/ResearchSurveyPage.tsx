@@ -7,7 +7,14 @@ import {
   withdrawResearchResponses,
   type ResearchConsentPolicy,
 } from "../api/research";
-import { getPilotStudies, recordPilotObservation } from "../api/pilot";
+import {
+  getPilotConsent,
+  getPilotStudies,
+  givePilotConsent,
+  recordPilotObservation,
+  type PilotConsent,
+} from "../api/pilot";
+import { describeApiError } from "../api/client";
 
 const susItems = [
   "I would like to use this learning system frequently.",
@@ -46,6 +53,10 @@ export function ResearchSurveyPage() {
   const [consentPolicy, setConsentPolicy] = useState<ResearchConsentPolicy | null>(null);
   const [consentPolicyError, setConsentPolicyError] = useState(false);
   const [activePilotId, setActivePilotId] = useState<number | null>(null);
+  const [pilotConsent, setPilotConsent] = useState<PilotConsent | null>(null);
+  const [joinChecked, setJoinChecked] = useState(false);
+  const [joinError, setJoinError] = useState("");
+  const [joining, setJoining] = useState(false);
   const scenarioVersion = search.get("scenarioVersion") ?? "";
   const complete =
     susItems.every((_, index) => answers[`sus_${index + 1}`]) &&
@@ -74,6 +85,16 @@ export function ResearchSurveyPage() {
       .catch(() => setActivePilotId(null));
   }, [scenarioVersion]);
 
+  useEffect(() => {
+    if (!activePilotId) return;
+    void getPilotConsent(activePilotId)
+      .then((value) => {
+        setPilotConsent(value);
+        if (value.consented) setConsent(true);
+      })
+      .catch(() => setPilotConsent(null));
+  }, [activePilotId]);
+
   return (
     <section className="survey-page">
       <span className="eyebrow">Optional pilot evaluation</span>
@@ -82,6 +103,63 @@ export function ResearchSurveyPage() {
         Your operational account is converted to a pseudonymous participant code. Responses are used
         only under the approved pilot consent and retention process.
       </p>
+      {activePilotId && pilotConsent ? (
+        <section className="survey-join" aria-labelledby="join-heading">
+          <h2 id="join-heading">
+            {pilotConsent.consented
+              ? "You are taking part in this pilot"
+              : "Take part in the pilot"}
+          </h2>
+          {pilotConsent.consented ? (
+            <p>
+              Your instructor can now record your practical results for the study. You can withdraw
+              at any time at the bottom of this page.
+            </p>
+          ) : (
+            <>
+              <p>
+                Taking part is voluntary and does not change your marks. If you agree, your
+                instructor records your test and practical results under a code instead of your
+                name, and you answer the questions below after your session.
+              </p>
+              <label className="survey-consent">
+                <input
+                  type="checkbox"
+                  checked={joinChecked}
+                  onChange={(event) => setJoinChecked(event.target.checked)}
+                />
+                I agree to take part in this pilot study under consent version{" "}
+                {pilotConsent.consentVersion}.
+              </label>
+              <button
+                type="button"
+                className="button button-primary"
+                disabled={!joinChecked || joining}
+                onClick={async () => {
+                  setJoining(true);
+                  setJoinError("");
+                  try {
+                    const value = await givePilotConsent(activePilotId);
+                    setPilotConsent(value);
+                    setConsent(true);
+                  } catch (error) {
+                    setJoinError(describeApiError(error, "Your decision could not be saved."));
+                  } finally {
+                    setJoining(false);
+                  }
+                }}
+              >
+                {joining ? "Saving…" : "Join the pilot"}
+              </button>
+              {joinError ? (
+                <p className="form-error" role="alert">
+                  {joinError}
+                </p>
+              ) : null}
+            </>
+          )}
+        </section>
+      ) : null}
       <form
         onSubmit={async (event) => {
           event.preventDefault();

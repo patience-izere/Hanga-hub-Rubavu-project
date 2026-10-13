@@ -515,6 +515,28 @@ class ResearchSurveyResponseSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Explicit research consent is required.")
         return value
 
+    def validate_instrument(self, value):
+        if value not in {
+            ResearchSurveyResponse.Instrument.SUS,
+            ResearchSurveyResponse.Instrument.TAM,
+        }:
+            raise serializers.ValidationError("This endpoint accepts SUS and TAM ratings only.")
+        return value
+
+    def validate_responses(self, value):
+        # Ratings only: free text here would carry names or contact details into data that is
+        # meant to be pseudonymous.
+        if not isinstance(value, dict) or not 1 <= len(value) <= 20:
+            raise serializers.ValidationError("Responses must be between 1 and 20 ratings.")
+        for key, rating in value.items():
+            if not isinstance(key, str) or not key.replace("_", "").isalnum() or len(key) > 40:
+                raise serializers.ValidationError("Each rating needs a short item code.")
+            if isinstance(rating, bool) or not isinstance(rating, int) or not 1 <= rating <= 5:
+                raise serializers.ValidationError(
+                    "Every rating must be a whole number from 1 to 5."
+                )
+        return value
+
     def validate_consent_version(self, value):
         if value != settings.RESEARCH_CONSENT_VERSION:
             raise serializers.ValidationError("This consent text is stale; reload before deciding.")

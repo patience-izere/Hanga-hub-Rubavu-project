@@ -1,3 +1,4 @@
+import csv
 import hashlib
 import json
 import struct
@@ -2230,6 +2231,15 @@ class LearningApiTests(TestCase):
         self.assertEqual(operational["Cache-Control"], "private, no-store")
         self.assertIn("learner@example.com", operational.content.decode())
 
+        # Research rows only cover learners with active consent.
+        ResearchConsentReceipt.objects.create(
+            school=self.school,
+            participant_code=research_participant_code(self.school.pk, self.learner.pk),
+            consent_version="opedu-pilot-consent-v1",
+            status=ResearchConsentReceipt.Status.ACTIVE,
+            consented_at=timezone.now(),
+            expires_at=timezone.now() + timedelta(days=30),
+        )
         research = self.client.get("/api/v1/instructor/evidence.csv?scope=research")
         self.assertEqual(research.status_code, 200)
         self.assertNotIn("learner@example.com", research.content.decode())
@@ -3312,3 +3322,175 @@ class ApprovalWorkflowTests(TestCase):
         self.client.force_login(self.instructor)
         options = self.client.get("/api/v1/instructor/assignments/").json()["scenarios"]
         self.assertEqual([item["version"] for item in options], [2])
+
+
+@override_settings(ALLOWED_HOSTS=["testserver"], RESEARCH_CONSENT_STATUS="approved")
+class ResearchConsentTests(TestCase):
+    """Research data only covers people who consented, and expires with their consent."""
+
+    setUp = PilotWorkflowTests.setUp
+    create_study = PilotWorkflowTests.create_study
+    freeze_and_start = PilotWorkflowTests.freeze_and_start
+
+    def learner_attempt(self):
+        assignment = Assignment.objects.get(learner=self.learner)
+        self.client.force_login(self.learner)
+        return self.client.post(f"/api/v1/assignments/{assignment.pk}/start/").json()["attempt"]
+
+    def test_learner_consents_before_the_pre_test_is_recorded(self):
+        study = self.create_study()
+        self.freeze_and_start(study)
+        observations_url = f"/api/v1/research/pilots/{study.pk}/observations/"
+        pre_test = {
+            "instrument": "pre_test",
+            "responses": {"score": 40},
+            "learner_id": self.learner.pk,
+        }
+
+        self.client.force_login(self.instructor)
+        participants = self.client.get(f"/api/v1/research/pilots/{study.pk}/participants/").json()
+        self.assertFalse(
+            next(p for p in participants if p["learnerId"] == self.learner.pk)["consented"]
+        )
+        self.assertEqual(
+            self.client.post(
+                observations_url, pre_test, content_type="application/json"
+            ).status_code,
+            409,
+        )
+
+        self.client.force_login(self.learner)
+        consent_url = f"/api/v1/research/pilots/{study.pk}/consent/"
+        self.assertFalse(self.client.get(consent_url).json()["consented"])
+        refused = self.client.post(
+            consent_url, {"consentAccepted": False}, content_type="application/json"
+        )
+        self.assertEqual(refused.status_code, 400)
+        given = self.client.post(
+            consent_url, {"consentAccepted": True}, content_type="application/json"
+        )
+        self.assertEqual(given.status_code, 201, given.content)
+        self.assertTrue(self.client.get(consent_url).json()["consented"])
+
+        self.client.force_login(self.instructor)
+        recorded = self.client.post(observations_url, pre_test, content_type="application/json")
+        self.assertEqual(recorded.status_code, 201, recorded.content)
+        participants = self.client.get(f"/api/v1/research/pilots/{study.pk}/participants/").json()
+        row = next(p for p in participants if p["learnerId"] == self.learner.pk)
+        self.assertTrue(row["consented"])
+        self.assertEqual(row["recordedInstruments"], ["pre_test"])
+
+    def test_instructor_self_reports_require_and_record_their_own_consent(self):
+        study = self.create_study()
+        self.freeze_and_start(study)
+        self.client.force_login(self.instructor)
+        workload = {
+            "instrument": "instructor_workload",
+            "responses": {
+                "preparationMinutes": 30,
+                "supportMinutes": 20,
+                "supportIncidents": 1,
+                "acceptable": True,
+            },
+        }
+        url = f"/api/v1/research/pilots/{study.pk}/observations/"
+        missing = self.client.post(url, workload, content_type="application/json")
+        self.assertEqual(missing.status_code, 400)
+        given = self.client.post(
+            url, {**workload, "consent_accepted": True}, content_type="application/json"
+        )
+        self.assertEqual(given.status_code, 201, given.content)
+
+    def test_research_export_excludes_non_consenting_learners_and_cannot_be_joined(self):
+        attempt = self.learner_attempt()
+        self.client.force_login(self.instructor)
+        rows = list(
+            csv.reader(
+                StringIO(
+                    self.client.get(
+                        "/api/v1/instructor/evidence.csv?scope=research"
+                    ).content.decode()
+                )
+            )
+        )
+        self.assertEqual(rows[0][0], "attempt_code")
+        self.assertEqual(len(rows), 1)
+
+        ResearchConsentReceipt.objects.create(
+            school=self.school,
+            participant_code=research_participant_code(self.school.pk, self.learner.pk),
+            consent_version="opedu-pilot-consent-v1",
+            status=ResearchConsentReceipt.Status.ACTIVE,
+            consented_at=timezone.now(),
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+        rows = list(
+            csv.reader(
+                StringIO(
+                    self.client.get(
+                        "/api/v1/instructor/evidence.csv?scope=research"
+                    ).content.decode()
+                )
+            )
+        )
+        self.assertEqual(len(rows), 2)
+        self.assertNotEqual(rows[1][0], str(attempt["id"]))
+        operational = list(
+            csv.reader(
+                StringIO(self.client.get("/api/v1/instructor/evidence.csv").content.decode())
+            )
+        )
+        self.assertEqual(operational[1][0], str(attempt["id"]))
+        self.assertNotIn(rows[1][0], {row[0] for row in operational})
+
+    def test_retention_purge_also_deletes_pilot_observations(self):
+        study = self.create_study()
+        self.freeze_and_start(study)
+        self.client.force_login(self.learner)
+        self.client.post(
+            f"/api/v1/research/pilots/{study.pk}/consent/",
+            {"consentAccepted": True},
+            content_type="application/json",
+        )
+        self.client.force_login(self.instructor)
+        self.client.post(
+            f"/api/v1/research/pilots/{study.pk}/observations/",
+            {"instrument": "pre_test", "responses": {"score": 55}, "learner_id": self.learner.pk},
+            content_type="application/json",
+        )
+        code = research_participant_code(self.school.pk, self.learner.pk)
+        self.assertTrue(PilotObservation.objects.filter(participant_code=code).exists())
+        ResearchConsentReceipt.objects.filter(participant_code=code).update(
+            consented_at=timezone.now() - timedelta(days=400),
+            expires_at=timezone.now() - timedelta(days=1),
+        )
+        call_command("purge_expired_research", stdout=StringIO())
+        self.assertFalse(PilotObservation.objects.filter(participant_code=code).exists())
+
+    def test_general_survey_accepts_ratings_only(self):
+        self.client.force_login(self.learner)
+        base = {
+            "instrument": "sus",
+            "consent_version": "opedu-pilot-consent-v1",
+            "consent_accepted": True,
+        }
+        with self.settings(RESEARCH_CONSENT_VERSION="opedu-pilot-consent-v1"):
+            transcript = self.client.post(
+                "/api/v1/research/surveys/",
+                {**base, "responses": {"notes": "Jean, 0788 123 456, said it was fine"}},
+                content_type="application/json",
+            )
+            self.assertEqual(transcript.status_code, 400)
+            ratings = self.client.post(
+                "/api/v1/research/surveys/",
+                {**base, "responses": {"item_1": 4, "item_2": 2}},
+                content_type="application/json",
+            )
+            self.assertEqual(ratings.status_code, 201, ratings.content)
+
+    def test_http_options_is_not_shadowed_by_the_options_action(self):
+        study = self.create_study()
+        self.client.force_login(self.admin)
+        response = self.client.options(f"/api/v1/research/pilots/{study.pk}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.get("/api/v1/research/pilots/options/").status_code, 200)

@@ -5746,3 +5746,56 @@ textarea {
   background: #2a2510;
   border-color: #5a4c1a;
 }
+
+/* Pilot observation form */
+.pilot-observation-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+.pilot-observation-form > label,
+.pilot-rubric label {
+  display: grid;
+  gap: 4px;
+  font-weight: 600;
+}
+.pilot-observation-form input:not([type="checkbox"]):not([type="radio"]),
+.pilot-observation-form select,
+.pilot-observation-form textarea {
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 400;
+}
+.pilot-rubric,
+.pilot-inline-choice {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.pilot-inline-choice {
+  grid-template-columns: repeat(auto-fit, minmax(80px, max-content));
+  gap: 18px;
+}
+.pilot-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 6px 14px;
+}
+.survey-join {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0 28px;
+  padding: 20px;
+  border: 1px solid var(--green-650);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.survey-join h2 {
+  margin: 0;
+}

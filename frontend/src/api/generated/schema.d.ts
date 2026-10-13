@@ -783,6 +783,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/research/pilots/{id}/consent/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description A learner's own decision to take part, recorded before any scored instrument. */
+        get: operations["api_v1_research_pilots_consent_retrieve"];
+        put?: never;
+        /** @description A learner's own decision to take part, recorded before any scored instrument. */
+        post: operations["api_v1_research_pilots_consent_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/research/pilots/{id}/incidents/": {
         parameters: {
             query?: never;
@@ -809,6 +827,23 @@ export interface paths {
         get: operations["api_v1_research_pilots_observations_list"];
         put?: never;
         post: operations["api_v1_research_pilots_observations_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/pilots/{id}/participants/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Enrolled learners with their consent state, for recording learner-scored instruments. */
+        get: operations["api_v1_research_pilots_participants_list"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -886,7 +921,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Handler method for HTTP 'OPTIONS' request. */
         get: operations["api_v1_research_pilots_options_retrieve"];
         put?: never;
         post?: never;
@@ -1935,6 +1969,21 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["PilotObservation"][];
         };
+        PaginatedPilotParticipantList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["PilotParticipant"][];
+        };
         PaginatedPilotRehearsalList: {
             /** @example 123 */
             count: number;
@@ -2067,6 +2116,15 @@ export interface components {
          * @enum {string}
          */
         PilotApprovalStatusEnum: "pending" | "approved" | "rejected";
+        PilotConsent: {
+            readonly consented: boolean;
+            readonly consentVersion: string;
+            /** Format: date-time */
+            readonly expiresAt: string | null;
+        };
+        PilotConsentRequest: {
+            consentAccepted?: boolean;
+        };
         PilotIncident: {
             readonly id: number;
             kind: components["schemas"]["PilotIncidentKindEnum"];
@@ -2168,6 +2226,12 @@ export interface components {
             scenarios: {
                 [key: string]: unknown;
             }[];
+        };
+        PilotParticipant: {
+            learnerId: number;
+            name: string;
+            consented: boolean;
+            recordedInstruments: string[];
         };
         PilotRehearsal: {
             readonly id: number;
@@ -4359,6 +4423,56 @@ export interface operations {
             };
         };
     };
+    api_v1_research_pilots_consent_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotConsent"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_consent_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PilotConsentRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PilotConsentRequest"];
+                "multipart/form-data": components["schemas"]["PilotConsentRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotConsent"];
+                };
+            };
+        };
+    };
     api_v1_research_pilots_incidents_list: {
         parameters: {
             query?: {
@@ -4491,6 +4605,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaginatedPilotObservationList"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_participants_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPilotParticipantList"];
                 };
             };
         };
