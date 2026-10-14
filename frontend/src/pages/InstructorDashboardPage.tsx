@@ -8,10 +8,19 @@ import { QueryBoundary } from "../components/ui/QueryBoundary";
 import { useInstructorOverview } from "../learning/useInstructor";
 
 type Filter =
-  "all" | "safety" | "review" | "in_progress" | "completed" | "overdue" | "blocked" | "failed";
+  | "all"
+  | "attention"
+  | "safety"
+  | "review"
+  | "in_progress"
+  | "completed"
+  | "overdue"
+  | "blocked"
+  | "failed";
 
 const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: "all", label: "All attempts" },
+  { value: "attention", label: "Needs your attention" },
   { value: "safety", label: "Safety attention" },
   { value: "review", label: "Requires review" },
   { value: "in_progress", label: "In progress" },
@@ -23,6 +32,8 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
 
 function matchesFilter(attempt: InstructorAttemptEvidence, filter: Filter): boolean {
   switch (filter) {
+    case "attention":
+      return needsAttention(attempt);
     case "safety":
       return attempt.safety_errors > 0;
     case "review":
@@ -42,11 +53,20 @@ function matchesFilter(attempt: InstructorAttemptEvidence, filter: Filter): bool
   }
 }
 
+/**
+ * Whether an attempt still needs the instructor. Safety errors stop counting once the instructor
+ * has signed the attempt off or published feedback on it; otherwise the list never shrinks.
+ */
+function needsAttention(attempt: InstructorAttemptEvidence): boolean {
+  if (attempt.status === "requires_review" || attempt.is_overdue) return true;
+  return attempt.safety_errors > 0 && !attempt.review_decision && !attempt.has_published_feedback;
+}
+
 function attentionReason(attempt: InstructorAttemptEvidence): string {
-  if (attempt.safety_errors > 0) {
-    return `${attempt.safety_errors} safety error${attempt.safety_errors === 1 ? "" : "s"}`;
+  if (attempt.status === "requires_review") return "Waiting for your sign-off";
+  if (attempt.safety_errors > 0 && !attempt.is_overdue) {
+    return `${attempt.safety_errors} safety error${attempt.safety_errors === 1 ? "" : "s"}, no feedback yet`;
   }
-  if (attempt.status === "requires_review") return "Awaiting review";
   return "Overdue";
 }
 
@@ -79,12 +99,14 @@ export function InstructorDashboardPage() {
         error="School evidence could not be loaded."
       >
         {(data) => {
-          const attention = data.attempts.filter(
-            (attempt) =>
-              attempt.safety_errors > 0 ||
-              attempt.status === "requires_review" ||
-              attempt.is_overdue,
-          );
+          // Waiting for sign-off first: those block the learner's result.
+          const attention = data.attempts
+            .filter(needsAttention)
+            .sort(
+              (left, right) =>
+                Number(right.status === "requires_review") -
+                Number(left.status === "requires_review"),
+            );
           const visible = data.attempts.filter((attempt) => matchesFilter(attempt, filter));
 
           return (
@@ -107,7 +129,10 @@ export function InstructorDashboardPage() {
                     <h2 id="attention-title">
                       {attention.length} attempt{attention.length === 1 ? "" : "s"} to look at
                     </h2>
-                    <p>Safety errors, attempts awaiting review, and work past its due date.</p>
+                    <p>
+                      Attempts waiting for your sign-off, safety errors without feedback, and work
+                      past its due date.
+                    </p>
                   </div>
                   <ul>
                     {attention.slice(0, 5).map((attempt) => (
@@ -121,8 +146,8 @@ export function InstructorDashboardPage() {
                     ))}
                   </ul>
                   {attention.length > 5 ? (
-                    <button className="button-link" onClick={() => setFilter("safety")}>
-                      Filter the table to safety attention
+                    <button className="button-link" onClick={() => setFilter("attention")}>
+                      Show all {attention.length} in the table
                     </button>
                   ) : null}
                 </section>
@@ -131,7 +156,12 @@ export function InstructorDashboardPage() {
               <div className="evidence-heading">
                 <div>
                   <h2>Attempt evidence</h2>
-                  <p>Most recently updated attempts appear first.</p>
+                  <p>
+                    Most recently updated attempts appear first.
+                    {data.attempts.length < data.metrics.attempts
+                      ? ` Showing ${data.attempts.length} of ${data.metrics.attempts}; open a learner from the roster for their full history.`
+                      : ""}
+                  </p>
                 </div>
                 <div className="evidence-controls">
                   <span>

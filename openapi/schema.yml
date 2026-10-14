@@ -20,6 +20,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -156,6 +162,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -479,6 +491,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -742,6 +760,437 @@ paths:
               schema:
                 $ref: '#/components/schemas/AssetPackageAuthoring'
           description: ''
+  /api/v1/content/courses/:
+    get:
+      operationId: api_v1_content_courses_list
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuthoringCourse'
+          description: ''
+    post:
+      operationId: api_v1_content_courses_create
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthoringCourseRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AuthoringCourseRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AuthoringCourseRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringCourse'
+          description: ''
+  /api/v1/content/courses/{id}/:
+    get:
+      operationId: api_v1_content_courses_retrieve
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringCourse'
+          description: ''
+    patch:
+      operationId: api_v1_content_courses_partial_update
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAuthoringCourseRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAuthoringCourseRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAuthoringCourseRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringCourse'
+          description: ''
+  /api/v1/content/courses/{id}/competencies/:
+    post:
+      operationId: api_v1_content_courses_competencies_create
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompetencyOptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CompetencyOptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CompetencyOptionRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompetencyOption'
+          description: ''
+  /api/v1/content/courses/{id}/modules/:
+    post:
+      operationId: api_v1_content_courses_modules_create
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModuleOptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ModuleOptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ModuleOptionRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleOption'
+          description: ''
+  /api/v1/content/grading-policies/:
+    get:
+      operationId: api_v1_content_grading_policies_list
+      description: Published grading policies an author may attach to a practical
+        scenario.
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GradingPolicyOption'
+          description: ''
+  /api/v1/content/lessons/:
+    get:
+      operationId: api_v1_content_lessons_list
+      description: Draft lessons an author writes before building the practical scenario.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAuthoringLessonList'
+          description: ''
+    post:
+      operationId: api_v1_content_lessons_create
+      description: Draft lessons an author writes before building the practical scenario.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthoringLessonRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AuthoringLessonRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AuthoringLessonRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringLesson'
+          description: ''
+  /api/v1/content/lessons/{id}/:
+    get:
+      operationId: api_v1_content_lessons_retrieve
+      description: Draft lessons an author writes before building the practical scenario.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this lesson.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringLesson'
+          description: ''
+    patch:
+      operationId: api_v1_content_lessons_partial_update
+      description: Draft lessons an author writes before building the practical scenario.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this lesson.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAuthoringLessonRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAuthoringLessonRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAuthoringLessonRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringLesson'
+          description: ''
+    delete:
+      operationId: api_v1_content_lessons_destroy
+      description: Draft lessons an author writes before building the practical scenario.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this lesson.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/content/lessons/{id}/history/:
+    get:
+      operationId: api_v1_content_lessons_history_list
+      description: Every authoring and review decision on the lesson and its practicals,
+        newest first.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this lesson.
+        required: true
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedContentHistoryEntryList'
+          description: ''
+  /api/v1/content/lessons/{id}/revise/:
+    post:
+      operationId: api_v1_content_lessons_revise_create
+      description: Copy a published lesson, and its latest practical, into a new draft
+        revision.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this lesson.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthoringLesson'
+          description: ''
+  /api/v1/content/lessons/{id}/scenarios/:
+    post:
+      operationId: api_v1_content_lessons_scenarios_create
+      description: Start a new draft practical scenario for this lesson.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this lesson.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioAuthoring'
+          description: ''
   /api/v1/content/lessons/{id}/transition/:
     post:
       operationId: api_v1_content_lessons_transition_create
@@ -788,6 +1237,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -1070,6 +1525,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/InstructorAssignmentCreateResponse'
           description: ''
+  /api/v1/instructor/assignments/{id}/:
+    patch:
+      operationId: api_v1_instructor_assignments_partial_update
+      description: Extend a deadline, open the lesson earlier or later, or allow more
+        attempts.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInstructorAssignmentUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInstructorAssignmentUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInstructorAssignmentUpdateRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstructorLearnerAssignment'
+          description: ''
   /api/v1/instructor/attempts/{id}/:
     get:
       operationId: api_v1_instructor_attempts_retrieve
@@ -1151,6 +1639,81 @@ paths:
               schema:
                 $ref: '#/components/schemas/AdaptiveRecommendation'
           description: ''
+  /api/v1/instructor/attempts/{id}/feedback/{feedback_id}/:
+    patch:
+      operationId: api_v1_instructor_attempts_feedback_partial_update
+      description: |-
+        Edit, publish or withdraw one piece of feedback.
+
+        Only its author or a school administrator may change it, so colleagues cannot rewrite each
+        other's words. Withdrawing hides it from the learner again.
+      parameters:
+      - in: path
+        name: feedback_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInstructorFeedbackUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInstructorFeedbackUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInstructorFeedbackUpdateRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstructorFeedback'
+          description: ''
+  /api/v1/instructor/attempts/{id}/review/:
+    post:
+      operationId: api_v1_instructor_attempts_review_create
+      description: Sign off an attempt that grading held back because of a safety-critical
+        mistake.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttemptReviewDecisionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AttemptReviewDecisionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AttemptReviewDecisionRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstructorAttemptReview'
+          description: ''
   /api/v1/instructor/evidence.csv:
     get:
       operationId: api_v1_instructor_evidence.csv_retrieve
@@ -1213,6 +1776,12 @@ paths:
   /api/v1/instructor/overview/:
     get:
       operationId: api_v1_instructor_overview_retrieve
+      description: |-
+        School-wide counts plus the attempts an instructor is most likely to act on.
+
+        Counts come from the database, and the attempt list is capped: it holds everything waiting
+        for review or overdue, then the most recently updated attempts. Loading every attempt and
+        event made this page slower with each week of practice.
       tags:
       - api
       security:
@@ -1252,6 +1821,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -1418,6 +1993,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -1456,6 +2037,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -1485,6 +2072,62 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedPilotApprovalList'
           description: ''
+  /api/v1/research/pilots/{id}/consent/:
+    get:
+      operationId: api_v1_research_pilots_consent_retrieve
+      description: A learner's own decision to take part, recorded before any scored
+        instrument.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this pilot study.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PilotConsent'
+          description: ''
+    post:
+      operationId: api_v1_research_pilots_consent_create
+      description: A learner's own decision to take part, recorded before any scored
+        instrument.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this pilot study.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PilotConsentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PilotConsentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PilotConsentRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PilotConsent'
+          description: ''
   /api/v1/research/pilots/{id}/incidents/:
     get:
       operationId: api_v1_research_pilots_incidents_list
@@ -1505,6 +2148,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -1543,6 +2192,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -1596,6 +2251,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -1634,6 +2295,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -1663,6 +2330,53 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedPilotObservationList'
           description: ''
+  /api/v1/research/pilots/{id}/participants/:
+    get:
+      operationId: api_v1_research_pilots_participants_list
+      description: Enrolled learners with their consent state, for recording learner-scored
+        instruments.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this pilot study.
+        required: true
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPilotParticipantList'
+          description: ''
   /api/v1/research/pilots/{id}/rehearsals/:
     get:
       operationId: api_v1_research_pilots_rehearsals_list
@@ -1683,6 +2397,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -1721,6 +2441,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -1862,7 +2588,6 @@ paths:
   /api/v1/research/pilots/options/:
     get:
       operationId: api_v1_research_pilots_options_retrieve
-      description: Handler method for HTTP 'OPTIONS' request.
       tags:
       - api
       security:
@@ -1926,7 +2651,7 @@ paths:
           description: No response body
   /api/v1/school/audit/:
     get:
-      operationId: api_v1_school_audit_list
+      operationId: api_v1_school_audit_retrieve
       description: |-
         Read-only governance trail for the administered schools.
 
@@ -1942,9 +2667,85 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AuditEvent'
+                $ref: '#/components/schemas/AuditPage'
+          description: ''
+  /api/v1/school/cohorts/:
+    get:
+      operationId: api_v1_school_cohorts_retrieve
+      description: |-
+        Cohorts (classes) and who is in them, so instructors can assign a lesson to a class.
+
+        Cohorts used to exist only in Django admin, which school administrators usually cannot open.
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolCohortList'
+          description: ''
+    post:
+      operationId: api_v1_school_cohorts_create
+      description: |-
+        Cohorts (classes) and who is in them, so instructors can assign a lesson to a class.
+
+        Cohorts used to exist only in Django admin, which school administrators usually cannot open.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchoolCohortCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SchoolCohortCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SchoolCohortCreateRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolCohort'
+          description: ''
+  /api/v1/school/cohorts/{id}/:
+    patch:
+      operationId: api_v1_school_cohorts_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSchoolCohortUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSchoolCohortUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSchoolCohortUpdateRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolCohort'
           description: ''
   /api/v1/school/invitations/:
     get:
@@ -2046,7 +2847,6 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/SchoolInvitationAcceptRequest'
-        required: true
       security:
       - cookieAuth: []
       - {}
@@ -2581,6 +3381,19 @@ components:
           type: string
           format: date-time
           readOnly: true
+        review_decision:
+          oneOf:
+          - $ref: '#/components/schemas/ReviewDecisionEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        review_note:
+          type: string
+        reviewed_by_name:
+          type: string
+          readOnly: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
         assignment:
           allOf:
           - $ref: '#/components/schemas/Assignment'
@@ -2603,7 +3416,7 @@ components:
         feedback:
           type: array
           items:
-            $ref: '#/components/schemas/InstructorFeedback'
+            $ref: '#/components/schemas/LearnerFeedback'
           readOnly: true
         recommendation:
           allOf:
@@ -2619,6 +3432,7 @@ components:
       - grading_policy_version
       - id
       - recommendation
+      - reviewed_by_name
       - scenario_version
       - step_results
       - updated_at
@@ -2644,6 +3458,16 @@ components:
           type: string
           format: date-time
         completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        review_decision:
+          oneOf:
+          - $ref: '#/components/schemas/ReviewDecisionEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        review_note:
+          type: string
+        reviewed_at:
           type: string
           format: date-time
           nullable: true
@@ -2734,6 +3558,26 @@ components:
         * `failed` - Failed
         * `requires_review` - Requires review
         * `mastered` - Mastered
+    AttemptReviewDecisionDecisionEnum:
+      enum:
+      - competent
+      - not_yet_competent
+      type: string
+      description: |-
+        * `competent` - competent
+        * `not_yet_competent` - not_yet_competent
+    AttemptReviewDecisionRequest:
+      type: object
+      properties:
+        decision:
+          $ref: '#/components/schemas/AttemptReviewDecisionDecisionEnum'
+        note:
+          type: string
+          minLength: 10
+          maxLength: 2000
+      required:
+      - decision
+      - note
     AttemptStatusEnum:
       enum:
       - in_progress
@@ -2787,10 +3631,24 @@ components:
           type: string
           format: date-time
           readOnly: true
+        review_decision:
+          oneOf:
+          - $ref: '#/components/schemas/ReviewDecisionEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        review_note:
+          type: string
+        reviewed_by_name:
+          type: string
+          readOnly: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
       required:
       - grading_policy_code
       - grading_policy_version
       - id
+      - reviewed_by_name
       - scenario_version
       - updated_at
     AttemptSyncAudit:
@@ -2873,9 +3731,249 @@ components:
       - schoolName
       - targetId
       - targetType
+    AuditPage:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        eventTypes:
+          type: array
+          items:
+            type: string
+        nextBefore:
+          type: integer
+          nullable: true
+      required:
+      - eventTypes
+      - events
+      - nextBefore
+    AuthoringCourse:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        school:
+          type: integer
+          nullable: true
+          description: Leave empty for platform-wide content.
+        schoolName:
+          type: string
+          readOnly: true
+          default: ''
+        title:
+          type: string
+          maxLength: 180
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        trade:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleOption'
+          readOnly: true
+        competencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetencyOption'
+          readOnly: true
+        lessonCount:
+          type: integer
+          readOnly: true
+      required:
+      - competencies
+      - id
+      - lessonCount
+      - modules
+      - schoolName
+      - slug
+      - title
+      - trade
+    AuthoringCourseRequest:
+      type: object
+      properties:
+        school:
+          type: integer
+          nullable: true
+          description: Leave empty for platform-wide content.
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        trade:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+      required:
+      - title
+      - trade
+    AuthoringLesson:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        course:
+          type: integer
+        courseTitle:
+          type: string
+          readOnly: true
+        module:
+          type: integer
+          nullable: true
+        title:
+          type: string
+          maxLength: 180
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        summary:
+          type: string
+        objectives:
+          type: array
+          items:
+            type: string
+            maxLength: 500
+          maxItems: 30
+        safetyNotes:
+          type: array
+          items:
+            type: string
+            maxLength: 500
+          maxItems: 30
+        estimatedMinutes:
+          type: integer
+          maximum: 480
+          minimum: 5
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+        competencies:
+          type: array
+          items:
+            type: integer
+        status:
+          allOf:
+          - $ref: '#/components/schemas/LessonPublicationStatusEnum'
+          readOnly: true
+        contentVersion:
+          type: integer
+          readOnly: true
+        authoredBy:
+          type: integer
+          readOnly: true
+          nullable: true
+        authorName:
+          type: string
+          readOnly: true
+        reviewNotes:
+          type: string
+          readOnly: true
+        submittedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        publishedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        scenarios:
+          type: array
+          items:
+            $ref: '#/components/schemas/LessonScenarioSummary'
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - authorName
+      - authoredBy
+      - contentVersion
+      - course
+      - courseTitle
+      - id
+      - publishedAt
+      - reviewNotes
+      - scenarios
+      - slug
+      - status
+      - submittedAt
+      - summary
+      - title
+      - updated_at
+    AuthoringLessonRequest:
+      type: object
+      properties:
+        course:
+          type: integer
+        module:
+          type: integer
+          nullable: true
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        summary:
+          type: string
+          minLength: 1
+        objectives:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+          maxItems: 30
+        safetyNotes:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+          maxItems: 30
+        estimatedMinutes:
+          type: integer
+          maximum: 480
+          minimum: 5
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+        competencies:
+          type: array
+          items:
+            type: integer
+      required:
+      - course
+      - summary
+      - title
     BlankEnum:
       enum:
       - ''
+    CohortLearner:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+      required:
+      - email
+      - id
+      - name
     Competency:
       type: object
       properties:
@@ -2906,6 +4004,48 @@ components:
       required:
       - code
       - id
+      - title
+    CompetencyOption:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          maxLength: 60
+        title:
+          type: string
+          maxLength: 180
+        description:
+          type: string
+        masteryThreshold:
+          type: integer
+          maximum: 100
+          minimum: 1
+      required:
+      - code
+      - id
+      - title
+    CompetencyOptionRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 60
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        description:
+          type: string
+        masteryThreshold:
+          type: integer
+          maximum: 100
+          minimum: 1
+      required:
+      - code
       - title
     CompetencyResult:
       type: object
@@ -2977,16 +4117,32 @@ components:
       - mastery_percentage
       - mastery_state
       - mastery_threshold
-    DecisionEnum:
-      enum:
-      - expand
-      - limit
-      - reject
-      type: string
-      description: |-
-        * `expand` - Approve expansion
-        * `limit` - Continue with limits
-        * `reject` - Reject expansion
+    ContentHistoryEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventType:
+          type: string
+        summary:
+          type: string
+        subject:
+          type: string
+        actorName:
+          type: string
+        reviewNotes:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+      required:
+      - actorName
+      - eventType
+      - id
+      - occurredAt
+      - reviewNotes
+      - subject
+      - summary
     Detail:
       type: object
       properties:
@@ -3020,6 +4176,31 @@ components:
         * `operations` - School operations
         * `recovery` - Recovery
         * `evidence` - Research evidence
+    GradingPolicyOption:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        version:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        passThreshold:
+          type: integer
+          readOnly: true
+      required:
+      - code
+      - id
+      - name
+      - passThreshold
+      - version
     GradingPolicyReference:
       type: object
       properties:
@@ -3164,6 +4345,7 @@ components:
         instructions:
           type: string
           default: ''
+          maxLength: 2000
       required:
       - scenarioId
     InstructorAssignmentCreateResponse:
@@ -3177,10 +4359,13 @@ components:
           type: integer
         existing:
           type: integer
+        skipped:
+          type: integer
       required:
       - assignmentIds
       - created
       - existing
+      - skipped
     InstructorAssignmentOptions:
       type: object
       properties:
@@ -3226,6 +4411,13 @@ components:
           format: decimal
           pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
           nullable: true
+        review_decision:
+          oneOf:
+          - $ref: '#/components/schemas/ReviewDecisionEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        has_published_feedback:
+          type: boolean
+          readOnly: true
         scenario_version:
           type: integer
           readOnly: true
@@ -3274,6 +4466,7 @@ components:
       - due_at
       - grading_policy_code
       - grading_policy_version
+      - has_published_feedback
       - id
       - incorrect_actions
       - is_blocked
@@ -3307,6 +4500,13 @@ components:
           format: decimal
           pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
           nullable: true
+        review_decision:
+          oneOf:
+          - $ref: '#/components/schemas/ReviewDecisionEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        has_published_feedback:
+          type: boolean
+          readOnly: true
         scenario_version:
           type: integer
           readOnly: true
@@ -3380,6 +4580,18 @@ components:
           items:
             $ref: '#/components/schemas/AdaptiveRecommendation'
           readOnly: true
+        pass_threshold:
+          type: integer
+          readOnly: true
+        review_note:
+          type: string
+        reviewed_by_name:
+          type: string
+          readOnly: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
       required:
       - competency_results
       - completed_steps
@@ -3388,14 +4600,17 @@ components:
       - feedback
       - grading_policy_code
       - grading_policy_version
+      - has_published_feedback
       - id
       - incorrect_actions
       - is_blocked
       - is_overdue
       - learner
       - lesson
+      - pass_threshold
       - procedure_steps
       - recommendations
+      - reviewed_by_name
       - safety_errors
       - scenario_version
       - step_results
@@ -3412,8 +4627,10 @@ components:
           readOnly: true
         observation:
           type: string
+          maxLength: 5000
         feedback:
           type: string
+          maxLength: 5000
         is_published:
           type: boolean
         published_at:
@@ -3441,9 +4658,11 @@ components:
       properties:
         observation:
           type: string
+          maxLength: 5000
         feedback:
           type: string
           minLength: 1
+          maxLength: 5000
         is_published:
           type: boolean
       required:
@@ -3498,6 +4717,10 @@ components:
           format: decimal
           pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
           nullable: true
+        instructions:
+          type: string
+        submitted:
+          type: boolean
       required:
       - attemptLimit
       - attemptsUsed
@@ -3505,10 +4728,12 @@ components:
       - courseTitle
       - dueAt
       - id
+      - instructions
       - isOverdue
       - latestScore
       - latestStatus
       - lessonTitle
+      - submitted
       - trade
     InstructorLearnerAttempt:
       type: object
@@ -3696,6 +4921,8 @@ components:
           type: integer
         completedAttempts:
           type: integer
+        completedAssignments:
+          type: integer
         safetyErrors:
           type: integer
         overdueAssignments:
@@ -3714,6 +4941,7 @@ components:
       - attempts
       - averageScore
       - cohorts
+      - completedAssignments
       - completedAttempts
       - email
       - id
@@ -3732,6 +4960,42 @@ components:
         * `en` - English
         * `rw` - Kinyarwanda
         * `en-rw` - English and Kinyarwanda
+    LearnerFeedback:
+      type: object
+      description: 'Published feedback as the learner sees it: the instructor''s private
+        observation is left out.'
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        author_name:
+          type: string
+          readOnly: true
+        feedback:
+          type: string
+          maxLength: 5000
+        is_published:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - author_name
+      - created_at
+      - feedback
+      - id
+      - published_at
+      - updated_at
     LearningModeEnum:
       enum:
       - guided
@@ -3771,6 +5035,32 @@ components:
         * `approved` - Approved
         * `published` - Published
         * `retired` - Retired
+    LessonScenarioSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        version:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/LessonPublicationStatusEnum'
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - id
+      - status
+      - title
+      - updated_at
+      - version
     LessonSummary:
       type: object
       properties:
@@ -3933,6 +5223,40 @@ components:
         * `developing` - Developing
         * `mastered` - Mastered
         * `requires_review` - Requires review
+    ModuleOption:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        title:
+          type: string
+          maxLength: 180
+        description:
+          type: string
+        order:
+          type: integer
+          readOnly: true
+      required:
+      - code
+      - id
+      - order
+      - title
+    ModuleOptionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        description:
+          type: string
+      required:
+      - title
     NullEnum:
       enum:
       - null
@@ -4015,6 +5339,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AttemptDetail'
+    PaginatedAuthoringLessonList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthoringLesson'
+    PaginatedContentHistoryEntryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentHistoryEntry'
     PaginatedPilotApprovalList:
       type: object
       required:
@@ -4084,6 +5454,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PilotObservation'
+    PaginatedPilotParticipantList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PilotParticipant'
     PaginatedPilotRehearsalList:
       type: object
       required:
@@ -4172,6 +5565,94 @@ components:
           minLength: 1
           maxLength: 180
         manifest: {}
+    PatchedAuthoringCourseRequest:
+      type: object
+      properties:
+        school:
+          type: integer
+          nullable: true
+          description: Leave empty for platform-wide content.
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        trade:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+    PatchedAuthoringLessonRequest:
+      type: object
+      properties:
+        course:
+          type: integer
+        module:
+          type: integer
+          nullable: true
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        summary:
+          type: string
+          minLength: 1
+        objectives:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+          maxItems: 30
+        safetyNotes:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+          maxItems: 30
+        estimatedMinutes:
+          type: integer
+          maximum: 480
+          minimum: 5
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+        competencies:
+          type: array
+          items:
+            type: integer
+    PatchedInstructorAssignmentUpdateRequest:
+      type: object
+      description: 'Change one learner''s assignment: extend the deadline or allow
+        more attempts.'
+      properties:
+        availableAt:
+          type: string
+          format: date-time
+          nullable: true
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+        attemptLimit:
+          type: integer
+          maximum: 20
+          minimum: 1
+        instructions:
+          type: string
+          maxLength: 2000
+    PatchedInstructorFeedbackUpdateRequest:
+      type: object
+      properties:
+        observation:
+          type: string
+          maxLength: 5000
+        feedback:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        is_published:
+          type: boolean
     PatchedPilotStudyRequest:
       type: object
       properties:
@@ -4230,11 +5711,31 @@ components:
         asset_package:
           type: integer
           nullable: true
+    PatchedSchoolCohortUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 180
+        academicYear:
+          type: string
+          maxLength: 20
+        isActive:
+          type: boolean
+        learnerIds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          maxItems: 500
     PatchedSchoolMemberUpdateRequest:
       type: object
       properties:
         isActive:
           type: boolean
+        role:
+          $ref: '#/components/schemas/RoleEnum'
     PilotApproval:
       type: object
       properties:
@@ -4313,6 +5814,30 @@ components:
         * `pending` - Pending
         * `approved` - Approved
         * `rejected` - Rejected
+    PilotConsent:
+      type: object
+      properties:
+        consented:
+          type: boolean
+          readOnly: true
+        consentVersion:
+          type: string
+          readOnly: true
+        expiresAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - consentVersion
+      - consented
+      - expiresAt
+    PilotConsentRequest:
+      type: object
+      properties:
+        consentAccepted:
+          type: boolean
+          writeOnly: true
     PilotIncident:
       type: object
       properties:
@@ -4524,6 +6049,24 @@ components:
       - cohorts
       - scenarios
       - schools
+    PilotParticipant:
+      type: object
+      properties:
+        learnerId:
+          type: integer
+        name:
+          type: string
+        consented:
+          type: boolean
+        recordedInstruments:
+          type: array
+          items:
+            type: string
+      required:
+      - consented
+      - learnerId
+      - name
+      - recordedInstruments
     PilotRehearsal:
       type: object
       properties:
@@ -4705,7 +6248,7 @@ components:
           type: integer
           readOnly: true
         decision:
-          $ref: '#/components/schemas/DecisionEnum'
+          $ref: '#/components/schemas/PilotReviewDecisionEnum'
         reviewer_name:
           type: string
           maxLength: 180
@@ -4742,11 +6285,21 @@ components:
       - rationale
       - reviewer_name
       - reviewer_role
+    PilotReviewDecisionEnum:
+      enum:
+      - expand
+      - limit
+      - reject
+      type: string
+      description: |-
+        * `expand` - Approve expansion
+        * `limit` - Continue with limits
+        * `reject` - Reject expansion
     PilotReviewRequest:
       type: object
       properties:
         decision:
-          $ref: '#/components/schemas/DecisionEnum'
+          $ref: '#/components/schemas/PilotReviewDecisionEnum'
         reviewer_name:
           type: string
           minLength: 1
@@ -5121,6 +6674,15 @@ components:
       - consent_accepted
       - consent_version
       - instrument
+    ReviewDecisionEnum:
+      enum:
+      - competent
+      - not_yet_competent
+      type: string
+      description: |-
+        * `` - Not reviewed
+        * `competent` - Competent
+        * `not_yet_competent` - Not yet competent
     RoleEnum:
       enum:
       - admin
@@ -5141,6 +6703,15 @@ components:
           readOnly: true
         lesson:
           type: integer
+        lessonTitle:
+          type: string
+          readOnly: true
+        lessonStatus:
+          type: string
+          readOnly: true
+        authorName:
+          type: string
+          readOnly: true
         version:
           type: integer
           maximum: 2147483647
@@ -5197,11 +6768,14 @@ components:
           format: date-time
           readOnly: true
       required:
+      - authorName
       - authoredBy
       - created_at
       - grading_policy
       - id
       - lesson
+      - lessonStatus
+      - lessonTitle
       - publicationChecks
       - published_at
       - reviewNotes
@@ -5236,6 +6810,76 @@ components:
       - lesson
       - title
       - version
+    SchoolCohort:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        academicYear:
+          type: string
+        isActive:
+          type: boolean
+        school:
+          $ref: '#/components/schemas/SchoolSummary'
+        programName:
+          type: string
+        learners:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortLearner'
+      required:
+      - academicYear
+      - code
+      - id
+      - isActive
+      - learners
+      - name
+      - programName
+      - school
+    SchoolCohortCreateRequest:
+      type: object
+      properties:
+        schoolId:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+          maxLength: 180
+        programName:
+          type: string
+          minLength: 1
+          maxLength: 180
+        academicYear:
+          type: string
+          maxLength: 20
+      required:
+      - name
+      - programName
+    SchoolCohortList:
+      type: object
+      properties:
+        cohorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchoolCohort'
+        programs:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        learners:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - cohorts
+      - learners
+      - programs
     SchoolInvitation:
       type: object
       properties:
@@ -5274,6 +6918,9 @@ components:
       - school
     SchoolInvitationAcceptRequest:
       type: object
+      description: |-
+        New people choose a name and password; people who already have an account sign in first
+        and send nothing.
       properties:
         firstName:
           type: string
@@ -5287,10 +6934,6 @@ components:
           type: string
           writeOnly: true
           minLength: 1
-      required:
-      - firstName
-      - lastName
-      - password
     SchoolInvitationCreateRequest:
       type: object
       properties:
@@ -5313,8 +6956,11 @@ components:
         acceptUrl:
           type: string
           format: uri
+        emailSent:
+          type: boolean
       required:
       - acceptUrl
+      - emailSent
       - invitation
     SchoolInvitationPreview:
       type: object
@@ -5329,7 +6975,10 @@ components:
         expiresAt:
           type: string
           format: date-time
+        accountExists:
+          type: boolean
       required:
+      - accountExists
       - email
       - expiresAt
       - role

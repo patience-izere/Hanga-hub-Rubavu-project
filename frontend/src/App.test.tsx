@@ -305,7 +305,8 @@ describe("App", () => {
   it("gives a content author the authoring workspace rather than the learner dashboard", async () => {
     stubApi({
       "/api/v1/auth/me/": signedInAs(["content_author"]),
-      "/api/v1/content/scenarios/": [],
+      "/api/v1/content/lessons/": { count: 0, next: null, previous: null, results: [] },
+      "/api/v1/content/courses/": [],
       "/api/v1/content/asset-packages/": [],
     });
 
@@ -313,7 +314,8 @@ describe("App", () => {
 
     // `content_author` previously fell through to the learner dashboard because no role branch
     // covered it.
-    expect(await screen.findByRole("link", { name: "Scenarios" })).toBeVisible();
+    expect(await screen.findByRole("link", { name: "Module Studio" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Build practical modules" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: /good to see you/i })).not.toBeInTheDocument();
   });
 });

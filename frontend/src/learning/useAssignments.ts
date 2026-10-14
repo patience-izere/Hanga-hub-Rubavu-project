@@ -19,6 +19,7 @@ import {
   type RendererMode,
   type TelemetryEventInput,
 } from "../api/learning";
+import { isNetworkError } from "../api/client";
 import {
   createOfflineAction,
   createTelemetryEvent,
@@ -105,30 +106,37 @@ export function useRecordAttemptAction(id: number) {
       const occurredAt = new Date().toISOString();
       const detail = queryClient.getQueryData<AttemptDetail>(["learning", "attempts", id]);
       if (navigator.onLine) {
-        return recordAttemptAction(
-          id,
-          action,
-          { source, rendererMode, occurredAt, scenarioVersion: detail?.scenario_version },
-          eventId,
-        );
+        try {
+          return await recordAttemptAction(
+            id,
+            action,
+            { source, rendererMode, occurredAt, scenarioVersion: detail?.scenario_version },
+            eventId,
+          );
+        } catch (error) {
+          // The browser can claim to be online on a dead workshop Wi-Fi; keep the evidence locally.
+          if (!isNetworkError(error)) throw error;
+        }
       }
 
       if (!detail) throw new Error("Open the lesson online once before completing it offline.");
       const completed = detail.resume_state.completedSteps ?? [];
       const steps = detail.assignment.lesson.procedure_steps;
       const current = steps.find((step) => !completed.includes(step.code));
-      const accepted =
-        current?.acceptable_actions.some((item) => item.action_code === action) ??
-        current?.action_code === action;
-      if (!current || !accepted) {
+      if (!current) {
         return {
-          correct: false,
-          message: "That action is not the current offline procedure step.",
-          currentStep: current ?? null,
-          isReadyToComplete: !current,
+          correct: true,
+          message: "All procedure steps are complete. Submit the attempt when you are back online.",
+          currentStep: null,
+          isReadyToComplete: true,
           attempt: detail,
         };
       }
+      const accepted = current.acceptable_actions.length
+        ? current.acceptable_actions.some((item) => item.action_code === action)
+        : current.action_code === action;
+      // Wrong actions are queued too: the server scores them, so practising offline must not hide
+      // mistakes from the instructor.
       const outboxItem = createOfflineAction(id, action, rendererMode, {
         source,
         scenarioVersion: detail.scenario_version,
@@ -136,6 +144,17 @@ export function useRecordAttemptAction(id: number) {
       outboxItem.id = eventId;
       outboxItem.createdAt = occurredAt;
       await queueOutboxItem(outboxItem);
+      if (!accepted) {
+        return {
+          correct: false,
+          message: current.safety_critical
+            ? "Safety sequence interrupted. Follow the current instruction before continuing. This attempt is saved on this device."
+            : "That action is out of sequence. Review the current instruction and try again. This attempt is saved on this device.",
+          currentStep: current,
+          isReadyToComplete: false,
+          attempt: detail,
+        };
+      }
       const completedSteps = [...completed, current.code];
       const nextStep = steps.find((step) => !completedSteps.includes(step.code)) ?? null;
       return {

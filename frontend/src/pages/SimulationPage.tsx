@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { ApiError } from "../api/client";
+import { describeApiError } from "../api/client";
 import type {
   CapabilityProfile,
   ProcedureStep,
@@ -22,7 +22,12 @@ import {
   useRequestAttemptHint,
   useSelectAttemptRenderer,
 } from "../learning/useAssignments";
-import { listOutboxItems, synchronizeOutbox } from "../offline/outbox";
+import {
+  discardBlockedOutboxItems,
+  isBlockedOutboxItem,
+  listOutboxItems,
+  synchronizeOutbox,
+} from "../offline/outbox";
 
 const rendererLabels: Record<RendererMode, string> = {
   accessible_2d: "Accessible 2D",
@@ -59,7 +64,11 @@ export function SimulationPage() {
   const [pendingSync, setPendingSync] = useState(0);
   const [failedSync, setFailedSync] = useState(0);
   const [staleSync, setStaleSync] = useState(0);
+  const [blockedSync, setBlockedSync] = useState(0);
   const [synchronizing, setSynchronizing] = useState(false);
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const [revealedHints, setRevealedHints] = useState<Record<string, string[]>>({});
   const selectionInitialized = useRef(false);
   const capabilityDetected = useRef(false);
   const initialRendererMode = useRef(mode);
@@ -82,12 +91,12 @@ export function SimulationPage() {
     const refreshOutbox = () =>
       void listOutboxItems().then((items) => {
         const attemptItems = items.filter((item) => item.attemptId === attemptId);
+        // Everything still on this device counts as unsent; refused items are reported apart
+        // because retrying cannot deliver them.
         setPendingSync(attemptItems.length);
-        setFailedSync(
-          attemptItems.filter((item) => ["failed", "conflict"].includes(item.syncStatus ?? ""))
-            .length,
-        );
+        setFailedSync(attemptItems.filter((item) => item.syncStatus === "failed").length);
         setStaleSync(attemptItems.filter((item) => item.syncStatus === "stale").length);
+        setBlockedSync(attemptItems.filter(isBlockedOutboxItem).length);
       });
     window.addEventListener("online", refreshNetwork);
     window.addEventListener("offline", refreshNetwork);
@@ -215,6 +224,42 @@ export function SimulationPage() {
     attempt.assignment.scenario?.renderer_config?.marker_ar?.targetValue ||
     `OPEDU-${lesson.slug}-V${lesson.content_version}`;
 
+  const usedHintCodes = currentStep
+    ? new Set([
+        ...attempt.events
+          .filter(
+            (event) =>
+              event.event_type === "hint_used" && event.payload.stepCode === currentStep.code,
+          )
+          .map((event) => String(event.payload.hintCode)),
+        ...(revealedHints[currentStep.code] ?? []),
+      ])
+    : new Set<string>();
+  const shownHints = (currentStep?.hints ?? [])
+    .filter((item) => usedHintCodes.has(item.code))
+    .sort((left, right) => left.order - right.order);
+  const nextHint = (currentStep?.hints ?? [])
+    .filter((item) => !usedHintCodes.has(item.code))
+    .sort((left, right) => left.order - right.order)[0];
+
+  function requestHint() {
+    if (!currentStep || !nextHint) return;
+    const stepCode = currentStep.code;
+    hint.mutate(nextHint.code, {
+      onSuccess: (result) =>
+        setRevealedHints((current) => ({
+          ...current,
+          [stepCode]: [...(current[stepCode] ?? []), result.hint.code],
+        })),
+    });
+  }
+
+  async function discardRefusedEvidence() {
+    await discardBlockedOutboxItems(attemptId);
+    setConfirmingDiscard(false);
+    await attemptQuery.refetch();
+  }
+
   function performAction(action: string, source: "scene" | "accessible-controls" | "camera-ar") {
     if (!isBusy && attempt.status === "in_progress") {
       record.mutate({ action, source, rendererMode: mode });
@@ -232,9 +277,10 @@ export function SimulationPage() {
     selectRenderer.mutate({ mode, capabilityProfile: capabilities, learningMode });
   }
 
-  if (attempt.status === "completed") {
+  if (attempt.status !== "in_progress") {
     // The result screen lives on its own route so it can be revisited; render its body here so
-    // finishing an attempt flows straight into the result without a redirect.
+    // finishing an attempt flows straight into the result without a redirect. Ended and
+    // review-pending attempts explain themselves there too.
     return (
       <section className="result-page">
         <AttemptResultBody attempt={attempt} />
@@ -403,15 +449,22 @@ export function SimulationPage() {
                     : "Offline"}
             </strong>
             <span>
-              {staleSync
-                ? `${staleSync} evidence item(s) use a stale scenario version and need instructor review`
+              {blockedSync
+                ? staleSync
+                  ? "This lesson changed after you started, so the server cannot accept the actions saved on this device."
+                  : "This attempt was closed on another device or by your instructor, so the actions saved on this device cannot be added to it."
                 : failedSync
-                  ? `${failedSync} evidence item(s) need synchronization review`
+                  ? `${pendingSync} saved ${pendingSync === 1 ? "action was" : "actions were"} not accepted yet. Try again, or ask your instructor if it keeps failing.`
                   : pendingSync
-                    ? `${pendingSync} evidence item(s) pending`
-                    : "Evidence synchronized"}
+                    ? `${pendingSync} ${pendingSync === 1 ? "action is" : "actions are"} saved on this device and will be sent when you are online.`
+                    : "All your actions are saved."}
             </span>
-            {online && pendingSync > 0 && (
+            {blockedSync > 0 && !confirmingDiscard ? (
+              <button type="button" onClick={() => setConfirmingDiscard(true)}>
+                Review saved actions
+              </button>
+            ) : null}
+            {online && pendingSync > 0 && blockedSync === 0 && (
               <button
                 type="button"
                 disabled={synchronizing}
@@ -428,20 +481,67 @@ export function SimulationPage() {
               </button>
             )}
           </div>
+          {confirmingDiscard ? (
+            <div className="inline-confirm" role="alertdialog" aria-labelledby="discard-title">
+              <strong id="discard-title">Delete the actions saved on this device?</strong>
+              <p>
+                {pendingSync} saved {pendingSync === 1 ? "action" : "actions"} for this attempt
+                cannot be delivered. Deleting them lets you carry on; your instructor still sees
+                everything the server already received. To keep them, leave this page and ask your
+                instructor before deleting.
+              </p>
+              <div className="button-row">
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => setConfirmingDiscard(false)}
+                >
+                  Keep them
+                </button>
+                <button
+                  className="button button-danger"
+                  type="button"
+                  onClick={() => void discardRefusedEvidence()}
+                >
+                  Delete saved actions
+                </button>
+              </div>
+            </div>
+          ) : null}
           {!independent && currentStep?.hints?.length ? (
             <div className="hint-panel">
-              <button
-                className="button button-secondary"
-                type="button"
-                disabled={!online || hint.isPending}
-                onClick={() => hint.mutate(currentStep.hints[0].code)}
-              >
-                {hint.isPending ? "Loading hint…" : "Request a guided hint"}
-              </button>
-              {!online ? (
-                <small>Hints require a connection so their evidence is preserved.</small>
+              {shownHints.length > 0 ? (
+                <ol className="hint-list" aria-label="Hints for this step">
+                  {shownHints.map((item) => (
+                    <li key={item.code}>{item.text}</li>
+                  ))}
+                </ol>
               ) : null}
-              {hint.data ? <p role="status">{hint.data.hint.text}</p> : null}
+              {nextHint ? (
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  disabled={!online || hint.isPending}
+                  onClick={requestHint}
+                >
+                  {hint.isPending
+                    ? "Loading hint…"
+                    : shownHints.length
+                      ? "Show another hint"
+                      : "Request a guided hint"}
+                  {nextHint.points_penalty > 0 ? ` (−${nextHint.points_penalty} points)` : ""}
+                </button>
+              ) : (
+                <small>No more hints for this step.</small>
+              )}
+              {!online && nextHint ? (
+                <small>Hints need a connection so your instructor can see which you used.</small>
+              ) : null}
+              {hint.isError ? (
+                <p className="form-error" role="alert">
+                  {describeApiError(hint.error, "The hint could not be loaded.")}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -486,9 +586,7 @@ export function SimulationPage() {
           )}
           {record.isError && (
             <p className="form-error" role="alert">
-              {record.error instanceof ApiError
-                ? record.error.message
-                : "The action could not be saved."}
+              {describeApiError(record.error, "The action could not be saved.")}
             </p>
           )}
 
@@ -534,36 +632,66 @@ export function SimulationPage() {
           >
             {complete.isPending
               ? "Scoring attempt…"
-              : !online || pendingSync > 0
-                ? "Synchronize evidence before scoring"
-                : "Complete and view result"}
+              : !online
+                ? "Reconnect to submit"
+                : pendingSync > 0
+                  ? "Send saved actions before submitting"
+                  : "Complete and view result"}
           </button>
-          <button
-            className="button button-secondary"
-            type="button"
-            disabled={!online || pendingSync > 0 || abandon.isPending}
-            onClick={() => {
-              if (
-                window.confirm(
-                  "End this attempt? Its evidence will remain in history and a new attempt will start from the safe beginning.",
-                )
-              ) {
-                abandon.mutate(undefined, {
-                  onSuccess: () => navigate(`/assignments/${attempt.assignment.id}`),
-                });
-              }
-            }}
-          >
-            {abandon.isPending ? "Ending attempt…" : "End and restart safely"}
-          </button>
+          {confirmingEnd ? (
+            <div className="inline-confirm" role="alertdialog" aria-labelledby="end-title">
+              <strong id="end-title">End this attempt?</strong>
+              <p>
+                It will not be scored and counts towards your attempt limit. Its evidence stays in
+                your history, and a new attempt starts from the safe beginning.
+              </p>
+              <div className="button-row">
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => setConfirmingEnd(false)}
+                >
+                  Keep working
+                </button>
+                <button
+                  className="button button-danger"
+                  type="button"
+                  disabled={abandon.isPending}
+                  onClick={() =>
+                    abandon.mutate(undefined, {
+                      onSuccess: () => navigate(`/assignments/${attempt.assignment.id}`),
+                    })
+                  }
+                >
+                  {abandon.isPending ? "Ending attempt…" : "End attempt"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={!online || pendingSync > 0 || abandon.isPending}
+              onClick={() => setConfirmingEnd(true)}
+            >
+              End and restart safely
+            </button>
+          )}
           {!online || pendingSync > 0 ? (
-            <small>Synchronize saved evidence before ending this attempt.</small>
+            <small>
+              {!online
+                ? "You can keep practising offline. Submitting or ending needs a connection."
+                : "Send the actions saved on this device before submitting or ending."}
+            </small>
           ) : null}
+          {abandon.isError && (
+            <p className="form-error" role="alert">
+              {describeApiError(abandon.error, "The attempt could not be ended.")}
+            </p>
+          )}
           {complete.isError && (
             <p className="form-error" role="alert">
-              {complete.error instanceof ApiError
-                ? complete.error.message
-                : "The attempt could not be completed."}
+              {describeApiError(complete.error, "The attempt could not be completed.")}
             </p>
           )}
         </aside>

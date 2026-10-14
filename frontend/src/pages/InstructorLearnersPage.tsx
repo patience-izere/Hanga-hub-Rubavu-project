@@ -18,7 +18,7 @@ function attentionScore(learner: InstructorRosterEntry): number {
 }
 
 function completionRate(learner: InstructorRosterEntry): number {
-  return learner.assignments === 0 ? 1 : learner.completedAttempts / learner.assignments;
+  return learner.assignments === 0 ? 1 : learner.completedAssignments / learner.assignments;
 }
 
 function compare(a: InstructorRosterEntry, b: InstructorRosterEntry, sort: Sort): number {
@@ -130,7 +130,7 @@ export function InstructorLearnersPage() {
                         <div>
                           <dt>Progress</dt>
                           <dd>
-                            {learner.completedAttempts}/{learner.assignments}
+                            {learner.completedAssignments}/{learner.assignments}
                           </dd>
                         </div>
                         <div>

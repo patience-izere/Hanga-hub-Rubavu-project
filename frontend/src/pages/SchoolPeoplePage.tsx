@@ -1,9 +1,13 @@
 import { useMemo, useState } from "react";
 
-import { ApiError } from "@/api/client";
+import { describeApiError } from "@/api/client";
 import type { SchoolMember } from "@/api/school";
 import { QueryBoundary } from "@/components/ui/QueryBoundary";
-import { useSchoolMembers, useSetSchoolMemberActive } from "@/school/useSchoolAdmin";
+import {
+  useSchoolMembers,
+  useSetSchoolMemberActive,
+  useUpdateSchoolMember,
+} from "@/school/useSchoolAdmin";
 
 const ROLE_LABELS: Record<SchoolMember["role"], string> = {
   admin: "School administrator",
@@ -12,9 +16,22 @@ const ROLE_LABELS: Record<SchoolMember["role"], string> = {
   learner: "Learner",
 };
 
+/** What changing to each role means, shown before the change is made. */
+const ROLE_CONSEQUENCES: Record<SchoolMember["role"], string> = {
+  admin: "They will manage people, invitations and classes, and approve content for this school.",
+  instructor: "They will assign lessons, review attempts and sign off safety reviews.",
+  content_author: "They will create and edit draft lessons and practicals for review.",
+  learner: "They will see only their own assignments and attempts.",
+};
+
 export function SchoolPeoplePage() {
   const members = useSchoolMembers();
   const activation = useSetSchoolMemberActive();
+  const roleChange = useUpdateSchoolMember();
+  const [pendingRole, setPendingRole] = useState<{
+    member: SchoolMember;
+    role: SchoolMember["role"];
+  } | null>(null);
   const [search, setSearch] = useState("");
   const [role, setRole] = useState<"" | SchoolMember["role"]>("");
   const [confirming, setConfirming] = useState<SchoolMember | null>(null);
@@ -49,11 +66,12 @@ export function SchoolPeoplePage() {
 
       {/* The API refuses self-deactivation and removal of the last administrator; surface the
           server's own reason rather than a generic failure. */}
-      {activation.isError ? (
+      {activation.isError || roleChange.isError ? (
         <p className="form-error" role="alert">
-          {activation.error instanceof ApiError
-            ? activation.error.message
-            : "That change could not be saved."}
+          {describeApiError(
+            activation.error ?? roleChange.error,
+            "That change could not be saved.",
+          )}
         </p>
       ) : null}
 
@@ -111,15 +129,36 @@ export function SchoolPeoplePage() {
                         {member.is_active ? "" : " · suspended"}
                       </small>
                     </div>
-                    <button
-                      className="button button-secondary"
-                      disabled={activation.isPending}
-                      onClick={() =>
-                        member.is_active ? setConfirming(member) : apply(member, true)
-                      }
-                    >
-                      {member.is_active ? "Suspend" : "Reactivate"}
-                    </button>
+                    <div className="member-actions">
+                      <label>
+                        <span className="sr-only">Role for {member.user.name}</span>
+                        <select
+                          value={member.role}
+                          disabled={roleChange.isPending || !member.is_active}
+                          onChange={(event) =>
+                            setPendingRole({
+                              member,
+                              role: event.target.value as SchoolMember["role"],
+                            })
+                          }
+                        >
+                          {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        className="button button-secondary"
+                        disabled={activation.isPending}
+                        onClick={() =>
+                          member.is_active ? setConfirming(member) : apply(member, true)
+                        }
+                      >
+                        {member.is_active ? "Suspend" : "Reactivate"}
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -127,6 +166,46 @@ export function SchoolPeoplePage() {
           </>
         )}
       </QueryBoundary>
+
+      {pendingRole ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setPendingRole(null)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="role-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="role-title">
+              Make {pendingRole.member.user.name} {ROLE_LABELS[pendingRole.role].toLowerCase()}?
+            </h2>
+            <p>{ROLE_CONSEQUENCES[pendingRole.role]}</p>
+            {pendingRole.member.role === "learner" ? (
+              <p>
+                They leave their classes. Their attempts and results are kept and stay visible to
+                instructors.
+              </p>
+            ) : null}
+            <div className="modal-actions">
+              <button className="button button-secondary" onClick={() => setPendingRole(null)}>
+                Cancel
+              </button>
+              <button
+                className="button button-primary"
+                disabled={roleChange.isPending}
+                onClick={() =>
+                  roleChange.mutate(
+                    { id: pendingRole.member.id, role: pendingRole.role },
+                    { onSettled: () => setPendingRole(null) },
+                  )
+                }
+              >
+                {roleChange.isPending ? "Saving…" : "Change role"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {confirming ? (
         <div className="modal-backdrop" role="presentation" onClick={() => setConfirming(null)}>

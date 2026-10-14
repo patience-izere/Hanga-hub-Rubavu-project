@@ -3,7 +3,13 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../api/client";
-import { listOutboxItems, queueOutboxItem, synchronizeOutbox, type OfflineAction } from "./outbox";
+import {
+  discardBlockedOutboxItems,
+  listOutboxItems,
+  queueOutboxItem,
+  synchronizeOutbox,
+  type OfflineAction,
+} from "./outbox";
 
 const api = vi.hoisted(() => ({
   ingestAttemptEvents: vi.fn(),
@@ -13,10 +19,10 @@ const api = vi.hoisted(() => ({
 
 vi.mock("../api/learning", () => api);
 
-function action(id: string, createdAt: string): OfflineAction {
+function action(id: string, createdAt: string, attemptId = 42): OfflineAction {
   return {
     id,
-    attemptId: 42,
+    attemptId,
     kind: "action",
     action: id,
     rendererMode: "accessible_2d",
@@ -102,5 +108,52 @@ describe("offline evidence outbox", () => {
       { synchronized: 1, pending: 0 },
     ]);
     expect(await listOutboxItems()).toEqual([]);
+  });
+
+  it("keeps other attempts synchronizing when one attempt's evidence is refused", async () => {
+    api.recordAttemptAction.mockRejectedValueOnce(
+      new ApiError(409, "This attempt is no longer active."),
+    );
+    await queueOutboxItem(action("closed", "2026-08-22T10:00:01Z", 7));
+    await queueOutboxItem(action("closed-later", "2026-08-22T10:00:02Z", 7));
+    await queueOutboxItem(action("other", "2026-08-22T10:00:03Z", 42));
+
+    expect(await synchronizeOutbox()).toEqual({ synchronized: 1, pending: 2 });
+    expect(api.recordAttemptAction.mock.calls.map((call) => call[1])).toEqual(["closed", "other"]);
+    const retained = await listOutboxItems();
+    expect(retained.map((item) => [item.id, item.syncStatus])).toEqual([
+      ["closed", "conflict"],
+      ["closed-later", "pending"],
+    ]);
+
+    // A refused attempt is not replayed on every reconnect.
+    api.recordAttemptAction.mockClear();
+    await synchronizeOutbox();
+    expect(api.recordAttemptAction).not.toHaveBeenCalled();
+  });
+
+  it("leaves evidence untouched when the connection drops mid-replay", async () => {
+    api.recordAttemptAction.mockRejectedValueOnce(
+      new ApiError(0, "Cannot reach the server.", "network_error"),
+    );
+    await queueOutboxItem(action("first", "2026-08-22T10:00:01Z"));
+    await queueOutboxItem(action("second", "2026-08-22T10:00:02Z", 7));
+
+    expect(await synchronizeOutbox()).toEqual({ synchronized: 0, pending: 2 });
+    expect(api.recordAttemptAction).toHaveBeenCalledOnce();
+    expect((await listOutboxItems()).map((item) => item.syncStatus)).toEqual([
+      "pending",
+      "pending",
+    ]);
+  });
+
+  it("discards an attempt's refused evidence only when something was refused", async () => {
+    await queueOutboxItem(action("waiting", "2026-08-22T10:00:01Z"));
+    expect(await discardBlockedOutboxItems(42)).toBe(0);
+
+    await queueOutboxItem({ ...action("stale", "2026-08-22T10:00:00Z"), syncStatus: "stale" });
+    await queueOutboxItem(action("elsewhere", "2026-08-22T10:00:02Z", 7));
+    expect(await discardBlockedOutboxItems(42)).toBe(2);
+    expect((await listOutboxItems()).map((item) => item.id)).toEqual(["elsewhere"]);
   });
 });

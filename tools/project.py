@@ -54,6 +54,7 @@ def main() -> None:
         backend("validate_asset_packages")
         backend("validate_event_contracts")
     elif task == "lint":
+        run(sys.executable, "tools/check_repository_integrity.py")
         run(sys.executable, "-m", "ruff", "check", "mechlab", "tools")
         run(sys.executable, "-m", "ruff", "format", "--check", "mechlab", "tools")
         npm("run", "lint")
@@ -76,6 +77,7 @@ def main() -> None:
         backend("spectacular", "--file", str(schema_output), "--validate", "--fail-on-warn")
         npm("run", "api:types")
     elif task == "check":
+        run(sys.executable, "tools/check_repository_integrity.py")
         backend("makemigrations", "--check", "--dry-run")
         backend("validate_asset_packages")
         main_task("api-generate")

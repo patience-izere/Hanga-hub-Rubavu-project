@@ -8,7 +8,11 @@ import {
   getInstructorLearner,
   createInstructorAssignments,
   overrideAttemptRecommendation,
+  signOffAttempt,
   submitInstructorFeedback,
+  updateInstructorAssignment,
+  updateInstructorFeedback,
+  type InstructorAssignmentChanges,
 } from "../api/instructor";
 
 export const instructorOverviewKey = ["learning", "instructor", "overview"] as const;
@@ -81,5 +85,58 @@ export function useInstructorLearner(id: number) {
     queryKey: ["learning", "instructor", "learners", id],
     queryFn: () => getInstructorLearner(id),
     enabled: Number.isInteger(id) && id > 0,
+  });
+}
+
+function useInvalidateAttemptEvidence(id: number) {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: ["learning", "instructor", "attempts", id] });
+    void queryClient.invalidateQueries({ queryKey: instructorOverviewKey });
+    void queryClient.invalidateQueries({ queryKey: ["learning", "instructor", "learners"] });
+    void queryClient.invalidateQueries({ queryKey: ["learning", "instructor", "roster"] });
+  };
+}
+
+export function useUpdateInstructorFeedback(attemptId: number) {
+  const invalidate = useInvalidateAttemptEvidence(attemptId);
+  return useMutation({
+    mutationFn: ({
+      feedbackId,
+      ...input
+    }: {
+      feedbackId: number;
+      observation?: string;
+      feedback?: string;
+      is_published?: boolean;
+    }) => updateInstructorFeedback(attemptId, feedbackId, input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSignOffAttempt(id: number) {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateAttemptEvidence(id);
+  return useMutation({
+    mutationFn: (input: Parameters<typeof signOffAttempt>[1]) => signOffAttempt(id, input),
+    onSuccess: (review) => {
+      queryClient.setQueryData(["learning", "instructor", "attempts", id], review);
+      invalidate();
+    },
+  });
+}
+
+export function useUpdateInstructorAssignment(learnerId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, changes }: { id: number; changes: InstructorAssignmentChanges }) =>
+      updateInstructorAssignment(id, changes),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["learning", "instructor", "learners", learnerId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["learning", "instructor", "roster"] });
+      void queryClient.invalidateQueries({ queryKey: instructorOverviewKey });
+    },
   });
 }

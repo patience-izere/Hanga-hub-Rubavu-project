@@ -98,6 +98,11 @@ export type Attempt = {
   capability_profile: Partial<CapabilityProfile>;
   started_at: string;
   completed_at: string | null;
+  /** An instructor's sign-off on an attempt held for review; empty until then. */
+  review_decision?: "" | "competent" | "not_yet_competent";
+  review_note?: string;
+  reviewed_by_name?: string;
+  reviewed_at?: string | null;
   updated_at: string;
 };
 
@@ -193,7 +198,8 @@ export type AttemptEvent = {
 export type InstructorFeedback = {
   id: number;
   author_name: string;
-  observation: string;
+  /** Instructor-only note; the learner API leaves it out. */
+  observation?: string;
   feedback: string;
   is_published: boolean;
   published_at: string | null;

@@ -8,6 +8,7 @@ import {
   usePilotReport,
   usePilotStudies,
 } from "../learning/usePilot";
+import { PilotObservationForm } from "../components/pilot/PilotObservationForm";
 
 const instruments: PilotInstrument[] = [
   "pre_test",
@@ -566,57 +567,7 @@ function PilotEvidenceForms({
         <DateInput name="completedAt" label="Completed at" />
       </EvidenceForm>
 
-      {status === "collecting" ? (
-        <EvidenceForm
-          title="Scored or coded observation"
-          onSubmit={(data) =>
-            submit(() =>
-              mutations.observation.mutateAsync({
-                id: pilotId,
-                input: {
-                  instrument: field(data, "instrument") as PilotInstrument,
-                  learner_id: Number(data.get("learnerId")) || undefined,
-                  responses: JSON.parse(field(data, "responses")),
-                  collected_at: new Date(field(data, "collectedAt")).toISOString(),
-                },
-              }),
-            )
-          }
-        >
-          <label>
-            Instrument
-            <select name="instrument">
-              {instruments.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Learner ID when learner-scored
-            <input name="learnerId" type="number" min="1" />
-          </label>
-          <label>
-            Validated response object (JSON)
-            <textarea name="responses" rows={8} required defaultValue={'{"score": 0}'} />
-          </label>
-          <details>
-            <summary>Validated response examples</summary>
-            <p>
-              Pre/post: <code>{'{"score": 70}'}</code>. SUS: ten 1–5 ratings. TAM: 1–5 rating arrays
-              for usefulness, ease, enjoyment, and intention. Transfer: 0–4 values for sequence,
-              accuracy, safety, time, and independence, plus criticalSafetyFailure and
-              durationSeconds.
-            </p>
-            <p>
-              Workload records preparationMinutes, supportMinutes, supportIncidents, acceptable,
-              downloads, downloadFailures, crashCount, storageUsedMb, and synchronizationIncidents.
-              Interviews accept controlled theme codes and a redacted summary only; raw transcripts
-              must not be pasted here.
-            </p>
-          </details>
-          <DateInput name="collectedAt" label="Collected at" />
-        </EvidenceForm>
-      ) : null}
+      {status === "collecting" ? <PilotObservationForm pilotId={pilotId} /> : null}
 
       <EvidenceForm
         title="Safety, usability or operational incident"
