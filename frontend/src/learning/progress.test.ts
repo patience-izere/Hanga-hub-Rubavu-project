@@ -42,6 +42,24 @@ describe("dueState", () => {
     expect(dueState(done, NOW)).toBe("none");
   });
 
+  it("treats an attempt awaiting instructor review as submitted, not overdue", () => {
+    const submitted = assignment({
+      due_at: "2026-06-10T09:00:00Z",
+      attempt_history: [
+        { id: 10, status: "requires_review" } as Assignment["attempt_history"][number],
+      ],
+    });
+    expect(dueState(submitted, NOW)).toBe("none");
+  });
+
+  it("still counts an assignment with only an ended attempt as outstanding", () => {
+    const ended = assignment({
+      due_at: "2026-06-10T09:00:00Z",
+      attempt_history: [{ id: 11, status: "abandoned" } as Assignment["attempt_history"][number]],
+    });
+    expect(dueState(ended, NOW)).toBe("overdue");
+  });
+
   it("has no state without a due date", () => {
     expect(dueState(assignment(), NOW)).toBe("none");
   });

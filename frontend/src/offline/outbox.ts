@@ -6,7 +6,7 @@ import {
   type RendererMode,
   type TelemetryEventInput,
 } from "../api/learning";
-import { ApiError } from "../api/client";
+import { ApiError, isNetworkError } from "../api/client";
 
 const DATABASE = "opedu-offline-v1";
 const DATABASE_VERSION = 3;
@@ -289,13 +289,22 @@ async function reconcileDeliveryReceipts(pendingItems: OutboxItem[]) {
   }
 }
 
+/** Evidence the server refused for good; replaying it cannot succeed without someone deciding. */
+export function isBlockedOutboxItem(item: OutboxItem) {
+  return item.syncStatus === "conflict" || item.syncStatus === "stale";
+}
+
 async function runOutboxSynchronization(attemptId?: number) {
   if (!navigator.onLine) return { synchronized: 0, pending: (await listOutboxItems()).length };
   const items = (await listOutboxItems()).filter(
     (item) => attemptId === undefined || item.attemptId === attemptId,
   );
+  // Steps are scored in order, so once one item of an attempt is refused the later ones wait with
+  // it; other attempts on this device keep synchronizing.
+  const heldAttempts = new Set(items.filter(isBlockedOutboxItem).map((item) => item.attemptId));
   let synchronized = 0;
   for (const item of items) {
+    if (heldAttempts.has(item.attemptId)) continue;
     try {
       if (item.kind === "action") {
         await recordAttemptAction(
@@ -319,6 +328,8 @@ async function runOutboxSynchronization(attemptId?: number) {
       await removeOutboxItem(item.id);
       synchronized += 1;
     } catch (error) {
+      // The connection dropped again: keep everything as it was and try on the next reconnect.
+      if (isNetworkError(error)) break;
       const message = error instanceof Error ? error.message : "Synchronization failed.";
       const syncStatus =
         error instanceof ApiError && error.status === 409
@@ -331,13 +342,25 @@ async function runOutboxSynchronization(attemptId?: number) {
         syncStatus,
         lastError: message,
       });
-      break;
+      heldAttempts.add(item.attemptId);
     }
   }
   const pending = (await listOutboxItems()).length;
   await reconcileDeliveryReceipts(await listOutboxItems());
   window.dispatchEvent(new CustomEvent("opedu:outbox-changed", { detail: { pending } }));
   return { synchronized, pending };
+}
+
+/**
+ * Delete one attempt's queued evidence that the server refused (the attempt was closed elsewhere
+ * or the lesson changed underneath it). Only the learner can make that call, after a warning.
+ */
+export async function discardBlockedOutboxItems(attemptId: number) {
+  const items = (await listOutboxItems()).filter((item) => item.attemptId === attemptId);
+  if (!items.some(isBlockedOutboxItem)) return 0;
+  for (const item of items) await removeOutboxItem(item.id);
+  window.dispatchEvent(new CustomEvent("opedu:outbox-changed"));
+  return items.length;
 }
 
 export function synchronizeOutbox(attemptId?: number) {
@@ -389,4 +412,27 @@ export function createTelemetryEvent(
       payload,
     },
   };
+}
+
+/**
+ * Remove this device's attempt snapshots, queued evidence and delivery ledger.
+ *
+ * Called on sign-out so the next person on a shared workshop computer cannot see or replay the
+ * previous learner's work. Downloaded lesson files are curriculum, not personal data, and stay.
+ */
+export async function clearLocalLearningData() {
+  memoryOutbox.clear();
+  memorySnapshots.clear();
+  memoryDeliveries.clear();
+  if (typeof indexedDB === "undefined") return;
+  const database = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction([STORE, SNAPSHOT_STORE, DELIVERY_STORE], "readwrite");
+    transaction.objectStore(STORE).clear();
+    transaction.objectStore(SNAPSHOT_STORE).clear();
+    transaction.objectStore(DELIVERY_STORE).clear();
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+  window.dispatchEvent(new CustomEvent("opedu:outbox-changed", { detail: { pending: 0 } }));
 }

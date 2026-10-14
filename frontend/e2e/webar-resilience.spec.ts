@@ -343,15 +343,15 @@ test("a downloaded lesson completes through a full outage and replays every acti
   expect(rejectedBackendRequests).toEqual([]);
   await page.getByRole("button", { name: /Inspect the terminals/ }).click();
   await expect(page.getByLabel("2 of 2 steps complete")).toBeVisible();
-  await expect(page.locator(".sync-banner")).toContainText("2 evidence item(s) pending");
-  await expect(
-    page.getByRole("button", { name: "Synchronize evidence before scoring" }),
-  ).toBeDisabled();
+  await expect(page.locator(".sync-banner")).toContainText(
+    "2 actions are saved on this device and will be sent when you are online.",
+  );
+  await expect(page.getByRole("button", { name: "Reconnect to submit" })).toBeDisabled();
 
   await page.unroute("**/api/v1/**", rejectBackend);
   await setApplicationOffline(page, false);
   await expect(page.locator(".sync-banner")).toContainText("Online");
-  await expect(page.locator(".sync-banner")).toContainText("Evidence synchronized");
+  await expect(page.locator(".sync-banner")).toContainText("All your actions are saved.");
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await page.waitForTimeout(250);
 

@@ -5,8 +5,13 @@ export type DueState = "overdue" | "due-soon" | "scheduled" | "none";
 /** Work due within this window is surfaced ahead of everything else. */
 const DUE_SOON_DAYS = 7;
 
+/** Statuses of an attempt the learner has submitted; review only decides how it counts. */
+export const SUBMITTED_ATTEMPT_STATUSES = new Set(["completed", "requires_review"]);
+
 export function isCompleted(assignment: Assignment): boolean {
-  return (assignment.attempt_history ?? []).some((attempt) => attempt.status === "completed");
+  return (assignment.attempt_history ?? []).some((attempt) =>
+    SUBMITTED_ATTEMPT_STATUSES.has(attempt.status),
+  );
 }
 
 export function attemptsUsed(assignment: Assignment): number {

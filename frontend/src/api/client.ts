@@ -87,11 +87,17 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     headers.set("X-CSRFToken", decodeURIComponent(csrfToken));
   }
 
-  const response = await fetch(path, {
-    ...init,
-    credentials: "include",
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...init,
+      credentials: "include",
+      headers,
+    });
+  } catch {
+    // fetch only rejects when the request never reached a server.
+    throw new ApiError(0, NETWORK_MESSAGE, "network_error");
+  }
 
   const body = (await response.json().catch(() => ({}))) as T & ApiErrorBody;
   if (!response.ok) {
@@ -116,6 +122,42 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   return body;
 }
 
+const NETWORK_MESSAGE = "We could not reach OPedu. Check your connection and try again.";
+
+/** True when a request failed because the device could not reach the server at all. */
+export function isNetworkError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 0;
+}
+
+// The last signed-in person, so the app can open offline on a device that has downloaded
+// lessons. Removed on sign-out and whenever the server says the session has ended.
+const CACHED_USER_KEY = "opedu:last-user";
+
+function rememberUser(user: User) {
+  try {
+    localStorage.setItem(CACHED_USER_KEY, JSON.stringify(user));
+  } catch {
+    // Storage can be unavailable (private mode); the app then needs a connection to start.
+  }
+}
+
+export function forgetCachedUser() {
+  try {
+    localStorage.removeItem(CACHED_USER_KEY);
+  } catch {
+    // Nothing was stored.
+  }
+}
+
+function cachedUser(): User | null {
+  try {
+    const raw = localStorage.getItem(CACHED_USER_KEY);
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function ensureCsrf(): Promise<void> {
   await apiFetch<{ detail: string }>("/api/v1/auth/csrf/");
 }
@@ -123,10 +165,16 @@ export async function ensureCsrf(): Promise<void> {
 export async function currentUser(): Promise<User | null> {
   try {
     const response = await apiFetch<{ user: User }>("/api/v1/auth/me/");
+    rememberUser(response.user);
     return response.user;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
+      forgetCachedUser();
       return null;
+    }
+    if (isNetworkError(error)) {
+      const offlineUser = cachedUser();
+      if (offlineUser) return offlineUser;
     }
     throw error;
   }
@@ -138,6 +186,7 @@ export async function signIn(email: string, password: string): Promise<User> {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
+  rememberUser(response.user);
   return response.user;
 }
 

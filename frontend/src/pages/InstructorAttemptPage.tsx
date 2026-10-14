@@ -90,7 +90,7 @@ export function InstructorAttemptPage() {
         <div className="evidence-heading">
           <div>
             <h2>Action timeline</h2>
-            <p>Immutable evidence in the order received by Django.</p>
+            <p>Evidence in the order the server received it. It cannot be edited.</p>
           </div>
         </div>
         <ol className="attempt-timeline">
