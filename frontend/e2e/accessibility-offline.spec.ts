@@ -24,6 +24,20 @@ test("public learning information has no serious automated accessibility violati
   ).toEqual([]);
 });
 
+test("public pages keep readable text contrast in dark mode", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  for (const path of ["/", "/about", "/features", "/contact", "/privacy", "/login"]) {
+    await page.goto(path);
+    await expect(page.locator("main")).toBeVisible();
+    const results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+    expect(
+      results.violations.flatMap((violation) =>
+        violation.nodes.map((node) => `${path} ${node.target.join(" ")}`),
+      ),
+    ).toEqual([]);
+  }
+});
+
 test("the public learning hero remains visually stable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Desktop baseline has the canonical snapshot.");
   await page.goto("/about");

@@ -3,11 +3,14 @@ from django.db import transaction
 from django.utils import timezone
 
 from lab.audit import record_audit_event
-from lab.models import ResearchConsentReceipt, ResearchSurveyResponse
+from lab.models import PilotObservation, ResearchConsentReceipt, ResearchSurveyResponse
 
 
 class Command(BaseCommand):
-    help = "Delete expired pseudonymous research responses and retain an expiry receipt."
+    help = (
+        "Delete expired pseudonymous research responses and pilot observations, and retain an "
+        "expiry receipt."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -36,7 +39,12 @@ class Command(BaseCommand):
                     consent_version=receipt.consent_version,
                     scenario_version=receipt.scenario_version,
                 ).delete()
-                deleted_responses += deleted
+                observations, _ = PilotObservation.objects.filter(
+                    study__school=receipt.school,
+                    participant_code=receipt.participant_code,
+                    consent_version=receipt.consent_version,
+                ).delete()
+                deleted_responses += deleted + observations
                 receipt.status = ResearchConsentReceipt.Status.EXPIRED
                 receipt.save(update_fields=["status"])
                 record_audit_event(
@@ -47,6 +55,7 @@ class Command(BaseCommand):
                         "consentVersion": receipt.consent_version,
                         "scenarioVersion": receipt.scenario_version,
                         "deletedResponses": deleted,
+                        "deletedPilotObservations": observations,
                     },
                 )
         self.stdout.write(

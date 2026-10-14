@@ -64,6 +64,23 @@ services:
       redis:
         condition: service_healthy
 
+  scheduler:
+    build:
+      context: ./mechlab
+    environment:
+      DJANGO_DEBUG: "true"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-unsafe-docker-development-key}
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      DATABASE_URL: postgresql://${POSTGRES_USER:-opedu}:${POSTGRES_PASSWORD:-opedu-development}@postgres:5432/${POSTGRES_DB:-opedu}
+      REDIS_URL: redis://redis:6379/0
+    # xAPI delivery and research retention every 15 minutes.
+    command: python manage.py run_scheduled_jobs --interval 900
+    volumes:
+      - ./mechlab:/app
+    depends_on:
+      backend:
+        condition: service_healthy
+
   frontend:
     build:
       context: ./frontend
@@ -80,7 +97,8 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health/live"]
+      # The development image runs Vite on 5173; nginx's /health/live exists only in production.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5173/"]
       interval: 10s
       timeout: 5s
       retries: 6

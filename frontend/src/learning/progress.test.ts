@@ -42,6 +42,24 @@ describe("dueState", () => {
     expect(dueState(done, NOW)).toBe("none");
   });
 
+  it("treats an attempt awaiting instructor review as submitted, not overdue", () => {
+    const submitted = assignment({
+      due_at: "2026-06-10T09:00:00Z",
+      attempt_history: [
+        { id: 10, status: "requires_review" } as Assignment["attempt_history"][number],
+      ],
+    });
+    expect(dueState(submitted, NOW)).toBe("none");
+  });
+
+  it("still counts an assignment with only an ended attempt as outstanding", () => {
+    const ended = assignment({
+      due_at: "2026-06-10T09:00:00Z",
+      attempt_history: [{ id: 11, status: "abandoned" } as Assignment["attempt_history"][number]],
+    });
+    expect(dueState(ended, NOW)).toBe("overdue");
+  });
+
   it("has no state without a due date", () => {
     expect(dueState(assignment(), NOW)).toBe("none");
   });
@@ -128,6 +146,18 @@ describe("competencyProfile", () => {
     ]);
 
     expect(profile.map((item) => item.competency_code)).toEqual(["AUTO-01", "AUTO-02"]);
+  });
+
+  it("reads a result held for review through the instructor's sign-off", () => {
+    const held = { ...result("AUTO-01", "requires_review"), mastery_percentage: "90.00" };
+    const reviewed = (decision: AttemptDetail["review_decision"]) =>
+      competencyProfile([
+        { ...attempt("2026-06-01T09:00:00Z", [held]), review_decision: decision } as AttemptDetail,
+      ])[0].mastery_state;
+
+    expect(reviewed("")).toBe("requires_review");
+    expect(reviewed("competent")).toBe("mastered");
+    expect(reviewed("not_yet_competent")).toBe("developing");
   });
 
   it("is empty when no attempt has results", () => {

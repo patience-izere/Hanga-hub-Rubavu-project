@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 
+import { describeApiError } from "../api/client";
+
 import { QueryBoundary } from "../components/ui/QueryBoundary";
 import {
   useCreateInstructorAssignments,
@@ -190,6 +192,7 @@ export function InstructorAssignPage() {
                   <input
                     type="datetime-local"
                     value={dueAt}
+                    min={availableAt || undefined}
                     onChange={(event) => setDueAt(event.target.value)}
                   />
                 </label>
@@ -241,14 +244,28 @@ export function InstructorAssignPage() {
 
             {create.isError ? (
               <p className="form-error" role="alert">
-                The assignments could not be created.
+                {describeApiError(create.error, "The assignments could not be created.")}
               </p>
             ) : null}
             {create.data ? (
-              <p className="form-success" role="status">
-                Created {create.data.created} assignment(s); {create.data.existing} learner(s)
-                already held this lesson and were left unchanged.
-              </p>
+              <div className="form-success" role="status">
+                <p>
+                  Assigned to {create.data.created} learner{create.data.created === 1 ? "" : "s"}.
+                </p>
+                {create.data.existing > 0 ? (
+                  <p>
+                    {create.data.existing} already had this lesson; their deadlines and attempt
+                    limits were not changed. Change them from each learner&rsquo;s page in the
+                    roster.
+                  </p>
+                ) : null}
+                {create.data.skipped > 0 ? (
+                  <p>
+                    {create.data.skipped} learner{create.data.skipped === 1 ? " is" : "s are"} in
+                    the cohort but their school access is suspended, so they were skipped.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
           </form>
         )}

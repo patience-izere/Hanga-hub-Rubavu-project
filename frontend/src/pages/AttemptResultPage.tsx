@@ -19,12 +19,36 @@ const MASTERY_LABELS: Record<string, string> = {
  * Lives on its own route rather than inside the simulation so a learner can come back to a
  * result later, from the progress view or an instructor's feedback notification.
  */
+function resultHeading(attempt: AttemptDetail, stepCount: number, incorrectCount: number) {
+  const mistakes = `${incorrectCount} recorded incorrect ${incorrectCount === 1 ? "action" : "actions"}`;
+  if (attempt.status === "requires_review") {
+    return {
+      kicker: "Waiting for instructor review",
+      summary: `You completed all ${stepCount} procedure steps with ${mistakes}. A safety-critical error was recorded, so your instructor reviews this attempt before it counts towards your progress.`,
+    };
+  }
+  if (attempt.status === "abandoned") {
+    const evidenced = attempt.resume_state?.completedSteps?.length ?? 0;
+    return {
+      kicker: "Attempt ended",
+      summary: `This attempt was ended after ${evidenced} of ${stepCount} steps, so it was not scored. Its evidence stays in your history.`,
+    };
+  }
+  return {
+    kicker: "Attempt complete",
+    summary: `You completed all ${stepCount} procedure steps with ${mistakes}.`,
+  };
+}
+
 export function AttemptResultBody({ attempt }: { attempt: AttemptDetail }) {
   const lesson = attempt.assignment.lesson;
+  // Out-of-tolerance measurements are mistakes too; the server scores both.
   const incorrectCount = attempt.events.filter(
-    (event) => event.event_type === "incorrect_action",
+    (event) => event.event_type === "incorrect_action" || event.event_type === "tolerance_failed",
   ).length;
   const evidencedSteps = attempt.resume_state?.completedSteps?.length ?? 0;
+  const stepTitles = new Map(lesson.procedure_steps.map((step) => [step.code, step.title]));
+  const heading = resultHeading(attempt, lesson.procedure_steps.length, incorrectCount);
   const passed = attemptPassed({
     outcome: attempt.outcome,
     score: attempt.score,
@@ -38,16 +62,24 @@ export function AttemptResultBody({ attempt }: { attempt: AttemptDetail }) {
 
   return (
     <div className="result-card">
-      <span className="result-kicker">Attempt complete</span>
+      <span className="result-kicker">{heading.kicker}</span>
       <div className="result-score" aria-label={`Score ${attempt.score ?? "pending"} percent`}>
         <strong>{attempt.score === null ? "—" : Number(attempt.score)}</strong>
         <span>%</span>
       </div>
       <h1>{lesson.title}</h1>
-      <p>
-        You completed all {lesson.procedure_steps.length} procedure steps with {incorrectCount}{" "}
-        recorded incorrect {incorrectCount === 1 ? "action" : "actions"}.
-      </p>
+      <p>{heading.summary}</p>
+      {attempt.review_decision ? (
+        <div className="result-feedback" role="status">
+          <strong>
+            {attempt.review_decision === "competent"
+              ? "Your instructor reviewed this attempt and accepted the result"
+              : "Your instructor reviewed this attempt: practise it again before it counts"}
+          </strong>
+          {attempt.review_note ? <blockquote>{attempt.review_note}</blockquote> : null}
+          {attempt.reviewed_by_name ? <small>{attempt.reviewed_by_name}</small> : null}
+        </div>
+      ) : null}
 
       <div className="result-evidence">
         <div>
@@ -68,7 +100,7 @@ export function AttemptResultBody({ attempt }: { attempt: AttemptDetail }) {
       </div>
 
       <p className="result-note">
-        Scores are calculated by Django from the saved action sequence, and safety-order errors
+        Your score is calculated on the server from the actions you saved, and safety-order errors
         carry a larger penalty.
         {threshold != null ? ` The pass mark for this lesson is ${threshold}%.` : ""}
       </p>
@@ -85,8 +117,10 @@ export function AttemptResultBody({ attempt }: { attempt: AttemptDetail }) {
                   needed
                 </span>
                 <strong>
-                  {MASTERY_LABELS[result.mastery_state] ??
-                    result.mastery_state.replaceAll("_", " ")}
+                  {result.mastery_state === "requires_review" && attempt.review_decision
+                    ? "Reviewed by your instructor"
+                    : (MASTERY_LABELS[result.mastery_state] ??
+                      result.mastery_state.replaceAll("_", " "))}
                 </strong>
               </li>
             ))}
@@ -100,8 +134,10 @@ export function AttemptResultBody({ attempt }: { attempt: AttemptDetail }) {
           <ul>
             {stepsToReview.map((result) => (
               <li key={result.step_code}>
-                {result.step_code}: {result.outcome.replaceAll("_", " ")} · {result.hints_used}{" "}
-                hint(s) · {result.safety_violations} safety violation(s)
+                {stepTitles.get(result.step_code) ?? result.step_code}:{" "}
+                {result.outcome.replaceAll("_", " ")} · {result.hints_used}{" "}
+                {result.hints_used === 1 ? "hint" : "hints"} · {result.safety_violations} safety{" "}
+                {result.safety_violations === 1 ? "violation" : "violations"}
               </li>
             ))}
           </ul>
@@ -133,6 +169,9 @@ export function AttemptResultBody({ attempt }: { attempt: AttemptDetail }) {
 
       <Link className="button button-primary" to="/learn">
         Return to my learning
+      </Link>
+      <Link className="button button-secondary" to={`/assignments/${attempt.assignment.id}`}>
+        Back to the lesson
       </Link>
       <Link
         className="button button-secondary"

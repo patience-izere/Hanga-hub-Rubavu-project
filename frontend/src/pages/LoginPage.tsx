@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
-import type { ApiError, User } from "../api/client";
+import { describeApiError, type User } from "../api/client";
 import { useSignIn } from "../auth/useAuth";
 
 export function LoginPage({ user }: { user: User | null }) {
@@ -12,15 +12,21 @@ export function LoginPage({ user }: { user: User | null }) {
   const location = useLocation();
   const sessionExpired = sessionStorage.getItem("opedu:session-expired") === "true";
 
+  // Once signed in, go where the person was heading (a protected page, or an invitation link).
+  const destination = (location.state as { from?: string } | null)?.from || "/dashboard";
+
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={destination} replace />;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await login.mutateAsync({ email, password });
+    try {
+      await login.mutateAsync({ email, password });
+    } catch {
+      return; // The error is shown below from the mutation state.
+    }
     sessionStorage.removeItem("opedu:session-expired");
-    const destination = (location.state as { from?: string } | null)?.from || "/dashboard";
     navigate(destination, { replace: true });
   }
 
@@ -60,7 +66,7 @@ export function LoginPage({ user }: { user: User | null }) {
         />
         {login.isError ? (
           <p className="form-error" role="alert">
-            {(login.error as ApiError).message}
+            {describeApiError(login.error, "Sign in failed. Try again.")}
           </p>
         ) : null}
         <button className="button button-primary button-full" disabled={login.isPending}>

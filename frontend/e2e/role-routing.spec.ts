@@ -88,7 +88,8 @@ test("a learner can sign in, reach a protected route, and sign out", async ({ pa
   await page.getByLabel("Email address").fill("learner@opedu.local");
   await page.getByLabel("Password").fill("learning-pass-123");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  // `/dashboard` is an alias for each person's workspace home, which for a learner is /learn.
+  await expect(page).toHaveURL(/\/learn$/);
   await expect(page.getByRole("heading", { name: /Good to see you, Demo/ })).toBeVisible();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login$/);
@@ -113,11 +114,28 @@ test("school administrators can open membership management", async ({ page }) =>
       }),
     ),
   );
+  await page.route("**/api/v1/school/overview/", (route) =>
+    route.fulfill(
+      json({
+        schools: [{ id: 1, name: "Rubavu Demo Technical School", code: "rubavu-demo" }],
+        membersByRole: { admin: 1 },
+        pendingInvitations: 0,
+        expiredInvitations: 0,
+        suspendedMembers: 0,
+        cohorts: [],
+        recentAudit: [],
+      }),
+    ),
+  );
   await page.route("**/api/v1/school/members/", (route) => route.fulfill(json([])));
   await page.route("**/api/v1/school/invitations/", (route) => route.fulfill(json([])));
+  // An administrator's workspace home is the school; membership tools are in its navigation.
   await page.goto("/dashboard");
-  await page.getByRole("link", { name: "Manage school access" }).click();
+  await expect(page).toHaveURL(/\/school$/);
+  const navigation = page.getByRole("navigation", { name: "Workspace navigation" });
+  await navigation.getByRole("link", { name: "People" }).click();
   await expect(page.getByRole("heading", { name: "People and access." })).toBeVisible();
+  await navigation.getByRole("link", { name: "Invitations" }).click();
   await expect(page.getByRole("heading", { name: "Invite a person" })).toBeVisible();
 });
 
@@ -142,7 +160,8 @@ test("learners cannot open the school administration route", async ({ page }) =>
     route.fulfill(json({ count: 0, next: null, previous: null, results: [] })),
   );
   await page.goto("/school/admin");
-  await expect(page).toHaveURL(/\/dashboard$/);
+  // The old admin URL now points at People, which a learner cannot open: they land on /learn.
+  await expect(page).toHaveURL(/\/learn$/);
   await expect(page.getByRole("heading", { name: /Good to see you/ })).toBeVisible();
 });
 

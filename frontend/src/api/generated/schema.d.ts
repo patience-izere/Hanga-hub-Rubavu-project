@@ -340,6 +340,181 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/content/courses/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        get: operations["api_v1_content_courses_list"];
+        put?: never;
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        post: operations["api_v1_content_courses_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/courses/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        get: operations["api_v1_content_courses_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        patch: operations["api_v1_content_courses_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/content/courses/{id}/competencies/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        post: operations["api_v1_content_courses_competencies_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/courses/{id}/modules/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        post: operations["api_v1_content_courses_modules_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/grading-policies/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Published grading policies an author may attach to a practical scenario. */
+        get: operations["api_v1_content_grading_policies_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/lessons/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Draft lessons an author writes before building the practical scenario. */
+        get: operations["api_v1_content_lessons_list"];
+        put?: never;
+        /** @description Draft lessons an author writes before building the practical scenario. */
+        post: operations["api_v1_content_lessons_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/lessons/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Draft lessons an author writes before building the practical scenario. */
+        get: operations["api_v1_content_lessons_retrieve"];
+        put?: never;
+        post?: never;
+        /** @description Draft lessons an author writes before building the practical scenario. */
+        delete: operations["api_v1_content_lessons_destroy"];
+        options?: never;
+        head?: never;
+        /** @description Draft lessons an author writes before building the practical scenario. */
+        patch: operations["api_v1_content_lessons_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/content/lessons/{id}/history/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Every authoring and review decision on the lesson and its practicals, newest first. */
+        get: operations["api_v1_content_lessons_history_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/lessons/{id}/revise/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Copy a published lesson, and its latest practical, into a new draft revision. */
+        post: operations["api_v1_content_lessons_revise_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/lessons/{id}/scenarios/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Start a new draft practical scenario for this lesson. */
+        post: operations["api_v1_content_lessons_scenarios_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/content/lessons/{id}/transition/": {
         parameters: {
             query?: never;
@@ -452,6 +627,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/instructor/assignments/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description Extend a deadline, open the lesson earlier or later, or allow more attempts. */
+        patch: operations["api_v1_instructor_assignments_partial_update"];
+        trace?: never;
+    };
     "/api/v1/instructor/attempts/{id}/": {
         parameters: {
             query?: never;
@@ -466,6 +658,45 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["api_v1_instructor_attempts_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/instructor/attempts/{id}/feedback/{feedback_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * @description Edit, publish or withdraw one piece of feedback.
+         *
+         *     Only its author or a school administrator may change it, so colleagues cannot rewrite each
+         *     other's words. Withdrawing hides it from the learner again.
+         */
+        patch: operations["api_v1_instructor_attempts_feedback_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/instructor/attempts/{id}/review/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Sign off an attempt that grading held back because of a safety-critical mistake. */
+        post: operations["api_v1_instructor_attempts_review_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/instructor/evidence.csv": {
@@ -535,6 +766,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * @description School-wide counts plus the attempts an instructor is most likely to act on.
+         *
+         *     Counts come from the database, and the attempt list is capped: it holds everything waiting
+         *     for review or overdue, then the most recently updated attempts. Loading every attempt and
+         *     event made this page slower with each week of practice.
+         */
         get: operations["api_v1_instructor_overview_retrieve"];
         put?: never;
         post?: never;
@@ -608,6 +846,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/research/pilots/{id}/consent/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description A learner's own decision to take part, recorded before any scored instrument. */
+        get: operations["api_v1_research_pilots_consent_retrieve"];
+        put?: never;
+        /** @description A learner's own decision to take part, recorded before any scored instrument. */
+        post: operations["api_v1_research_pilots_consent_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/research/pilots/{id}/incidents/": {
         parameters: {
             query?: never;
@@ -634,6 +890,23 @@ export interface paths {
         get: operations["api_v1_research_pilots_observations_list"];
         put?: never;
         post: operations["api_v1_research_pilots_observations_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/pilots/{id}/participants/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Enrolled learners with their consent state, for recording learner-scored instruments. */
+        get: operations["api_v1_research_pilots_participants_list"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -711,7 +984,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Handler method for HTTP 'OPTIONS' request. */
         get: operations["api_v1_research_pilots_options_retrieve"];
         put?: never;
         post?: never;
@@ -751,13 +1023,55 @@ export interface paths {
          *     AuditEvent; until now those were reachable only through Django admin, which the person
          *     accountable for governance may not have access to.
          */
-        get: operations["api_v1_school_audit_list"];
+        get: operations["api_v1_school_audit_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/school/cohorts/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Cohorts (classes) and who is in them, so instructors can assign a lesson to a class.
+         *
+         *     Cohorts used to exist only in Django admin, which school administrators usually cannot open.
+         */
+        get: operations["api_v1_school_cohorts_retrieve"];
+        put?: never;
+        /**
+         * @description Cohorts (classes) and who is in them, so instructors can assign a lesson to a class.
+         *
+         *     Cohorts used to exist only in Django admin, which school administrators usually cannot open.
+         */
+        post: operations["api_v1_school_cohorts_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/school/cohorts/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["api_v1_school_cohorts_partial_update"];
         trace?: never;
     };
     "/api/v1/school/invitations/": {
@@ -1019,11 +1333,16 @@ export interface components {
             completed_at?: string | null;
             /** Format: date-time */
             readonly updated_at: string;
+            review_decision?: components["schemas"]["ReviewDecisionEnum"] | components["schemas"]["BlankEnum"];
+            review_note?: string;
+            readonly reviewed_by_name: string;
+            /** Format: date-time */
+            reviewed_at?: string | null;
             readonly assignment: components["schemas"]["Assignment"];
             readonly events: components["schemas"]["AttemptEvent"][];
             readonly step_results: components["schemas"]["StepResult"][];
             readonly competency_results: components["schemas"]["CompetencyResult"][];
-            readonly feedback: components["schemas"]["InstructorFeedback"][];
+            readonly feedback: components["schemas"]["LearnerFeedback"][];
             readonly recommendation: components["schemas"]["AdaptiveRecommendation"] | null;
         };
         AttemptDetailRequest: {
@@ -1039,6 +1358,10 @@ export interface components {
             started_at?: string;
             /** Format: date-time */
             completed_at?: string | null;
+            review_decision?: components["schemas"]["ReviewDecisionEnum"] | components["schemas"]["BlankEnum"];
+            review_note?: string;
+            /** Format: date-time */
+            reviewed_at?: string | null;
         };
         AttemptEvent: {
             /** Format: uuid */
@@ -1080,6 +1403,16 @@ export interface components {
          */
         AttemptOutcomeEnum: "pending" | "passed" | "failed" | "requires_review" | "mastered";
         /**
+         * @description * `competent` - competent
+         *     * `not_yet_competent` - not_yet_competent
+         * @enum {string}
+         */
+        AttemptReviewDecisionDecisionEnum: "competent" | "not_yet_competent";
+        AttemptReviewDecisionRequest: {
+            decision: components["schemas"]["AttemptReviewDecisionDecisionEnum"];
+            note: string;
+        };
+        /**
          * @description * `in_progress` - In progress
          *     * `completed` - Completed
          *     * `requires_review` - Requires review
@@ -1106,6 +1439,11 @@ export interface components {
             completed_at?: string | null;
             /** Format: date-time */
             readonly updated_at: string;
+            review_decision?: components["schemas"]["ReviewDecisionEnum"] | components["schemas"]["BlankEnum"];
+            review_note?: string;
+            readonly reviewed_by_name: string;
+            /** Format: date-time */
+            reviewed_at?: string | null;
         };
         AttemptSyncAudit: {
             /** Format: uuid */
@@ -1139,8 +1477,78 @@ export interface components {
             /** Format: date-time */
             occurredAt: string;
         };
+        AuditPage: {
+            events: {
+                [key: string]: unknown;
+            }[];
+            eventTypes: string[];
+            nextBefore: number | null;
+        };
+        AuthoringCourse: {
+            readonly id: number;
+            /** @description Leave empty for platform-wide content. */
+            school?: number | null;
+            /** @default  */
+            readonly schoolName: string;
+            title: string;
+            readonly slug: string;
+            trade: string;
+            description?: string;
+            readonly modules: components["schemas"]["ModuleOption"][];
+            readonly competencies: components["schemas"]["CompetencyOption"][];
+            readonly lessonCount: number;
+        };
+        AuthoringCourseRequest: {
+            /** @description Leave empty for platform-wide content. */
+            school?: number | null;
+            title: string;
+            trade: string;
+            description?: string;
+        };
+        AuthoringLesson: {
+            readonly id: number;
+            course: number;
+            readonly courseTitle: string;
+            module?: number | null;
+            title: string;
+            readonly slug: string;
+            summary: string;
+            objectives?: string[];
+            safetyNotes?: string[];
+            estimatedMinutes?: number;
+            language?: components["schemas"]["LanguageEnum"];
+            competencies?: number[];
+            readonly status: components["schemas"]["LessonPublicationStatusEnum"];
+            readonly contentVersion: number;
+            readonly authoredBy: number | null;
+            readonly authorName: string;
+            readonly reviewNotes: string;
+            /** Format: date-time */
+            readonly submittedAt: string | null;
+            /** Format: date-time */
+            readonly publishedAt: string | null;
+            readonly scenarios: components["schemas"]["LessonScenarioSummary"][];
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        AuthoringLessonRequest: {
+            course: number;
+            module?: number | null;
+            title: string;
+            summary: string;
+            objectives?: string[];
+            safetyNotes?: string[];
+            estimatedMinutes?: number;
+            language?: components["schemas"]["LanguageEnum"];
+            competencies?: number[];
+        };
         /** @enum {unknown} */
         BlankEnum: "";
+        CohortLearner: {
+            id: number;
+            name: string;
+            email: string;
+        };
         Competency: {
             readonly id: number;
             code: string;
@@ -1151,6 +1559,19 @@ export interface components {
             evidence_rules?: unknown;
             mastery_criteria?: unknown;
             mastery_threshold?: number;
+        };
+        CompetencyOption: {
+            readonly id: number;
+            code: string;
+            title: string;
+            description?: string;
+            masteryThreshold?: number;
+        };
+        CompetencyOptionRequest: {
+            code: string;
+            title: string;
+            description?: string;
+            masteryThreshold?: number;
         };
         CompetencyResult: {
             competency_code: string;
@@ -1178,13 +1599,16 @@ export interface components {
             mastery_state: components["schemas"]["MasteryStateEnum"];
             evidence?: unknown;
         };
-        /**
-         * @description * `expand` - Approve expansion
-         *     * `limit` - Continue with limits
-         *     * `reject` - Reject expansion
-         * @enum {string}
-         */
-        DecisionEnum: "expand" | "limit" | "reject";
+        ContentHistoryEntry: {
+            id: number;
+            eventType: string;
+            summary: string;
+            subject: string;
+            actorName: string;
+            reviewNotes: string;
+            /** Format: date-time */
+            occurredAt: string;
+        };
         Detail: {
             detail: string;
         };
@@ -1203,6 +1627,13 @@ export interface components {
          * @enum {string}
          */
         DomainEnum: "ethics" | "privacy" | "safeguarding" | "instructor" | "safety" | "device" | "accessibility" | "security" | "operations" | "recovery" | "evidence";
+        GradingPolicyOption: {
+            readonly id: number;
+            readonly code: string;
+            readonly version: number;
+            readonly name: string;
+            readonly passThreshold: number;
+        };
         GradingPolicyReference: {
             code: string;
             version: number;
@@ -1255,6 +1686,7 @@ export interface components {
             assignmentIds: number[];
             created: number;
             existing: number;
+            skipped: number;
         };
         InstructorAssignmentOptions: {
             learners: {
@@ -1275,6 +1707,8 @@ export interface components {
             outcome?: components["schemas"]["AttemptOutcomeEnum"];
             /** Format: decimal */
             score?: string | null;
+            review_decision?: components["schemas"]["ReviewDecisionEnum"] | components["schemas"]["BlankEnum"];
+            readonly has_published_feedback: boolean;
             readonly scenario_version: number;
             readonly grading_policy_code: string;
             readonly grading_policy_version: number;
@@ -1301,6 +1735,8 @@ export interface components {
             outcome?: components["schemas"]["AttemptOutcomeEnum"];
             /** Format: decimal */
             score?: string | null;
+            review_decision?: components["schemas"]["ReviewDecisionEnum"] | components["schemas"]["BlankEnum"];
+            readonly has_published_feedback: boolean;
             readonly scenario_version: number;
             readonly grading_policy_code: string;
             readonly grading_policy_version: number;
@@ -1324,6 +1760,11 @@ export interface components {
             readonly competency_results: components["schemas"]["CompetencyResult"][];
             readonly feedback: components["schemas"]["InstructorFeedback"][];
             readonly recommendations: components["schemas"]["AdaptiveRecommendation"][];
+            readonly pass_threshold: number;
+            review_note?: string;
+            readonly reviewed_by_name: string;
+            /** Format: date-time */
+            reviewed_at?: string | null;
         };
         InstructorFeedback: {
             readonly id: number;
@@ -1364,6 +1805,8 @@ export interface components {
             latestStatus: string | null;
             /** Format: decimal */
             latestScore: string | null;
+            instructions: string;
+            submitted: boolean;
         };
         InstructorLearnerAttempt: {
             id: number;
@@ -1434,6 +1877,7 @@ export interface components {
             assignments: number;
             attempts: number;
             completedAttempts: number;
+            completedAssignments: number;
             safetyErrors: number;
             overdueAssignments: number;
             /** Format: decimal */
@@ -1448,6 +1892,19 @@ export interface components {
          * @enum {string}
          */
         LanguageEnum: "en" | "rw" | "en-rw";
+        /** @description Published feedback as the learner sees it: the instructor's private observation is left out. */
+        LearnerFeedback: {
+            readonly id: number;
+            readonly author_name: string;
+            feedback: string;
+            is_published?: boolean;
+            /** Format: date-time */
+            readonly published_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
         /**
          * @description * `guided` - Guided practice
          *     * `independent` - Independent assessment
@@ -1468,6 +1925,14 @@ export interface components {
          * @enum {string}
          */
         LessonPublicationStatusEnum: "draft" | "review" | "approved" | "published" | "retired";
+        LessonScenarioSummary: {
+            readonly id: number;
+            readonly version: number;
+            readonly title: string;
+            readonly status: components["schemas"]["LessonPublicationStatusEnum"];
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
         LessonSummary: {
             readonly id: number;
             title: string;
@@ -1524,6 +1989,17 @@ export interface components {
          * @enum {string}
          */
         MasteryStateEnum: "not_demonstrated" | "developing" | "mastered" | "requires_review";
+        ModuleOption: {
+            readonly id: number;
+            readonly code: string;
+            title: string;
+            description?: string;
+            readonly order: number;
+        };
+        ModuleOptionRequest: {
+            title: string;
+            description?: string;
+        };
         /** @enum {unknown} */
         NullEnum: null;
         /**
@@ -1578,6 +2054,36 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["AttemptDetail"][];
         };
+        PaginatedAuthoringLessonList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["AuthoringLesson"][];
+        };
+        PaginatedContentHistoryEntryList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["ContentHistoryEntry"][];
+        };
         PaginatedPilotApprovalList: {
             /** @example 123 */
             count: number;
@@ -1622,6 +2128,21 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["PilotObservation"][];
+        };
+        PaginatedPilotParticipantList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["PilotParticipant"][];
         };
         PaginatedPilotRehearsalList: {
             /** @example 123 */
@@ -1675,6 +2196,38 @@ export interface components {
             name?: string;
             manifest?: unknown;
         };
+        PatchedAuthoringCourseRequest: {
+            /** @description Leave empty for platform-wide content. */
+            school?: number | null;
+            title?: string;
+            trade?: string;
+            description?: string;
+        };
+        PatchedAuthoringLessonRequest: {
+            course?: number;
+            module?: number | null;
+            title?: string;
+            summary?: string;
+            objectives?: string[];
+            safetyNotes?: string[];
+            estimatedMinutes?: number;
+            language?: components["schemas"]["LanguageEnum"];
+            competencies?: number[];
+        };
+        /** @description Change one learner's assignment: extend the deadline or allow more attempts. */
+        PatchedInstructorAssignmentUpdateRequest: {
+            /** Format: date-time */
+            availableAt?: string | null;
+            /** Format: date-time */
+            dueAt?: string | null;
+            attemptLimit?: number;
+            instructions?: string;
+        };
+        PatchedInstructorFeedbackUpdateRequest: {
+            observation?: string;
+            feedback?: string;
+            is_published?: boolean;
+        };
         PatchedPilotStudyRequest: {
             school?: number;
             code?: string;
@@ -1700,8 +2253,15 @@ export interface components {
             grading_policy?: number;
             asset_package?: number | null;
         };
+        PatchedSchoolCohortUpdateRequest: {
+            name?: string;
+            academicYear?: string;
+            isActive?: boolean;
+            learnerIds?: number[];
+        };
         PatchedSchoolMemberUpdateRequest: {
             isActive?: boolean;
+            role?: components["schemas"]["RoleEnum"];
         };
         PilotApproval: {
             readonly id: number;
@@ -1737,6 +2297,15 @@ export interface components {
          * @enum {string}
          */
         PilotApprovalStatusEnum: "pending" | "approved" | "rejected";
+        PilotConsent: {
+            readonly consented: boolean;
+            readonly consentVersion: string;
+            /** Format: date-time */
+            readonly expiresAt: string | null;
+        };
+        PilotConsentRequest: {
+            consentAccepted?: boolean;
+        };
         PilotIncident: {
             readonly id: number;
             kind: components["schemas"]["PilotIncidentKindEnum"];
@@ -1839,6 +2408,12 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
+        PilotParticipant: {
+            learnerId: number;
+            name: string;
+            consented: boolean;
+            recordedInstruments: string[];
+        };
         PilotRehearsal: {
             readonly id: number;
             kind: components["schemas"]["PilotRehearsalKindEnum"];
@@ -1929,7 +2504,7 @@ export interface components {
         };
         PilotReview: {
             readonly id: number;
-            decision: components["schemas"]["DecisionEnum"];
+            decision: components["schemas"]["PilotReviewDecisionEnum"];
             reviewer_name: string;
             reviewer_role: string;
             organization: string;
@@ -1942,8 +2517,15 @@ export interface components {
             /** Format: date-time */
             readonly created_at: string;
         };
+        /**
+         * @description * `expand` - Approve expansion
+         *     * `limit` - Continue with limits
+         *     * `reject` - Reject expansion
+         * @enum {string}
+         */
+        PilotReviewDecisionEnum: "expand" | "limit" | "reject";
         PilotReviewRequest: {
-            decision: components["schemas"]["DecisionEnum"];
+            decision: components["schemas"]["PilotReviewDecisionEnum"];
             reviewer_name: string;
             reviewer_role: string;
             organization: string;
@@ -2083,6 +2665,13 @@ export interface components {
             scenario_version?: string;
         };
         /**
+         * @description * `` - Not reviewed
+         *     * `competent` - Competent
+         *     * `not_yet_competent` - Not yet competent
+         * @enum {string}
+         */
+        ReviewDecisionEnum: "competent" | "not_yet_competent";
+        /**
          * @description * `admin` - School administrator
          *     * `instructor` - Instructor
          *     * `learner` - Learner
@@ -2093,6 +2682,9 @@ export interface components {
         ScenarioAuthoring: {
             readonly id: number;
             lesson: number;
+            readonly lessonTitle: string;
+            readonly lessonStatus: string;
+            readonly authorName: string;
             version: number;
             title: string;
             definition?: unknown;
@@ -2124,6 +2716,31 @@ export interface components {
             grading_policy: number;
             asset_package?: number | null;
         };
+        SchoolCohort: {
+            id: number;
+            name: string;
+            code: string;
+            academicYear: string;
+            isActive: boolean;
+            school: components["schemas"]["SchoolSummary"];
+            programName: string;
+            learners: components["schemas"]["CohortLearner"][];
+        };
+        SchoolCohortCreateRequest: {
+            schoolId?: number;
+            name: string;
+            programName: string;
+            academicYear?: string;
+        };
+        SchoolCohortList: {
+            cohorts: components["schemas"]["SchoolCohort"][];
+            programs: {
+                [key: string]: unknown;
+            }[];
+            learners: {
+                [key: string]: unknown;
+            }[];
+        };
         SchoolInvitation: {
             readonly id: number;
             readonly school: components["schemas"]["SchoolSummary"];
@@ -2138,10 +2755,14 @@ export interface components {
             /** Format: date-time */
             readonly created_at: string;
         };
+        /**
+         * @description New people choose a name and password; people who already have an account sign in first
+         *     and send nothing.
+         */
         SchoolInvitationAcceptRequest: {
-            firstName: string;
-            lastName: string;
-            password: string;
+            firstName?: string;
+            lastName?: string;
+            password?: string;
         };
         SchoolInvitationCreateRequest: {
             schoolId?: number;
@@ -2153,6 +2774,7 @@ export interface components {
             invitation: components["schemas"]["SchoolInvitation"];
             /** Format: uri */
             acceptUrl: string;
+            emailSent: boolean;
         };
         SchoolInvitationPreview: {
             schoolName: string;
@@ -2161,6 +2783,7 @@ export interface components {
             role: string;
             /** Format: date-time */
             expiresAt: string;
+            accountExists: boolean;
         };
         SchoolMember: {
             readonly id: number;
@@ -2285,6 +2908,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -2411,6 +3036,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -2699,6 +3326,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -2948,6 +3577,379 @@ export interface operations {
             };
         };
     };
+    api_v1_content_courses_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringCourse"][];
+                };
+            };
+        };
+    };
+    api_v1_content_courses_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthoringCourseRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AuthoringCourseRequest"];
+                "multipart/form-data": components["schemas"]["AuthoringCourseRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringCourse"];
+                };
+            };
+        };
+    };
+    api_v1_content_courses_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringCourse"];
+                };
+            };
+        };
+    };
+    api_v1_content_courses_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedAuthoringCourseRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedAuthoringCourseRequest"];
+                "multipart/form-data": components["schemas"]["PatchedAuthoringCourseRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringCourse"];
+                };
+            };
+        };
+    };
+    api_v1_content_courses_competencies_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompetencyOptionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["CompetencyOptionRequest"];
+                "multipart/form-data": components["schemas"]["CompetencyOptionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompetencyOption"];
+                };
+            };
+        };
+    };
+    api_v1_content_courses_modules_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModuleOptionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ModuleOptionRequest"];
+                "multipart/form-data": components["schemas"]["ModuleOptionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleOption"];
+                };
+            };
+        };
+    };
+    api_v1_content_grading_policies_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradingPolicyOption"][];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedAuthoringLessonList"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthoringLessonRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AuthoringLessonRequest"];
+                "multipart/form-data": components["schemas"]["AuthoringLessonRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringLesson"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this lesson. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringLesson"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this lesson. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_v1_content_lessons_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this lesson. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedAuthoringLessonRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedAuthoringLessonRequest"];
+                "multipart/form-data": components["schemas"]["PatchedAuthoringLessonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringLesson"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_history_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this lesson. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedContentHistoryEntryList"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_revise_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this lesson. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthoringLesson"];
+                };
+            };
+        };
+    };
+    api_v1_content_lessons_scenarios_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this lesson. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioAuthoring"];
+                };
+            };
+        };
+    };
     api_v1_content_lessons_transition_create: {
         parameters: {
             query?: never;
@@ -2982,6 +3984,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3253,6 +4257,33 @@ export interface operations {
             };
         };
     };
+    api_v1_instructor_assignments_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedInstructorAssignmentUpdateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedInstructorAssignmentUpdateRequest"];
+                "multipart/form-data": components["schemas"]["PatchedInstructorAssignmentUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructorLearnerAssignment"];
+                };
+            };
+        };
+    };
     api_v1_instructor_attempts_retrieve: {
         parameters: {
             query?: never;
@@ -3324,6 +4355,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdaptiveRecommendation"];
+                };
+            };
+        };
+    };
+    api_v1_instructor_attempts_feedback_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                feedback_id: number;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedInstructorFeedbackUpdateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedInstructorFeedbackUpdateRequest"];
+                "multipart/form-data": components["schemas"]["PatchedInstructorFeedbackUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructorFeedback"];
+                };
+            };
+        };
+    };
+    api_v1_instructor_attempts_review_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttemptReviewDecisionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AttemptReviewDecisionRequest"];
+                "multipart/form-data": components["schemas"]["AttemptReviewDecisionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructorAttemptReview"];
                 };
             };
         };
@@ -3432,6 +4518,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3582,6 +4670,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3611,6 +4701,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3639,6 +4731,56 @@ export interface operations {
             };
         };
     };
+    api_v1_research_pilots_consent_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotConsent"];
+                };
+            };
+        };
+    };
+    api_v1_research_pilots_consent_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PilotConsentRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PilotConsentRequest"];
+                "multipart/form-data": components["schemas"]["PilotConsentRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotConsent"];
+                };
+            };
+        };
+    };
     api_v1_research_pilots_incidents_list: {
         parameters: {
             query?: {
@@ -3646,6 +4788,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3675,6 +4819,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3710,6 +4856,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3739,6 +4887,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3767,6 +4917,37 @@ export interface operations {
             };
         };
     };
+    api_v1_research_pilots_participants_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description A search term. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this pilot study. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPilotParticipantList"];
+                };
+            };
+        };
+    };
     api_v1_research_pilots_rehearsals_list: {
         parameters: {
             query?: {
@@ -3774,6 +4955,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -3803,6 +4986,8 @@ export interface operations {
                 ordering?: string;
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description A search term. */
                 search?: string;
             };
@@ -4012,7 +5197,7 @@ export interface operations {
             };
         };
     };
-    api_v1_school_audit_list: {
+    api_v1_school_audit_retrieve: {
         parameters: {
             query?: never;
             header?: never;
@@ -4026,7 +5211,78 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuditEvent"][];
+                    "application/json": components["schemas"]["AuditPage"];
+                };
+            };
+        };
+    };
+    api_v1_school_cohorts_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolCohortList"];
+                };
+            };
+        };
+    };
+    api_v1_school_cohorts_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchoolCohortCreateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["SchoolCohortCreateRequest"];
+                "multipart/form-data": components["schemas"]["SchoolCohortCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolCohort"];
+                };
+            };
+        };
+    };
+    api_v1_school_cohorts_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedSchoolCohortUpdateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedSchoolCohortUpdateRequest"];
+                "multipart/form-data": components["schemas"]["PatchedSchoolCohortUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolCohort"];
                 };
             };
         };
@@ -4125,7 +5381,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
                 "application/json": components["schemas"]["SchoolInvitationAcceptRequest"];
                 "application/x-www-form-urlencoded": components["schemas"]["SchoolInvitationAcceptRequest"];

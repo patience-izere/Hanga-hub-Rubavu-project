@@ -21,6 +21,17 @@ const AUDIT_LABELS: Record<string, string> = {
   "assessment.feedback_published": "Feedback published to learner",
   "assessment.feedback_saved": "Feedback saved as draft",
   "assignment.created": "Assignment created",
+  "assignment.updated": "Assignment deadline or attempts changed",
+  "account.password_reset": "Password reset",
+  "membership.role_changed": "Role changed",
+  "cohort.created": "Class created",
+  "cohort.updated": "Class changed",
+  "assessment.review_signed_off": "Attempt signed off after review",
+  "assessment.feedback_updated": "Feedback edited",
+  "assessment.feedback_withdrawn": "Feedback withdrawn from learner",
+  "assessment.recommendation_overridden": "Recommendation changed",
+  "assessment.attempt_started": "Attempt started",
+  "assessment.attempt_completed": "Attempt submitted",
 };
 
 export function auditLabel(eventType: string): string {

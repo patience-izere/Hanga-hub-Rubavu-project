@@ -67,16 +67,19 @@ export function SchoolOverviewPage() {
               <Link className="button button-secondary" to="/school/invitations">
                 Review invitations
               </Link>
+              <Link className="button button-secondary" to="/school/classes">
+                Manage classes
+              </Link>
               <Link className="button button-secondary" to="/school/audit">
                 Open the audit log
               </Link>
             </div>
 
-            <h2 className="section-title">Cohorts</h2>
+            <h2 className="section-title">Classes</h2>
             {data.cohorts.length === 0 ? (
               <p className="field-note">
-                No active cohorts. Cohorts are created in Django admin and let instructors assign a
-                lesson to a whole class at once.
+                No active classes. <Link to="/school/classes">Create a class</Link> so instructors
+                can assign a lesson to all its learners at once.
               </p>
             ) : (
               <ul className="cohort-list">

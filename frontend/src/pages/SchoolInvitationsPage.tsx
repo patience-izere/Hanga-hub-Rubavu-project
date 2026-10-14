@@ -1,12 +1,13 @@
 import { FormEvent, useState } from "react";
 
-import { ApiError } from "@/api/client";
+import { describeApiError } from "@/api/client";
 import type { SchoolInvitation, SchoolMember } from "@/api/school";
 import { QueryBoundary } from "@/components/ui/QueryBoundary";
 import {
   useCreateSchoolInvitation,
   useRevokeSchoolInvitation,
   useSchoolInvitations,
+  useSchoolOverview,
 } from "@/school/useSchoolAdmin";
 
 type InvitationState = "accepted" | "revoked" | "expired" | "pending";
@@ -29,12 +30,32 @@ export function SchoolInvitationsPage() {
   const invitations = useSchoolInvitations();
   const invite = useCreateSchoolInvitation();
   const revoke = useRevokeSchoolInvitation();
+  const overview = useSchoolOverview();
+  const schools = overview.data?.schools ?? [];
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<SchoolMember["role"]>("learner");
+  const [schoolId, setSchoolId] = useState<number | "">("");
+  const [confirmRevoke, setConfirmRevoke] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
+  // Administrators of more than one school (and platform administrators) must say which one.
+  const needsSchool = schools.length > 1;
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    invite.mutate({ email, role }, { onSuccess: () => setEmail("") });
+    setCopied(false);
+    invite.mutate(
+      { email, role, schoolId: needsSchool && schoolId !== "" ? schoolId : undefined },
+      { onSuccess: () => setEmail("") },
+    );
+  }
+
+  async function copyLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
   }
 
   return (
@@ -44,8 +65,8 @@ export function SchoolInvitationsPage() {
           <span className="eyebrow">School administration</span>
           <h1>Invitations.</h1>
           <p>
-            Invitation links expire after seven days and can be used once. Accepting creates the
-            account and the school membership together.
+            Invitation links expire after seven days and can be used once. New people create their
+            account when they accept; people who already use OPedu sign in and join this school.
           </p>
         </div>
       </div>
@@ -53,6 +74,26 @@ export function SchoolInvitationsPage() {
       <section className="admin-panel">
         <h2>Invite a person</h2>
         <form onSubmit={submit}>
+          {needsSchool ? (
+            <>
+              <label htmlFor="invite-school">School</label>
+              <select
+                id="invite-school"
+                required
+                value={schoolId}
+                onChange={(event) =>
+                  setSchoolId(event.target.value ? Number(event.target.value) : "")
+                }
+              >
+                <option value="">Choose a school</option>
+                {schools.map((school) => (
+                  <option key={school.id} value={school.id}>
+                    {school.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : null}
           <label htmlFor="invite-email">Email</label>
           <input
             id="invite-email"
@@ -74,14 +115,27 @@ export function SchoolInvitationsPage() {
           </select>
           {invite.isError && (
             <p className="form-error" role="alert">
-              {invite.error instanceof ApiError ? invite.error.message : "Invitation failed."}
+              {describeApiError(invite.error, "Invitation failed.")}
             </p>
           )}
           {invite.data && (
-            <p className="form-success" role="status">
-              Invitation sent. Development link:{" "}
-              <a href={invite.data.acceptUrl}>{invite.data.acceptUrl}</a>
-            </p>
+            <div className={invite.data.emailSent ? "form-success" : "form-error"} role="status">
+              <p>
+                {invite.data.emailSent
+                  ? `Invitation emailed to ${invite.data.invitation.email}.`
+                  : `The invitation was created, but the email to ${invite.data.invitation.email} could not be sent. Share this link with them yourself; it works once and expires in seven days.`}
+              </p>
+              <p className="invitation-link">
+                <code>{invite.data.acceptUrl}</code>
+                <button
+                  type="button"
+                  className="button-link"
+                  onClick={() => void copyLink(invite.data.acceptUrl)}
+                >
+                  {copied ? "Copied" : "Copy link"}
+                </button>
+              </p>
+            </div>
           )}
           <button className="button button-primary" disabled={invite.isPending}>
             {invite.isPending ? "Sending…" : "Send invitation"}
@@ -92,9 +146,7 @@ export function SchoolInvitationsPage() {
       <h2 className="section-title">All invitations</h2>
       {revoke.isError ? (
         <p className="form-error" role="alert">
-          {revoke.error instanceof ApiError
-            ? revoke.error.message
-            : "The invitation could not be revoked."}
+          {describeApiError(revoke.error, "The invitation could not be revoked.")}
         </p>
       ) : null}
 
@@ -115,7 +167,10 @@ export function SchoolInvitationsPage() {
                 <li key={item.id} className={`invitation-${state}`}>
                   <div>
                     <strong>{item.email}</strong>
-                    <span>{item.role.replaceAll("_", " ")}</span>
+                    <span>
+                      {item.role.replaceAll("_", " ")}
+                      {schools.length > 1 ? ` · ${item.school.name}` : ""}
+                    </span>
                     <small>
                       {state === "accepted"
                         ? `Accepted ${new Date(item.accepted_at as string).toLocaleDateString()}`
@@ -124,14 +179,27 @@ export function SchoolInvitationsPage() {
                   </div>
                   <div className="invitation-actions">
                     <span className={`status status-${state}`}>{STATE_LABELS[state]}</span>
-                    {state === "pending" || state === "expired" ? (
-                      <button
-                        className="button-link"
-                        onClick={() => revoke.mutate(item.id)}
-                        disabled={revoke.isPending}
-                      >
+                    {(state === "pending" || state === "expired") && confirmRevoke !== item.id ? (
+                      <button className="button-link" onClick={() => setConfirmRevoke(item.id)}>
                         Revoke
                       </button>
+                    ) : null}
+                    {confirmRevoke === item.id ? (
+                      <span className="inline-confirm-row" role="group" aria-label="Confirm revoke">
+                        <span>The link will stop working.</span>
+                        <button
+                          className="button-link"
+                          disabled={revoke.isPending}
+                          onClick={() =>
+                            revoke.mutate(item.id, { onSuccess: () => setConfirmRevoke(null) })
+                          }
+                        >
+                          Revoke it
+                        </button>
+                        <button className="button-link" onClick={() => setConfirmRevoke(null)}>
+                          Keep
+                        </button>
+                      </span>
                     ) : null}
                   </div>
                 </li>
