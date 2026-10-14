@@ -29,6 +29,11 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
+            // Vite's dynamic-import helper is needed by every page. Left unassigned, Rollup put
+            // it in the drei chunk, so the entry imported drei, fiber and three.js on every route.
+            if (id.includes("vite/preload-helper") || id.includes("commonjsHelpers")) {
+              return "react-platform";
+            }
             if (id.includes("node_modules/@react-three/drei")) return "react-three-drei";
             if (id.includes("node_modules/@react-three/fiber")) return "react-three-fiber";
             if (id.includes("node_modules/three/examples")) return "three-addons";

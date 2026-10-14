@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createPilotStudy,
   getPilotOptions,
+  getPilotParticipants,
   getPilotReport,
   getPilotStudies,
   recordPilotApproval,
@@ -72,4 +73,12 @@ export function usePilotMutation() {
       onSuccess: refresh,
     }),
   };
+}
+
+export function usePilotParticipants(id: number | null) {
+  return useQuery({
+    queryKey: [...pilotsKey, id, "participants"],
+    queryFn: () => getPilotParticipants(id!),
+    enabled: Boolean(id),
+  });
 }

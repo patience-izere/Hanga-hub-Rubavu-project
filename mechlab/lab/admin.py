@@ -71,7 +71,7 @@ class AssetFileInline(admin.TabularInline):
 
 @admin.register(School)
 class SchoolAdmin(admin.ModelAdmin):
-    list_display = ("name", "code", "is_active")
+    list_display = ("name", "code", "is_active", "allow_self_approval")
     search_fields = ("name", "code")
 
 
@@ -167,7 +167,17 @@ class LessonAdmin(admin.ModelAdmin):
     list_filter = ("status", "language", "course")
     prepopulated_fields = {"slug": ("title",)}
     filter_horizontal = ("competencies", "prerequisites")
-    readonly_fields = ("submitted_at", "reviewed_at", "published_at")
+    # Review state changes go through the Studio so separation of duties and the audit trail
+    # apply; the admin shows them but cannot set them.
+    readonly_fields = (
+        "status",
+        "authored_by",
+        "reviewed_by",
+        "review_notes",
+        "submitted_at",
+        "reviewed_at",
+        "published_at",
+    )
     inlines = (ProcedureStepInline,)
 
 
@@ -193,7 +203,17 @@ class SimulationScenarioAdmin(admin.ModelAdmin):
     list_display = ("title", "version", "lesson", "grading_policy", "status")
     list_filter = ("status", "lesson__course")
     search_fields = ("title", "lesson__title")
-    readonly_fields = ("published_at", "created_at", "updated_at")
+    readonly_fields = (
+        "status",
+        "authored_by",
+        "reviewed_by",
+        "review_notes",
+        "submitted_at",
+        "reviewed_at",
+        "published_at",
+        "created_at",
+        "updated_at",
+    )
 
 
 @admin.register(Tool)

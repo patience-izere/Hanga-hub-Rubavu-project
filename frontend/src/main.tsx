@@ -9,14 +9,16 @@ import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { synchronizeOutbox } from "./offline/outbox";
 import { LocaleProvider } from "./i18n/LocaleProvider";
 import { installGlobalErrorMonitoring } from "./monitoring/clientErrors";
+import "@fontsource-variable/inter/wght.css";
 import "./styles.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
+      // Retry dropped connections and server faults; a 4xx answer will not change on retry.
       retry: (failureCount, error) =>
-        !(error instanceof ApiError && error.status < 500) && failureCount < 2,
+        !(error instanceof ApiError && error.status > 0 && error.status < 500) && failureCount < 2,
     },
   },
 });

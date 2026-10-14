@@ -1,10 +1,14 @@
 import type { ReactNode } from "react";
 
+import { isNetworkError } from "../../api/client";
 import { EmptyState } from "./EmptyState";
 
 type QueryLike = {
   isPending: boolean;
   isError: boolean;
+  isFetching?: boolean;
+  error?: unknown;
+  refetch?: () => unknown;
 };
 
 type QueryBoundaryProps<TData> = {
@@ -45,9 +49,23 @@ export function QueryBoundary<TData>({
 
   if (query.isError || query.data === undefined) {
     return (
-      <p className="panel-status form-error" role="alert">
-        {error}
-      </p>
+      <div className="panel-status query-error" role="alert">
+        <p className="form-error">
+          {isNetworkError(query.error)
+            ? "You're offline. This will load when your connection returns."
+            : error}
+        </p>
+        {query.refetch ? (
+          <button
+            type="button"
+            className="button button-secondary"
+            disabled={query.isFetching}
+            onClick={() => void query.refetch?.()}
+          >
+            {query.isFetching ? "Trying again…" : "Try again"}
+          </button>
+        ) : null}
+      </div>
     );
   }
 

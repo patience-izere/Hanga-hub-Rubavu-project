@@ -5,15 +5,21 @@ from rest_framework.routers import DefaultRouter
 from . import api_views
 from .content_views import (
     AssetPackageAuthoringViewSet,
+    AuthoringCourseViewSet,
+    AuthoringLessonViewSet,
+    GradingPolicyOptionsView,
     LessonTransitionView,
     ScenarioAuthoringViewSet,
 )
 from .learning_views import (
     AssignmentViewSet,
     AttemptViewSet,
+    InstructorAssignmentDetailView,
     InstructorAssignmentView,
+    InstructorAttemptReviewDecisionView,
     InstructorAttemptReviewView,
     InstructorEvidenceExportView,
+    InstructorFeedbackDetailView,
     InstructorLearnerDetailView,
     InstructorOverviewView,
     InstructorRosterView,
@@ -23,6 +29,8 @@ from .learning_views import (
 from .pilot_views import PilotStudyViewSet
 from .school_views import (
     SchoolAuditView,
+    SchoolCohortDetailView,
+    SchoolCohortListView,
     SchoolInvitationAcceptView,
     SchoolInvitationDetailView,
     SchoolInvitationListCreateView,
@@ -35,6 +43,8 @@ router = DefaultRouter()
 router.register("assignments", AssignmentViewSet, basename="assignment")
 router.register("attempts", AttemptViewSet, basename="attempt")
 router.register("content/scenarios", ScenarioAuthoringViewSet, basename="content-scenario")
+router.register("content/courses", AuthoringCourseViewSet, basename="content-course")
+router.register("content/lessons", AuthoringLessonViewSet, basename="content-lesson")
 router.register(
     "content/asset-packages",
     AssetPackageAuthoringViewSet,
@@ -87,12 +97,19 @@ urlpatterns = [
     ),
     path("research/surveys/", ResearchSurveyView.as_view(), name="research-surveys"),
     path(
+        "content/grading-policies/",
+        GradingPolicyOptionsView.as_view(),
+        name="content-grading-policies",
+    ),
+    path(
         "content/lessons/<int:pk>/transition/",
         LessonTransitionView.as_view(),
         name="content-lesson-transition",
     ),
     path("school/overview/", SchoolOverviewView.as_view(), name="school-overview"),
     path("school/audit/", SchoolAuditView.as_view(), name="school-audit"),
+    path("school/cohorts/", SchoolCohortListView.as_view(), name="school-cohort-list"),
+    path("school/cohorts/<int:pk>/", SchoolCohortDetailView.as_view(), name="school-cohort-detail"),
     path("school/members/", SchoolMemberListView.as_view(), name="school-member-list"),
     path("school/members/<int:pk>/", SchoolMemberDetailView.as_view(), name="school-member-detail"),
     path(
@@ -114,6 +131,21 @@ urlpatterns = [
         "instructor/attempts/<int:pk>/",
         InstructorAttemptReviewView.as_view(),
         name="instructor-attempt-review",
+    ),
+    path(
+        "instructor/attempts/<int:pk>/review/",
+        InstructorAttemptReviewDecisionView.as_view(),
+        name="instructor-attempt-review-decision",
+    ),
+    path(
+        "instructor/attempts/<int:pk>/feedback/<int:feedback_id>/",
+        InstructorFeedbackDetailView.as_view(),
+        name="instructor-feedback-detail",
+    ),
+    path(
+        "instructor/assignments/<int:pk>/",
+        InstructorAssignmentDetailView.as_view(),
+        name="instructor-assignment-detail",
     ),
     path("", include(router.urls)),
 ]

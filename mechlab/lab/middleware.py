@@ -1,9 +1,23 @@
 import json
 import logging
+import re
 import time
 import uuid
 
 request_logger = logging.getLogger("opedu.requests")
+
+# Path segments that look like secrets (invitation and password-reset tokens) when a request
+# does not resolve to a known route.
+_SECRET_LIKE_SEGMENT = re.compile(r"/[A-Za-z0-9_\-:@.]{20,}")
+
+
+def loggable_path(request):
+    """Return the matched route pattern so tokens in the URL never reach central logs."""
+
+    match = getattr(request, "resolver_match", None)
+    if match is not None and match.route:
+        return "/" + match.route.lstrip("^").rstrip("$")
+    return _SECRET_LIKE_SEGMENT.sub("/:redacted", request.path)
 
 
 class RequestObservabilityMiddleware:
@@ -30,7 +44,7 @@ class RequestObservabilityMiddleware:
                     "event": "http_request",
                     "request_id": request_id,
                     "method": request.method,
-                    "path": request.path,
+                    "path": loggable_path(request),
                     "status": response.status_code,
                     "duration_ms": duration_ms,
                 },

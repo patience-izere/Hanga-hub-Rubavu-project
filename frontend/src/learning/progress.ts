@@ -5,8 +5,13 @@ export type DueState = "overdue" | "due-soon" | "scheduled" | "none";
 /** Work due within this window is surfaced ahead of everything else. */
 const DUE_SOON_DAYS = 7;
 
+/** Statuses of an attempt the learner has submitted; review only decides how it counts. */
+export const SUBMITTED_ATTEMPT_STATUSES = new Set(["completed", "requires_review"]);
+
 export function isCompleted(assignment: Assignment): boolean {
-  return (assignment.attempt_history ?? []).some((attempt) => attempt.status === "completed");
+  return (assignment.attempt_history ?? []).some((attempt) =>
+    SUBMITTED_ATTEMPT_STATUSES.has(attempt.status),
+  );
 }
 
 export function attemptsUsed(assignment: Assignment): number {
@@ -126,6 +131,18 @@ export function attemptPassed(attempt: {
   return Number(attempt.score) >= threshold;
 }
 
+/**
+ * A result held for review, read through the instructor's later sign-off: accepted results count
+ * as mastered when the score met the threshold, anything else as still developing.
+ */
+function reviewedResult(result: CompetencyResult, attempt: AttemptDetail): CompetencyResult {
+  if (result.mastery_state !== "requires_review" || !attempt.review_decision) return result;
+  const mastered =
+    attempt.review_decision === "competent" &&
+    Number(result.mastery_percentage) >= result.mastery_threshold;
+  return { ...result, mastery_state: mastered ? "mastered" : "developing" };
+}
+
 /** Latest state per competency across attempts, newest attempt winning. */
 export function competencyProfile(attempts: AttemptDetail[]): CompetencyResult[] {
   const latest = new Map<string, CompetencyResult>();
@@ -134,7 +151,9 @@ export function competencyProfile(attempts: AttemptDetail[]): CompetencyResult[]
   );
   for (const attempt of newestFirst) {
     for (const result of attempt.competency_results ?? []) {
-      if (!latest.has(result.competency_code)) latest.set(result.competency_code, result);
+      if (!latest.has(result.competency_code)) {
+        latest.set(result.competency_code, reviewedResult(result, attempt));
+      }
     }
   }
   return [...latest.values()].sort((a, b) => a.competency_code.localeCompare(b.competency_code));

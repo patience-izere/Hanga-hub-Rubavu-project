@@ -71,6 +71,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "lab.middleware.RequestObservabilityMiddleware",
     "lab.middleware.SecurityHeadersMiddleware",
+    "lab.throttling.AdminLoginThrottleMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -125,7 +126,8 @@ elif use_sqlite:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+            # A separate file keeps local runs and tools away from any checked-in database.
+            "NAME": os.environ.get("DJANGO_SQLITE_PATH") or BASE_DIR / "db.sqlite3",
         }
     }
 else:
@@ -245,9 +247,20 @@ CSRF_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+EMAIL_HOST = os.environ.get("DJANGO_EMAIL_HOST", "").strip()
+EMAIL_PORT = int(os.environ.get("DJANGO_EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("DJANGO_EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("DJANGO_EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("DJANGO_EMAIL_USE_TLS", EMAIL_PORT == 587)
+EMAIL_USE_SSL = env_bool("DJANGO_EMAIL_USE_SSL", EMAIL_PORT == 465)
+EMAIL_TIMEOUT = int(os.environ.get("DJANGO_EMAIL_TIMEOUT", "10"))
+# SMTP when a mail host is configured; the console backend is for local development only and is
+# flagged by `manage.py check --deploy` (opedu.W001).
 EMAIL_BACKEND = os.environ.get(
     "DJANGO_EMAIL_BACKEND",
-    "django.core.mail.backends.console.EmailBackend",
+    "django.core.mail.backends.smtp.EmailBackend"
+    if EMAIL_HOST
+    else "django.core.mail.backends.console.EmailBackend",
 )
 DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "no-reply@opedu.local")
 LRS_ENDPOINT = os.environ.get("OPEDU_LRS_ENDPOINT", "").strip()
@@ -265,6 +278,17 @@ if RESEARCH_RETENTION_DAYS < 1:
     raise ImproperlyConfigured("OPEDU_RESEARCH_RETENTION_DAYS must be at least 1.")
 LOGIN_FAILURE_LIMIT = int(os.environ.get("DJANGO_LOGIN_FAILURE_LIMIT", "5"))
 LOGIN_LOCKOUT_SECONDS = int(os.environ.get("DJANGO_LOGIN_LOCKOUT_SECONDS", "300"))
+# Failures for one account from any address, and from one address across accounts (password
+# spraying). Both are higher than the per-address-and-account limit so a shared school network
+# is not locked out by a few typing mistakes.
+LOGIN_ACCOUNT_FAILURE_LIMIT = int(os.environ.get("DJANGO_LOGIN_ACCOUNT_FAILURE_LIMIT", "20"))
+LOGIN_IP_FAILURE_LIMIT = int(os.environ.get("DJANGO_LOGIN_IP_FAILURE_LIMIT", "50"))
+PASSWORD_RESET_EMAIL_LIMIT = int(os.environ.get("DJANGO_PASSWORD_RESET_EMAIL_LIMIT", "3"))
+PASSWORD_RESET_IP_LIMIT = int(os.environ.get("DJANGO_PASSWORD_RESET_IP_LIMIT", "10"))
+PASSWORD_RESET_WINDOW_SECONDS = 3600
+# How many reverse proxies (nginx, a load balancer) sit in front of Django. Client addresses for
+# rate limits are read from X-Forwarded-For only when this is set; 0 trusts REMOTE_ADDR.
+OPEDU_TRUSTED_PROXY_COUNT = int(os.environ.get("OPEDU_TRUSTED_PROXY_COUNT", "0"))
 
 LOGGING = {
     "version": 1,
@@ -282,8 +306,15 @@ LOGGING = {
             "level": "ERROR",
             "propagate": False,
         },
+        "opedu.email": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        # Unhandled exceptions: Django only prints these itself when DEBUG is on, so production
+        # 500s would otherwise leave no trace.
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
     },
 }
+
+# Serve /static/ (Django admin styles) from the ASGI app when no web server does it.
+SERVE_STATIC = env_bool("OPEDU_SERVE_STATIC", True)
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -299,7 +330,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "lab.pagination.StandardPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "lab.api_exceptions.opedu_exception_handler",
@@ -311,6 +342,8 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
+    # DRF throttles identify anonymous clients the same way as the sign-in limits.
+    "NUM_PROXIES": OPEDU_TRUSTED_PROXY_COUNT or None,
     "DEFAULT_THROTTLE_RATES": {
         "anon": os.environ.get("DJANGO_ANON_THROTTLE_RATE", "120/hour"),
         "user": os.environ.get("DJANGO_USER_THROTTLE_RATE", "1200/hour"),
@@ -323,6 +356,9 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
+    # Automatic prefix detection differs between Windows and Linux, which made the committed
+    # schema drift from CI. Keep full paths in operation IDs and tags on every platform.
+    "SCHEMA_PATH_PREFIX": "",
     "ENUM_NAME_OVERRIDES": {
         "LessonPublicationStatusEnum": [
             ("draft", "Draft"),
