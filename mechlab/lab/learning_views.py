@@ -782,7 +782,7 @@ class InstructorAssignmentDetailView(APIView):
         school_ids = _instructor_school_ids(request.user)
         with transaction.atomic():
             assignment = (
-                Assignment.objects.select_for_update()
+                Assignment.objects.select_for_update(of=("self",))
                 .filter(pk=pk, lesson__course__school_id__in=school_ids)
                 .select_related("lesson", "lesson__course", "lesson__course__school")
                 .first()
@@ -1458,6 +1458,8 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
                 "assignment__assigned_by",
                 "scenario",
                 "grading_policy",
+                # Optional, so it is an outer join: row locks on this queryset lock only the
+                # attempt (of=("self",)), which PostgreSQL requires.
                 "reviewed_by",
             )
             .prefetch_related(
@@ -1478,7 +1480,9 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = RendererSelectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
-            attempt = self.get_queryset().select_for_update().get(pk=self.get_object().pk)
+            attempt = (
+                self.get_queryset().select_for_update(of=("self",)).get(pk=self.get_object().pk)
+            )
             if attempt.status != Attempt.Status.IN_PROGRESS:
                 return Response(
                     {"detail": "This attempt is no longer active."},
@@ -1523,7 +1527,9 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
         accepted = []
         deduplicated = 0
         with transaction.atomic():
-            attempt = self.get_queryset().select_for_update().get(pk=self.get_object().pk)
+            attempt = (
+                self.get_queryset().select_for_update(of=("self",)).get(pk=self.get_object().pk)
+            )
             if attempt.status != Attempt.Status.IN_PROGRESS:
                 return Response(
                     {"detail": "This attempt is no longer active."},
@@ -1665,7 +1671,9 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
                 )
 
         with transaction.atomic():
-            attempt = self.get_queryset().select_for_update().get(pk=self.get_object().pk)
+            attempt = (
+                self.get_queryset().select_for_update(of=("self",)).get(pk=self.get_object().pk)
+            )
             if event_id:
                 existing = AttemptEvent.objects.filter(event_id=event_id).first()
                 if existing is not None:
@@ -1815,7 +1823,9 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
         request_serializer.is_valid(raise_exception=True)
         requested_code = request_serializer.validated_data.get("hintCode")
         with transaction.atomic():
-            attempt = self.get_queryset().select_for_update().get(pk=self.get_object().pk)
+            attempt = (
+                self.get_queryset().select_for_update(of=("self",)).get(pk=self.get_object().pk)
+            )
             if attempt.status != Attempt.Status.IN_PROGRESS:
                 return Response(
                     {"detail": "This attempt is no longer active."},
@@ -1863,7 +1873,9 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         with transaction.atomic():
-            attempt = self.get_queryset().select_for_update().get(pk=self.get_object().pk)
+            attempt = (
+                self.get_queryset().select_for_update(of=("self",)).get(pk=self.get_object().pk)
+            )
             if attempt.status in {Attempt.Status.COMPLETED, Attempt.Status.REQUIRES_REVIEW}:
                 return Response({"attempt": AttemptDetailSerializer(attempt).data})
             if attempt.status != Attempt.Status.IN_PROGRESS:
@@ -1952,7 +1964,9 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["post"])
     def abandon(self, request, pk=None):
         with transaction.atomic():
-            attempt = self.get_queryset().select_for_update().get(pk=self.get_object().pk)
+            attempt = (
+                self.get_queryset().select_for_update(of=("self",)).get(pk=self.get_object().pk)
+            )
             if attempt.status != Attempt.Status.IN_PROGRESS:
                 return Response(
                     {"detail": "Only an active attempt can be ended."},

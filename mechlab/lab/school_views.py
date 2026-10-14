@@ -78,7 +78,7 @@ def _invitation_for_token(token: str, *, lock: bool = False):
     token_hash = sha256(token.encode()).hexdigest()
     queryset = SchoolInvitation.objects.select_related("school", "created_by")
     if lock:
-        queryset = queryset.select_for_update()
+        queryset = queryset.select_for_update(of=("self",))
     return queryset.filter(
         token_hash=token_hash,
         is_active=True,
@@ -649,7 +649,7 @@ class SchoolCohortDetailView(APIView):
         school_ids = _admin_school_ids(request.user)
         with transaction.atomic():
             cohort = (
-                Cohort.objects.select_for_update()
+                Cohort.objects.select_for_update(of=("self",))
                 .filter(pk=pk, school_id__in=school_ids)
                 .select_related("school")
                 .first()

@@ -9,6 +9,7 @@ import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { synchronizeOutbox } from "./offline/outbox";
 import { LocaleProvider } from "./i18n/LocaleProvider";
 import { installGlobalErrorMonitoring } from "./monitoring/clientErrors";
+import "@fontsource-variable/inter/wght.css";
 import "./styles.css";
 
 const queryClient = new QueryClient({
