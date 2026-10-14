@@ -627,6 +627,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/instructor/assignments/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description Extend a deadline, open the lesson earlier or later, or allow more attempts. */
+        patch: operations["api_v1_instructor_assignments_partial_update"];
+        trace?: never;
+    };
     "/api/v1/instructor/attempts/{id}/": {
         parameters: {
             query?: never;
@@ -641,6 +658,45 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["api_v1_instructor_attempts_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/instructor/attempts/{id}/feedback/{feedback_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * @description Edit, publish or withdraw one piece of feedback.
+         *
+         *     Only its author or a school administrator may change it, so colleagues cannot rewrite each
+         *     other's words. Withdrawing hides it from the learner again.
+         */
+        patch: operations["api_v1_instructor_attempts_feedback_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/instructor/attempts/{id}/review/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Sign off an attempt that grading held back because of a safety-critical mistake. */
+        post: operations["api_v1_instructor_attempts_review_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/instructor/evidence.csv": {
@@ -710,6 +766,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * @description School-wide counts plus the attempts an instructor is most likely to act on.
+         *
+         *     Counts come from the database, and the attempt list is capped: it holds everything waiting
+         *     for review or overdue, then the most recently updated attempts. Loading every attempt and
+         *     event made this page slower with each week of practice.
+         */
         get: operations["api_v1_instructor_overview_retrieve"];
         put?: never;
         post?: never;
@@ -1228,11 +1291,16 @@ export interface components {
             completed_at?: string | null;
             /** Format: date-time */
             readonly updated_at: string;
+            review_decision?: components["schemas"]["ReviewDecisionEnum"] | components["schemas"]["BlankEnum"];
+            review_note?: string;
+            readonly reviewed_by_name: string;
+            /** Format: date-time */
+            reviewed_at?: string | null;
             readonly assignment: components["schemas"]["Assignment"];
             readonly events: components["schemas"]["AttemptEvent"][];
             readonly step_results: components["schemas"]["StepResult"][];
             readonly competency_results: components["schemas"]["CompetencyResult"][];
-            readonly feedback: components["schemas"]["InstructorFeedback"][];
+            readonly feedback: components["schemas"]["LearnerFeedback"][];
             readonly recommendation: components["schemas"]["AdaptiveRecommendation"] | null;
         };
         AttemptDetailRequest: {
@@ -1248,6 +1316,10 @@ export interface components {
             started_at?: string;
             /** Format: date-time */
             completed_at?: string | null;
+            review_decision?: components["schemas"]["ReviewDecisionEnum"] | components["schemas"]["BlankEnum"];
+            review_note?: string;
+            /** Format: date-time */
+            reviewed_at?: string | null;
         };
         AttemptEvent: {
             /** Format: uuid */
@@ -1289,6 +1361,16 @@ export interface components {
          */
         AttemptOutcomeEnum: "pending" | "passed" | "failed" | "requires_review" | "mastered";
         /**
+         * @description * `competent` - competent
+         *     * `not_yet_competent` - not_yet_competent
+         * @enum {string}
+         */
+        AttemptReviewDecisionDecisionEnum: "competent" | "not_yet_competent";
+        AttemptReviewDecisionRequest: {
+            decision: components["schemas"]["AttemptReviewDecisionDecisionEnum"];
+            note: string;
+        };
+        /**
          * @description * `in_progress` - In progress
          *     * `completed` - Completed
          *     * `requires_review` - Requires review
@@ -1315,6 +1397,11 @@ export interface components {
             completed_at?: string | null;
             /** Format: date-time */
             readonly updated_at: string;
+            review_decision?: components["schemas"]["ReviewDecisionEnum"] | components["schemas"]["BlankEnum"];
+            review_note?: string;
+            readonly reviewed_by_name: string;
+            /** Format: date-time */
+            reviewed_at?: string | null;
         };
         AttemptSyncAudit: {
             /** Format: uuid */
@@ -1468,13 +1555,6 @@ export interface components {
             /** Format: date-time */
             occurredAt: string;
         };
-        /**
-         * @description * `expand` - Approve expansion
-         *     * `limit` - Continue with limits
-         *     * `reject` - Reject expansion
-         * @enum {string}
-         */
-        DecisionEnum: "expand" | "limit" | "reject";
         Detail: {
             detail: string;
         };
@@ -1552,6 +1632,7 @@ export interface components {
             assignmentIds: number[];
             created: number;
             existing: number;
+            skipped: number;
         };
         InstructorAssignmentOptions: {
             learners: {
@@ -1572,6 +1653,8 @@ export interface components {
             outcome?: components["schemas"]["AttemptOutcomeEnum"];
             /** Format: decimal */
             score?: string | null;
+            review_decision?: components["schemas"]["ReviewDecisionEnum"] | components["schemas"]["BlankEnum"];
+            readonly has_published_feedback: boolean;
             readonly scenario_version: number;
             readonly grading_policy_code: string;
             readonly grading_policy_version: number;
@@ -1598,6 +1681,8 @@ export interface components {
             outcome?: components["schemas"]["AttemptOutcomeEnum"];
             /** Format: decimal */
             score?: string | null;
+            review_decision?: components["schemas"]["ReviewDecisionEnum"] | components["schemas"]["BlankEnum"];
+            readonly has_published_feedback: boolean;
             readonly scenario_version: number;
             readonly grading_policy_code: string;
             readonly grading_policy_version: number;
@@ -1621,6 +1706,11 @@ export interface components {
             readonly competency_results: components["schemas"]["CompetencyResult"][];
             readonly feedback: components["schemas"]["InstructorFeedback"][];
             readonly recommendations: components["schemas"]["AdaptiveRecommendation"][];
+            readonly pass_threshold: number;
+            review_note?: string;
+            readonly reviewed_by_name: string;
+            /** Format: date-time */
+            reviewed_at?: string | null;
         };
         InstructorFeedback: {
             readonly id: number;
@@ -1661,6 +1751,8 @@ export interface components {
             latestStatus: string | null;
             /** Format: decimal */
             latestScore: string | null;
+            instructions: string;
+            submitted: boolean;
         };
         InstructorLearnerAttempt: {
             id: number;
@@ -1731,6 +1823,7 @@ export interface components {
             assignments: number;
             attempts: number;
             completedAttempts: number;
+            completedAssignments: number;
             safetyErrors: number;
             overdueAssignments: number;
             /** Format: decimal */
@@ -1745,6 +1838,19 @@ export interface components {
          * @enum {string}
          */
         LanguageEnum: "en" | "rw" | "en-rw";
+        /** @description Published feedback as the learner sees it: the instructor's private observation is left out. */
+        LearnerFeedback: {
+            readonly id: number;
+            readonly author_name: string;
+            feedback: string;
+            is_published?: boolean;
+            /** Format: date-time */
+            readonly published_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
         /**
          * @description * `guided` - Guided practice
          *     * `independent` - Independent assessment
@@ -2054,6 +2160,20 @@ export interface components {
             language?: components["schemas"]["LanguageEnum"];
             competencies?: number[];
         };
+        /** @description Change one learner's assignment: extend the deadline or allow more attempts. */
+        PatchedInstructorAssignmentUpdateRequest: {
+            /** Format: date-time */
+            availableAt?: string | null;
+            /** Format: date-time */
+            dueAt?: string | null;
+            attemptLimit?: number;
+            instructions?: string;
+        };
+        PatchedInstructorFeedbackUpdateRequest: {
+            observation?: string;
+            feedback?: string;
+            is_published?: boolean;
+        };
         PatchedPilotStudyRequest: {
             school?: number;
             code?: string;
@@ -2323,7 +2443,7 @@ export interface components {
         };
         PilotReview: {
             readonly id: number;
-            decision: components["schemas"]["DecisionEnum"];
+            decision: components["schemas"]["PilotReviewDecisionEnum"];
             reviewer_name: string;
             reviewer_role: string;
             organization: string;
@@ -2336,8 +2456,15 @@ export interface components {
             /** Format: date-time */
             readonly created_at: string;
         };
+        /**
+         * @description * `expand` - Approve expansion
+         *     * `limit` - Continue with limits
+         *     * `reject` - Reject expansion
+         * @enum {string}
+         */
+        PilotReviewDecisionEnum: "expand" | "limit" | "reject";
         PilotReviewRequest: {
-            decision: components["schemas"]["DecisionEnum"];
+            decision: components["schemas"]["PilotReviewDecisionEnum"];
             reviewer_name: string;
             reviewer_role: string;
             organization: string;
@@ -2476,6 +2603,13 @@ export interface components {
             consent_accepted: boolean;
             scenario_version?: string;
         };
+        /**
+         * @description * `` - Not reviewed
+         *     * `competent` - Competent
+         *     * `not_yet_competent` - Not yet competent
+         * @enum {string}
+         */
+        ReviewDecisionEnum: "competent" | "not_yet_competent";
         /**
          * @description * `admin` - School administrator
          *     * `instructor` - Instructor
@@ -4032,6 +4166,33 @@ export interface operations {
             };
         };
     };
+    api_v1_instructor_assignments_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedInstructorAssignmentUpdateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedInstructorAssignmentUpdateRequest"];
+                "multipart/form-data": components["schemas"]["PatchedInstructorAssignmentUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructorLearnerAssignment"];
+                };
+            };
+        };
+    };
     api_v1_instructor_attempts_retrieve: {
         parameters: {
             query?: never;
@@ -4103,6 +4264,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdaptiveRecommendation"];
+                };
+            };
+        };
+    };
+    api_v1_instructor_attempts_feedback_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                feedback_id: number;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedInstructorFeedbackUpdateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedInstructorFeedbackUpdateRequest"];
+                "multipart/form-data": components["schemas"]["PatchedInstructorFeedbackUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructorFeedback"];
+                };
+            };
+        };
+    };
+    api_v1_instructor_attempts_review_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttemptReviewDecisionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AttemptReviewDecisionRequest"];
+                "multipart/form-data": components["schemas"]["AttemptReviewDecisionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructorAttemptReview"];
                 };
             };
         };

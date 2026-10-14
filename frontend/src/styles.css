@@ -5953,3 +5953,110 @@ textarea {
   border-radius: 0 8px 8px 0;
   background: color-mix(in srgb, var(--green-800) 8%, var(--paper));
 }
+
+/* Instructor sign-off for attempts held for review */
+.signoff-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+  padding: clamp(20px, 4vw, 32px);
+  border: 2px solid var(--danger);
+  border-radius: 22px;
+  background: var(--paper);
+}
+.signoff-panel.is-done {
+  border: 1px solid var(--line);
+}
+.signoff-panel h2,
+.signoff-panel p {
+  margin: 0;
+}
+.signoff-panel form {
+  display: grid;
+  gap: 14px;
+  max-width: 640px;
+}
+.signoff-panel fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.signoff-panel legend,
+.signoff-panel label {
+  font-weight: 800;
+}
+.signoff-panel textarea {
+  width: 100%;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+}
+.choice-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.choice-row:has(input:checked) {
+  border-color: var(--green-800);
+  background: var(--surface-success, #edf5ea);
+}
+.choice-row input {
+  margin-top: 4px;
+}
+.choice-row span {
+  display: grid;
+  gap: 4px;
+}
+.choice-row small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 760px) {
+  /* Two fixed minimum columns overflowed phone screens. */
+  .feedback-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .feedback-panel article,
+  .feedback-panel form {
+    grid-column: 1;
+  }
+}
+.assignment-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+.assignment-editor label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 800;
+}
+.assignment-editor input {
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+}
+.assignment-editor small {
+  color: var(--muted);
+  font-weight: 400;
+}

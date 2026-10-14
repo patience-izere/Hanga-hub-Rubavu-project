@@ -292,6 +292,7 @@ class AttemptSummarySerializer(serializers.ModelSerializer):
         source="grading_policy.version",
         read_only=True,
     )
+    reviewed_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Attempt
@@ -310,7 +311,16 @@ class AttemptSummarySerializer(serializers.ModelSerializer):
             "started_at",
             "completed_at",
             "updated_at",
+            "review_decision",
+            "review_note",
+            "reviewed_by_name",
+            "reviewed_at",
         ]
+
+    def get_reviewed_by_name(self, obj) -> str:
+        if not obj.reviewed_by_id:
+            return ""
+        return obj.reviewed_by.get_full_name() or obj.reviewed_by.get_username()
 
 
 class HintRequestSerializer(serializers.Serializer):
@@ -443,8 +453,13 @@ class KnowledgeCheckSubmissionSerializer(serializers.ModelSerializer):
         return bounded_json(value, "Answers")
 
 
+MISTAKE_EVENT_TYPES = ("incorrect_action", "tolerance_failed")
+
+
 class InstructorFeedbackSerializer(serializers.ModelSerializer):
     author_name = serializers.SerializerMethodField()
+    observation = serializers.CharField(required=False, allow_blank=True, max_length=5000)
+    feedback = serializers.CharField(max_length=5000)
 
     class Meta:
         model = InstructorFeedback
@@ -462,6 +477,31 @@ class InstructorFeedbackSerializer(serializers.ModelSerializer):
 
     def get_author_name(self, obj) -> str:
         return obj.author.get_full_name() or obj.author.get_username()
+
+
+class InstructorFeedbackUpdateSerializer(serializers.Serializer):
+    observation = serializers.CharField(required=False, allow_blank=True, max_length=5000)
+    feedback = serializers.CharField(required=False, max_length=5000)
+    is_published = serializers.BooleanField(required=False)
+
+
+class LearnerFeedbackSerializer(InstructorFeedbackSerializer):
+    """Published feedback as the learner sees it: the instructor's private observation is left out."""
+
+    class Meta(InstructorFeedbackSerializer.Meta):
+        fields = [
+            field for field in InstructorFeedbackSerializer.Meta.fields if field != "observation"
+        ]
+
+
+class AttemptReviewDecisionSerializer(serializers.Serializer):
+    decision = serializers.ChoiceField(
+        choices=[
+            Attempt.ReviewDecision.COMPETENT,
+            Attempt.ReviewDecision.NOT_YET_COMPETENT,
+        ]
+    )
+    note = serializers.CharField(min_length=10, max_length=2000)
 
 
 class AdaptiveRecommendationSerializer(serializers.ModelSerializer):
@@ -639,9 +679,9 @@ class AttemptDetailSerializer(AttemptSummarySerializer):
             "recommendation",
         ]
 
-    @extend_schema_field(InstructorFeedbackSerializer(many=True))
+    @extend_schema_field(LearnerFeedbackSerializer(many=True))
     def get_feedback(self, obj) -> list[dict[str, object]]:
-        return InstructorFeedbackSerializer(
+        return LearnerFeedbackSerializer(
             [item for item in obj.feedback.all() if item.is_published], many=True
         ).data
 
@@ -687,6 +727,7 @@ class InstructorAttemptEvidenceSerializer(serializers.ModelSerializer):
     due_at = serializers.DateTimeField(source="assignment.due_at", read_only=True, allow_null=True)
     is_overdue = serializers.SerializerMethodField()
     is_blocked = serializers.SerializerMethodField()
+    has_published_feedback = serializers.SerializerMethodField()
 
     class Meta:
         model = Attempt
@@ -697,6 +738,8 @@ class InstructorAttemptEvidenceSerializer(serializers.ModelSerializer):
             "status",
             "outcome",
             "score",
+            "review_decision",
+            "has_published_feedback",
             "scenario_version",
             "grading_policy_code",
             "grading_policy_version",
@@ -718,14 +761,25 @@ class InstructorAttemptEvidenceSerializer(serializers.ModelSerializer):
     def get_total_steps(self, obj) -> int:
         return len(obj.scenario.definition.get("steps", []))
 
+    # Wrong actions and out-of-tolerance readings are both mistakes the grading policy penalises.
+    # Lists annotate these counts (see _with_evidence_counts) instead of loading every event.
     def get_incorrect_actions(self, obj) -> int:
-        return sum(event.event_type == "incorrect_action" for event in obj.events.all())
+        if hasattr(obj, "incorrect_count"):
+            return obj.incorrect_count
+        return sum(event.event_type in MISTAKE_EVENT_TYPES for event in obj.events.all())
 
     def get_safety_errors(self, obj) -> int:
+        if hasattr(obj, "safety_count"):
+            return obj.safety_count
         return sum(
-            event.event_type == "incorrect_action" and event.payload.get("safetyCritical") is True
+            event.event_type in MISTAKE_EVENT_TYPES and event.payload.get("safetyCritical") is True
             for event in obj.events.all()
         )
+
+    def get_has_published_feedback(self, obj) -> bool:
+        if hasattr(obj, "published_feedback_count"):
+            return obj.published_feedback_count > 0
+        return any(item.is_published for item in obj.feedback.all())
 
     def get_is_overdue(self, obj) -> bool:
         return bool(
@@ -749,6 +803,10 @@ class InstructorAttemptReviewSerializer(InstructorAttemptEvidenceSerializer):
     competency_results = CompetencyResultSerializer(many=True, read_only=True)
     feedback = InstructorFeedbackSerializer(many=True, read_only=True)
     recommendations = AdaptiveRecommendationSerializer(many=True, read_only=True)
+    pass_threshold = serializers.IntegerField(
+        source="grading_policy.pass_threshold", read_only=True
+    )
+    reviewed_by_name = serializers.SerializerMethodField()
 
     class Meta(InstructorAttemptEvidenceSerializer.Meta):
         fields = InstructorAttemptEvidenceSerializer.Meta.fields + [
@@ -758,7 +816,16 @@ class InstructorAttemptReviewSerializer(InstructorAttemptEvidenceSerializer):
             "competency_results",
             "feedback",
             "recommendations",
+            "pass_threshold",
+            "review_note",
+            "reviewed_by_name",
+            "reviewed_at",
         ]
+
+    def get_reviewed_by_name(self, obj) -> str:
+        if not obj.reviewed_by_id:
+            return ""
+        return obj.reviewed_by.get_full_name() or obj.reviewed_by.get_username()
 
     @extend_schema_field(ProcedureStepSerializer(many=True))
     def get_procedure_steps(self, obj) -> list[dict[str, object]]:
@@ -804,7 +871,14 @@ class InstructorAssignmentCreateSerializer(serializers.Serializer):
     availableAt = serializers.DateTimeField(required=False, allow_null=True)
     dueAt = serializers.DateTimeField(required=False, allow_null=True)
     attemptLimit = serializers.IntegerField(min_value=1, max_value=20, default=3)
-    instructions = serializers.CharField(required=False, allow_blank=True, default="")
+    instructions = serializers.CharField(
+        required=False, allow_blank=True, default="", max_length=2000
+    )
+
+    def validate_dueAt(self, value):
+        if value is not None and value <= timezone.now():
+            raise serializers.ValidationError("Choose a due date in the future.")
+        return value
 
     def validate(self, attrs):
         if not attrs["learnerIds"] and not attrs["cohortIds"]:
@@ -818,6 +892,25 @@ class InstructorAssignmentCreateSerializer(serializers.Serializer):
         return attrs
 
 
+class InstructorAssignmentUpdateSerializer(serializers.Serializer):
+    """Change one learner's assignment: extend the deadline or allow more attempts."""
+
+    availableAt = serializers.DateTimeField(required=False, allow_null=True)
+    dueAt = serializers.DateTimeField(required=False, allow_null=True)
+    attemptLimit = serializers.IntegerField(required=False, min_value=1, max_value=20)
+    instructions = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+
+    def validate_dueAt(self, value):
+        if value is not None and value <= timezone.now():
+            raise serializers.ValidationError("Choose a due date in the future.")
+        return value
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError("Nothing to change.")
+        return attrs
+
+
 class InstructorAssignmentOptionsSerializer(serializers.Serializer):
     learners = serializers.ListField(child=serializers.DictField())
     cohorts = serializers.ListField(child=serializers.DictField())
@@ -828,6 +921,7 @@ class InstructorAssignmentCreateResponseSerializer(serializers.Serializer):
     assignmentIds = serializers.ListField(child=serializers.IntegerField())
     created = serializers.IntegerField()
     existing = serializers.IntegerField()
+    skipped = serializers.IntegerField()
 
 
 class InstructorRosterCompetencySerializer(serializers.Serializer):
@@ -848,6 +942,7 @@ class InstructorRosterEntrySerializer(serializers.Serializer):
     assignments = serializers.IntegerField()
     attempts = serializers.IntegerField()
     completedAttempts = serializers.IntegerField()
+    completedAssignments = serializers.IntegerField()
     safetyErrors = serializers.IntegerField()
     overdueAssignments = serializers.IntegerField()
     averageScore = serializers.DecimalField(max_digits=5, decimal_places=2, allow_null=True)
@@ -870,6 +965,8 @@ class InstructorLearnerAssignmentSerializer(serializers.Serializer):
     isOverdue = serializers.BooleanField()
     latestStatus = serializers.CharField(allow_null=True)
     latestScore = serializers.DecimalField(max_digits=5, decimal_places=2, allow_null=True)
+    instructions = serializers.CharField(allow_blank=True)
+    submitted = serializers.BooleanField()
 
 
 class InstructorLearnerAttemptSerializer(serializers.Serializer):

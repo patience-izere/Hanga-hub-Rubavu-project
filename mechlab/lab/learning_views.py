@@ -9,7 +9,7 @@ from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Count, Max, Q
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -28,6 +28,7 @@ from .learning_serializers import (
     AttemptDetailSerializer,
     AttemptEventBatchSerializer,
     AttemptEventSerializer,
+    AttemptReviewDecisionSerializer,
     AttemptSummarySerializer,
     AttemptSyncAuditInputSerializer,
     AttemptSyncAuditSerializer,
@@ -36,9 +37,12 @@ from .learning_serializers import (
     InstructorAssignmentCreateResponseSerializer,
     InstructorAssignmentCreateSerializer,
     InstructorAssignmentOptionsSerializer,
+    InstructorAssignmentUpdateSerializer,
     InstructorAttemptEvidenceSerializer,
     InstructorAttemptReviewSerializer,
     InstructorFeedbackSerializer,
+    InstructorFeedbackUpdateSerializer,
+    InstructorLearnerAssignmentSerializer,
     InstructorLearnerDetailSerializer,
     InstructorOverviewSerializer,
     InstructorRosterSerializer,
@@ -56,7 +60,9 @@ from .models import (
     AttemptEvent,
     AttemptSyncAudit,
     Cohort,
+    CompetencyResult,
     Enrollment,
+    InstructorFeedback,
     KnowledgeCheckSubmission,
     Lesson,
     PilotObservation,
@@ -67,6 +73,7 @@ from .models import (
     SimulationScenario,
     XApiDelivery,
 )
+from .notifications import send_email_safely
 from .permissions import IsInstructorOrSchoolAdmin
 from .research import (
     consenting_participant_codes,
@@ -126,21 +133,57 @@ def _parse_client_datetime(value):
     return parsed if parsed is not None and timezone.is_aware(parsed) else None
 
 
+MISTAKE_EVENT_TYPES = ("incorrect_action", "tolerance_failed")
+SUBMITTED_STATUSES = (Attempt.Status.COMPLETED, Attempt.Status.REQUIRES_REVIEW)
+
+
+def _is_mistake(event):
+    return event.event_type in MISTAKE_EVENT_TYPES
+
+
+def _is_safety_error(event):
+    """A wrong action or out-of-tolerance reading on a safety-critical step."""
+
+    return _is_mistake(event) and event.payload.get("safetyCritical") is True
+
+
+def _score_text(score):
+    # Decimal("85") and Decimal("85.00") are the same score; keep one spelling so snapshots match.
+    return None if score is None else f"{Decimal(score):.2f}"
+
+
+def _same_snapshot(stored, current):
+    return {**stored, "score": _score_text(stored.get("score"))} == current
+
+
 def _recommendation_for(attempt):
     safety_errors = attempt.events.filter(
-        event_type__in=["incorrect_action", "tolerance_failed"],
+        event_type__in=MISTAKE_EVENT_TYPES,
         payload__safetyCritical=True,
     ).count()
     hints = attempt.events.filter(event_type="hint_used").count()
     snapshot = {
         "status": attempt.status,
         "outcome": attempt.outcome,
-        "score": str(attempt.score) if attempt.score is not None else None,
+        "score": _score_text(attempt.score),
         "safetyErrors": safety_errors,
         "hintsUsed": hints,
         "completedSteps": len(attempt.resume_state.get("completedSteps", [])),
     }
-    if attempt.status == Attempt.Status.IN_PROGRESS:
+    if attempt.review_decision:
+        snapshot["reviewDecision"] = attempt.review_decision
+    if attempt.review_decision == Attempt.ReviewDecision.COMPETENT:
+        kind = AdaptiveRecommendation.Kind.COMPLETE
+        rationale = (
+            "Your instructor reviewed the safety evidence and confirmed this attempt counts."
+        )
+    elif attempt.review_decision == Attempt.ReviewDecision.NOT_YET_COMPETENT:
+        kind = AdaptiveRecommendation.Kind.REMEDIATE
+        rationale = (
+            "Your instructor reviewed the safety evidence: practise the procedure again "
+            "before it counts."
+        )
+    elif attempt.status == Attempt.Status.IN_PROGRESS:
         kind = AdaptiveRecommendation.Kind.CONTINUE
         rationale = "Continue the current procedure from the first incomplete step."
     elif safety_errors:
@@ -155,10 +198,16 @@ def _recommendation_for(attempt):
     else:
         kind = AdaptiveRecommendation.Kind.COMPLETE
         rationale = "The recorded evidence meets the current deterministic completion rules."
-    latest = attempt.recommendations.filter(
-        rule_version="transparent-rules-v1",
-        input_snapshot=snapshot,
-    ).first()
+    # Reuse the recommendation for the same evidence, so an instructor's override is not replaced
+    # by a fresh, un-overridden copy the next time someone opens the attempt.
+    latest = next(
+        (
+            item
+            for item in attempt.recommendations.filter(rule_version="transparent-rules-v1")
+            if _same_snapshot(item.input_snapshot, snapshot)
+        ),
+        None,
+    )
     return latest or AdaptiveRecommendation.objects.create(
         attempt=attempt,
         rule_version="transparent-rules-v1",
@@ -326,6 +375,7 @@ def _instructor_attempt_queryset(user):
             "assignment__lesson__module",
             "scenario",
             "grading_policy",
+            "reviewed_by",
         )
         .prefetch_related(
             "events",
@@ -345,6 +395,19 @@ def _attempt_school(attempt):
     return attempt.assignment.lesson.course.school
 
 
+def _notify_learner(attempt, subject, opening):
+    """Email the learner a link to their attempt once the change is committed."""
+
+    email = attempt.learner.email
+    if not email:
+        return
+    message = (
+        f"{opening}\n\nLesson: {attempt.assignment.lesson.title}\n"
+        f"Open it in OPedu: {settings.FRONTEND_URL}/learn/attempts/{attempt.pk}\n"
+    )
+    transaction.on_commit(lambda: send_email_safely(subject, message, [email]))
+
+
 def _active_learner_school_ids(user):
     """Schools where the user may currently practise as a learner."""
 
@@ -356,7 +419,38 @@ def _active_learner_school_ids(user):
     ).values("school_id")
 
 
+OVERVIEW_ATTEMPT_LIMIT = 200
+
+
+def _with_evidence_counts(attempts):
+    """Annotate the per-attempt counts the evidence table shows, so events are not loaded."""
+
+    return attempts.annotate(
+        incorrect_count=Count(
+            "events", filter=Q(events__event_type__in=MISTAKE_EVENT_TYPES), distinct=True
+        ),
+        safety_count=Count(
+            "events",
+            filter=Q(
+                events__event_type__in=MISTAKE_EVENT_TYPES,
+                events__payload__safetyCritical=True,
+            ),
+            distinct=True,
+        ),
+        published_feedback_count=Count(
+            "feedback", filter=Q(feedback__is_published=True), distinct=True
+        ),
+    )
+
+
 class InstructorOverviewView(APIView):
+    """School-wide counts plus the attempts an instructor is most likely to act on.
+
+    Counts come from the database, and the attempt list is capped: it holds everything waiting
+    for review or overdue, then the most recently updated attempts. Loading every attempt and
+    event made this page slower with each week of practice.
+    """
+
     permission_classes = [IsInstructorOrSchoolAdmin]
 
     @extend_schema(responses=InstructorOverviewSerializer)
@@ -365,130 +459,120 @@ class InstructorOverviewView(APIView):
         if not school_ids and not request.user.is_superuser:
             raise PermissionDenied("An active instructor or school administrator role is required.")
 
-        assignments = Assignment.objects.filter(lesson__course__school_id__in=school_ids)
-        attempts = list(_instructor_attempt_queryset(request.user).order_by("-updated_at"))
-        operational_events = [event for attempt in attempts for event in attempt.events.all()]
-        safety_errors = sum(
-            event.event_type == "incorrect_action" and event.payload.get("safetyCritical") is True
-            for attempt in attempts
-            for event in attempt.events.all()
-        )
-        competency_aggregation = {}
-        for attempt in attempts:
-            for result in attempt.competency_results.all():
-                item = competency_aggregation.setdefault(
-                    result.competency.code,
-                    {
-                        "code": result.competency.code,
-                        "title": result.competency.title,
-                        "attempts": 0,
-                        "mastered": 0,
-                        "developing": 0,
-                        "notDemonstrated": 0,
-                        "requiresReview": 0,
-                    },
-                )
-                item["attempts"] += 1
-                item["mastered"] += int(result.mastery_state == "mastered")
-                item["developing"] += int(result.mastery_state == "developing")
-                item["notDemonstrated"] += int(result.mastery_state == "not_demonstrated")
-                item["requiresReview"] += int(result.mastery_state == "requires_review")
         now = timezone.now()
+        assignments = Assignment.objects.filter(lesson__course__school_id__in=school_ids)
+        scope = Attempt.objects.filter(assignment__lesson__course__school_id__in=school_ids)
+        statuses = dict(scope.values_list("status").annotate(total=Count("id")))
+        outcomes = dict(scope.values_list("outcome").annotate(total=Count("id")))
+        events = AttemptEvent.objects.filter(attempt__in=scope)
+        event_counts = dict(events.values_list("event_type").annotate(total=Count("id")))
+        deliveries = dict(
+            XApiDelivery.objects.filter(attempt__in=scope)
+            .values_list("status")
+            .annotate(total=Count("id"))
+        )
+        overdue_filter = Q(status=Attempt.Status.IN_PROGRESS, assignment__due_at__lt=now)
+
+        attention_ids = list(
+            scope.filter(Q(status=Attempt.Status.REQUIRES_REVIEW) | overdue_filter)
+            .order_by("-updated_at")
+            .values_list("id", flat=True)[:OVERVIEW_ATTEMPT_LIMIT]
+        )
+        recent_ids = list(
+            scope.exclude(id__in=attention_ids)
+            .order_by("-updated_at")
+            .values_list("id", flat=True)[: max(0, OVERVIEW_ATTEMPT_LIMIT - len(attention_ids))]
+        )
+        attempts = list(
+            _with_evidence_counts(
+                Attempt.objects.filter(id__in=attention_ids + recent_ids).select_related(
+                    "learner",
+                    "assignment",
+                    "assignment__lesson",
+                    "assignment__lesson__course",
+                    "assignment__lesson__course__program",
+                    "assignment__lesson__module",
+                    "scenario",
+                    "grading_policy",
+                )
+            ).order_by("-updated_at")
+        )
+
+        competency_aggregation = {}
+        for code, title, state, total in (
+            CompetencyResult.objects.filter(attempt__in=scope)
+            .values_list("competency__code", "competency__title", "mastery_state")
+            .annotate(total=Count("id"))
+            .order_by("competency__code")
+        ):
+            item = competency_aggregation.setdefault(
+                code,
+                {
+                    "code": code,
+                    "title": title,
+                    "attempts": 0,
+                    "mastered": 0,
+                    "developing": 0,
+                    "notDemonstrated": 0,
+                    "requiresReview": 0,
+                },
+            )
+            item["attempts"] += total
+            key = {
+                "mastered": "mastered",
+                "developing": "developing",
+                "not_demonstrated": "notDemonstrated",
+                "requires_review": "requiresReview",
+            }.get(state)
+            if key:
+                item[key] += total
+
         return Response(
             {
                 "metrics": {
                     "learners": assignments.values("learner_id").distinct().count(),
                     "assignments": assignments.count(),
-                    "attempts": len(attempts),
-                    "completedAttempts": sum(
-                        attempt.status == Attempt.Status.COMPLETED for attempt in attempts
-                    ),
-                    "inProgressAttempts": sum(
-                        attempt.status == Attempt.Status.IN_PROGRESS for attempt in attempts
-                    ),
-                    "safetyErrors": safety_errors,
-                    "overdueAttempts": sum(
-                        bool(
-                            attempt.assignment.due_at
-                            and attempt.assignment.due_at < now
-                            and attempt.status == Attempt.Status.IN_PROGRESS
-                        )
-                        for attempt in attempts
-                    ),
-                    "requiresReview": sum(
-                        attempt.status == Attempt.Status.REQUIRES_REVIEW for attempt in attempts
-                    ),
-                    "failedAttempts": sum(
-                        attempt.outcome == Attempt.Outcome.FAILED for attempt in attempts
-                    ),
+                    "attempts": sum(statuses.values()),
+                    "completedAttempts": statuses.get(Attempt.Status.COMPLETED, 0),
+                    "inProgressAttempts": statuses.get(Attempt.Status.IN_PROGRESS, 0),
+                    "safetyErrors": events.filter(
+                        event_type__in=MISTAKE_EVENT_TYPES, payload__safetyCritical=True
+                    ).count(),
+                    "overdueAttempts": scope.filter(overdue_filter).count(),
+                    "requiresReview": statuses.get(Attempt.Status.REQUIRES_REVIEW, 0),
+                    "failedAttempts": outcomes.get(Attempt.Outcome.FAILED, 0),
                 },
                 "attempts": InstructorAttemptEvidenceSerializer(attempts, many=True).data,
                 "competencies": list(competency_aggregation.values()),
                 "operationalAnalytics": {
                     "learning": {
-                        "masteredAttempts": sum(
-                            attempt.outcome == Attempt.Outcome.MASTERED for attempt in attempts
-                        ),
-                        "failedAttempts": sum(
-                            attempt.outcome == Attempt.Outcome.FAILED for attempt in attempts
-                        ),
+                        "masteredAttempts": outcomes.get(Attempt.Outcome.MASTERED, 0),
+                        "failedAttempts": outcomes.get(Attempt.Outcome.FAILED, 0),
                     },
                     "recognition": {
-                        "markerFound": sum(
-                            event.event_type == "ar_marker_found" for event in operational_events
-                        ),
-                        "markerMismatch": sum(
-                            event.event_type == "ar_marker_mismatch" for event in operational_events
-                        ),
-                        "trackingLoss": sum(
-                            event.event_type == "ar_marker_lost" for event in operational_events
-                        ),
-                        "placements": sum(
-                            event.event_type == "ar_placement_confirmed"
-                            for event in operational_events
-                        ),
+                        "markerFound": event_counts.get("ar_marker_found", 0),
+                        "markerMismatch": event_counts.get("ar_marker_mismatch", 0),
+                        "trackingLoss": event_counts.get("ar_marker_lost", 0),
+                        "placements": event_counts.get("ar_placement_confirmed", 0),
                     },
                     "deviceReliability": {
-                        "performanceSamples": sum(
-                            event.event_type == "performance_sample" for event in operational_events
-                        ),
-                        "lowFrameRateSamples": sum(
-                            event.event_type == "performance_sample"
-                            and isinstance(event.payload.get("framesPerSecond"), (int, float))
-                            and event.payload["framesPerSecond"] < 24
-                            for event in operational_events
-                        ),
-                        "assetFailures": sum(
-                            event.event_type == "asset_load_failed" for event in operational_events
-                        ),
+                        "performanceSamples": event_counts.get("performance_sample", 0),
+                        "lowFrameRateSamples": events.filter(
+                            event_type="performance_sample", payload__framesPerSecond__lt=24
+                        ).count(),
+                        "assetFailures": event_counts.get("asset_load_failed", 0),
                     },
                     "synchronization": {
-                        "stateChanges": sum(
-                            event.event_type == "sync_state_changed" for event in operational_events
-                        ),
-                        "xapiPending": sum(
-                            delivery.status
-                            in {
-                                XApiDelivery.Status.PENDING,
-                                XApiDelivery.Status.FAILED,
-                            }
-                            for attempt in attempts
-                            for delivery in attempt.xapi_deliveries.all()
-                        ),
-                        "xapiDeadLetters": sum(
-                            delivery.status == XApiDelivery.Status.DEAD_LETTER
-                            for attempt in attempts
-                            for delivery in attempt.xapi_deliveries.all()
-                        ),
+                        "stateChanges": event_counts.get("sync_state_changed", 0),
+                        "xapiPending": deliveries.get(XApiDelivery.Status.PENDING, 0)
+                        + deliveries.get(XApiDelivery.Status.FAILED, 0),
+                        "xapiDeadLetters": deliveries.get(XApiDelivery.Status.DEAD_LETTER, 0),
                     },
                     "fallback": {
-                        "accessibleAttempts": sum(
-                            attempt.renderer_mode == Attempt.RendererMode.ACCESSIBLE_2D
-                            for attempt in attempts
-                        ),
-                        "arFallbackEvents": sum(
-                            event.event_type == "ar_fallback_used" for event in operational_events
-                        ),
+                        "accessibleAttempts": scope.filter(
+                            renderer_mode=Attempt.RendererMode.ACCESSIBLE_2D
+                        ).count(),
+                        "arFallbackEvents": event_counts.get("ar_fallback_used", 0),
                     },
                 },
             }
@@ -585,38 +669,44 @@ class InstructorAssignmentView(APIView):
         )
         if scenario is None:
             return Response({"detail": "Scenario not found."}, status=status.HTTP_404_NOT_FOUND)
-        cohort_learner_ids = set(
-            Enrollment.objects.filter(
-                cohort_id__in=values["cohortIds"],
-                cohort__school_id__in=school_ids,
-                cohort__is_active=True,
-                status=Enrollment.Status.ACTIVE,
-            ).values_list("learner_id", flat=True)
-        )
+        # Learners and cohorts must belong to the school that owns the lesson, not merely to one
+        # of the instructor's schools.
+        school_id = scenario.lesson.course.school_id
         valid_cohort_ids = set(
             Cohort.objects.filter(
-                id__in=values["cohortIds"], school_id__in=school_ids, is_active=True
+                id__in=values["cohortIds"], school_id=school_id, is_active=True
             ).values_list("id", flat=True)
         )
         if valid_cohort_ids != set(values["cohortIds"]):
-            raise PermissionDenied("Every selected cohort must belong to your active school.")
-        requested_learner_ids = set(values["learnerIds"]) | cohort_learner_ids
-        if not requested_learner_ids:
+            raise PermissionDenied("Every selected cohort must belong to the lesson's school.")
+        active_learner_ids = SchoolMembership.objects.filter(
+            school_id=school_id,
+            role=SchoolMembership.Role.LEARNER,
+            is_active=True,
+            user__is_active=True,
+        ).values_list("user_id", flat=True)
+        cohort_learner_ids = set(
+            Enrollment.objects.filter(
+                cohort_id__in=valid_cohort_ids,
+                status=Enrollment.Status.ACTIVE,
+            ).values_list("learner_id", flat=True)
+        )
+        # A cohort can still list someone whose school access was suspended; they are skipped
+        # rather than blocking the whole class.
+        eligible_cohort_ids = set(active_learner_ids.filter(user_id__in=cohort_learner_ids))
+        skipped = len(cohort_learner_ids - eligible_cohort_ids - set(values["learnerIds"]))
+        selected_ids = set(values["learnerIds"])
+        valid_selected_ids = set(active_learner_ids.filter(user_id__in=selected_ids))
+        if valid_selected_ids != selected_ids:
+            raise PermissionDenied(
+                "Every selected learner must be an active learner in the lesson's school."
+            )
+        valid_learner_ids = valid_selected_ids | eligible_cohort_ids
+        if not valid_learner_ids:
             return Response(
                 {"detail": "The selected cohorts have no active learners."},
                 status=status.HTTP_409_CONFLICT,
             )
-        valid_learner_ids = set(
-            SchoolMembership.objects.filter(
-                school_id__in=school_ids,
-                role=SchoolMembership.Role.LEARNER,
-                is_active=True,
-                user__is_active=True,
-                user_id__in=requested_learner_ids,
-            ).values_list("user_id", flat=True)
-        )
-        if valid_learner_ids != requested_learner_ids:
-            raise PermissionDenied("Every selected learner must belong to your active school.")
         assignment_ids = []
         created_count = 0
         with transaction.atomic():
@@ -648,8 +738,122 @@ class InstructorAssignmentView(APIView):
                 "assignmentIds": assignment_ids,
                 "created": created_count,
                 "existing": len(assignment_ids) - created_count,
+                "skipped": skipped,
             },
             status=status.HTTP_201_CREATED if created_count else status.HTTP_200_OK,
+        )
+
+
+def _assignment_row(assignment, attempts, now):
+    """One assignment as the instructor sees it; ``attempts`` are its attempts, newest first."""
+
+    latest = attempts[0] if attempts else None
+    submitted = any(attempt.status in SUBMITTED_STATUSES for attempt in attempts)
+    return {
+        "id": assignment.pk,
+        "lessonTitle": assignment.lesson.title,
+        "courseTitle": assignment.lesson.course.title,
+        "trade": assignment.lesson.course.trade,
+        "dueAt": assignment.due_at,
+        "availableAt": assignment.available_at,
+        "attemptLimit": assignment.attempt_limit,
+        "attemptsUsed": len(attempts),
+        "isOverdue": bool(assignment.due_at and assignment.due_at < now and not submitted),
+        "latestStatus": latest.status if latest else None,
+        "latestScore": latest.score if latest else None,
+        "instructions": assignment.instructions,
+        "submitted": submitted,
+    }
+
+
+class InstructorAssignmentDetailView(APIView):
+    """Extend a deadline, open the lesson earlier or later, or allow more attempts."""
+
+    permission_classes = [IsInstructorOrSchoolAdmin]
+
+    @extend_schema(
+        request=InstructorAssignmentUpdateSerializer,
+        responses=InstructorLearnerAssignmentSerializer,
+    )
+    def patch(self, request, pk):
+        serializer = InstructorAssignmentUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        school_ids = _instructor_school_ids(request.user)
+        with transaction.atomic():
+            assignment = (
+                Assignment.objects.select_for_update()
+                .filter(pk=pk, lesson__course__school_id__in=school_ids)
+                .select_related("lesson", "lesson__course", "lesson__course__school")
+                .first()
+            )
+            if assignment is None:
+                return Response(
+                    {"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND
+                )
+            attempts = list(assignment.attempts.order_by("-started_at"))
+            if "attemptLimit" in values and values["attemptLimit"] < len(attempts):
+                return Response(
+                    {
+                        "attemptLimit": [
+                            f"The learner has already used {len(attempts)} attempts, so the "
+                            "limit cannot be lower than that."
+                        ]
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            available_at = values.get("availableAt", assignment.available_at)
+            due_at = values.get("dueAt", assignment.due_at)
+            if available_at and due_at and due_at < available_at:
+                return Response(
+                    {"dueAt": ["The due date cannot be before the lesson opens."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            fields = {
+                "availableAt": "available_at",
+                "dueAt": "due_at",
+                "attemptLimit": "attempt_limit",
+                "instructions": "instructions",
+            }
+            changed = {}
+            for key, field in fields.items():
+                if key in values and getattr(assignment, field) != values[key]:
+                    setattr(assignment, field, values[key])
+                    changed[key] = (
+                        values[key].isoformat()
+                        if hasattr(values[key], "isoformat")
+                        else values[key]
+                    )
+            if changed:
+                assignment.save(update_fields=[fields[key] for key in changed])
+                record_audit_event(
+                    event_type="assignment.updated",
+                    actor=request.user,
+                    school=assignment.lesson.course.school,
+                    target=assignment,
+                    payload={"learnerId": assignment.learner_id, "changes": changed},
+                )
+        return Response(_assignment_row(assignment, attempts, timezone.now()))
+
+
+class _SpreadsheetSafeWriter:
+    """CSV rows that spreadsheet software will not run as formulas.
+
+    Names and titles come from users; a cell starting with =, +, - or @ would otherwise execute
+    when an instructor opens the export.
+    """
+
+    def __init__(self, writer):
+        self.writer = writer
+
+    def writerow(self, row):
+        self.writer.writerow(
+            [
+                f"'{value}"
+                if isinstance(value, str) and value[:1] in ("=", "+", "-", "@")
+                else value
+                for value in row
+            ]
         )
 
 
@@ -666,7 +870,7 @@ class InstructorEvidenceExportView(APIView):
             else set()
         )
         stream = io.StringIO()
-        writer = csv.writer(stream)
+        writer = _SpreadsheetSafeWriter(csv.writer(stream))
         writer.writerow(
             [
                 "attempt_code" if research_export else "attempt_id",
@@ -683,6 +887,8 @@ class InstructorEvidenceExportView(APIView):
                 "safety_errors",
                 "hints",
                 "competency_results",
+                "outcome",
+                "review_decision",
             ]
         )
         for attempt in attempts:
@@ -717,14 +923,12 @@ class InstructorEvidenceExportView(APIView):
                     attempt.started_at.isoformat(),
                     completed_at.isoformat() if completed_at else "",
                     duration,
-                    sum(event.event_type == "incorrect_action" for event in events),
-                    sum(
-                        event.event_type == "incorrect_action"
-                        and event.payload.get("safetyCritical") is True
-                        for event in events
-                    ),
-                    sum(event.event_type == "hint_requested" for event in events),
+                    sum(_is_mistake(event) for event in events),
+                    sum(_is_safety_error(event) for event in events),
+                    sum(event.event_type == "hint_used" for event in events),
                     competency_results,
+                    attempt.outcome,
+                    attempt.review_decision,
                 ]
             )
         response = HttpResponse(stream.getvalue(), content_type="text/csv; charset=utf-8")
@@ -751,16 +955,23 @@ class InstructorAttemptReviewView(APIView):
             return Response({"detail": "Attempt not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = InstructorFeedbackSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        feedback = serializer.save(attempt=attempt, author=request.user)
-        record_audit_event(
-            event_type="assessment.feedback_published"
-            if feedback.is_published
-            else "assessment.feedback_saved",
-            actor=request.user,
-            school=_attempt_school(attempt),
-            target=attempt,
-            payload={"feedbackId": feedback.pk},
-        )
+        with transaction.atomic():
+            feedback = serializer.save(attempt=attempt, author=request.user)
+            record_audit_event(
+                event_type="assessment.feedback_published"
+                if feedback.is_published
+                else "assessment.feedback_saved",
+                actor=request.user,
+                school=_attempt_school(attempt),
+                target=attempt,
+                payload={"feedbackId": feedback.pk},
+            )
+            if feedback.is_published:
+                _notify_learner(
+                    attempt,
+                    "Your instructor left feedback",
+                    "Your instructor has written feedback on one of your practical attempts.",
+                )
         return Response(
             InstructorFeedbackSerializer(feedback).data,
             status=status.HTTP_201_CREATED,
@@ -798,6 +1009,169 @@ class InstructorAttemptReviewView(APIView):
             },
         )
         return Response(AdaptiveRecommendationSerializer(recommendation).data)
+
+
+class InstructorFeedbackDetailView(APIView):
+    """Edit, publish or withdraw one piece of feedback.
+
+    Only its author or a school administrator may change it, so colleagues cannot rewrite each
+    other's words. Withdrawing hides it from the learner again.
+    """
+
+    permission_classes = [IsInstructorOrSchoolAdmin]
+
+    @extend_schema(
+        request=InstructorFeedbackUpdateSerializer,
+        responses=InstructorFeedbackSerializer,
+    )
+    def patch(self, request, pk, feedback_id):
+        attempt = _instructor_attempt_queryset(request.user).filter(pk=pk).first()
+        if attempt is None:
+            return Response({"detail": "Attempt not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = InstructorFeedbackUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        school = _attempt_school(attempt)
+        is_admin = (
+            request.user.is_superuser
+            or SchoolMembership.objects.filter(
+                user=request.user,
+                school=school,
+                role=SchoolMembership.Role.ADMIN,
+                is_active=True,
+            ).exists()
+        )
+        with transaction.atomic():
+            feedback = (
+                InstructorFeedback.objects.select_for_update()
+                .filter(pk=feedback_id, attempt=attempt)
+                .first()
+            )
+            if feedback is None:
+                return Response({"detail": "Feedback not found."}, status=status.HTTP_404_NOT_FOUND)
+            if feedback.author_id != request.user.pk and not is_admin:
+                raise PermissionDenied("Only the author or a school administrator can change it.")
+            values = serializer.validated_data
+            was_published = feedback.is_published
+            for field in ("observation", "feedback", "is_published"):
+                if field in values:
+                    setattr(feedback, field, values[field])
+            if not feedback.is_published:
+                feedback.published_at = None
+            feedback.save()
+            event_type = (
+                "assessment.feedback_published"
+                if feedback.is_published and not was_published
+                else "assessment.feedback_withdrawn"
+                if was_published and not feedback.is_published
+                else "assessment.feedback_updated"
+            )
+            record_audit_event(
+                event_type=event_type,
+                actor=request.user,
+                school=school,
+                target=attempt,
+                payload={"feedbackId": feedback.pk},
+            )
+            if feedback.is_published and not was_published:
+                _notify_learner(
+                    attempt,
+                    "Your instructor left feedback",
+                    "Your instructor has written feedback on one of your practical attempts.",
+                )
+        return Response(InstructorFeedbackSerializer(feedback).data)
+
+
+def _effective_mastery(result, attempt):
+    """A competency result's state once any instructor sign-off is taken into account.
+
+    Results are immutable, so a result held for review keeps that state; after sign-off the
+    profile shows what the decision means for the learner instead.
+    """
+
+    if result.mastery_state != "requires_review" or not attempt.review_decision:
+        return result.mastery_state
+    if (
+        attempt.review_decision == Attempt.ReviewDecision.COMPETENT
+        and result.mastery_percentage >= result.mastery_threshold
+    ):
+        return "mastered"
+    return "developing"
+
+
+def _reviewed_outcome(attempt, decision):
+    """How an attempt held for review counts once an instructor has signed it off."""
+
+    if decision == Attempt.ReviewDecision.NOT_YET_COMPETENT:
+        return Attempt.Outcome.FAILED
+    if attempt.score is None or attempt.score < attempt.grading_policy.pass_threshold:
+        return Attempt.Outcome.FAILED
+    results = list(attempt.competency_results.all())
+    if results and all(result.mastery_percentage >= result.mastery_threshold for result in results):
+        return Attempt.Outcome.MASTERED
+    return Attempt.Outcome.PASSED
+
+
+class InstructorAttemptReviewDecisionView(APIView):
+    """Sign off an attempt that grading held back because of a safety-critical mistake."""
+
+    permission_classes = [IsInstructorOrSchoolAdmin]
+
+    @extend_schema(
+        request=AttemptReviewDecisionSerializer,
+        responses=InstructorAttemptReviewSerializer,
+    )
+    def post(self, request, pk):
+        serializer = AttemptReviewDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        school_ids = _instructor_school_ids(request.user)
+        with transaction.atomic():
+            attempt = (
+                Attempt.objects.select_for_update()
+                .filter(pk=pk, assignment__lesson__course__school_id__in=school_ids)
+                .first()
+            )
+            if attempt is None:
+                return Response({"detail": "Attempt not found."}, status=status.HTTP_404_NOT_FOUND)
+            if attempt.learner_id == request.user.pk:
+                raise PermissionDenied("You cannot sign off your own attempt.")
+            if attempt.status != Attempt.Status.REQUIRES_REVIEW:
+                return Response(
+                    {"detail": "Only attempts waiting for review can be signed off."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            decision = serializer.validated_data["decision"]
+            attempt.review_decision = decision
+            attempt.review_note = serializer.validated_data["note"]
+            attempt.reviewed_by = request.user
+            attempt.reviewed_at = timezone.now()
+            attempt.outcome = _reviewed_outcome(attempt, decision)
+            attempt.status = Attempt.Status.COMPLETED
+            attempt.save(
+                update_fields=[
+                    "review_decision",
+                    "review_note",
+                    "reviewed_by",
+                    "reviewed_at",
+                    "outcome",
+                    "status",
+                    "updated_at",
+                ]
+            )
+            _recommendation_for(attempt)
+            record_audit_event(
+                event_type="assessment.review_signed_off",
+                actor=request.user,
+                school=_attempt_school(attempt),
+                target=attempt,
+                payload={"decision": decision, "outcome": attempt.outcome},
+            )
+            _notify_learner(
+                attempt,
+                "Your attempt has been reviewed",
+                "Your instructor has reviewed a practical attempt that was waiting for review.",
+            )
+        reviewed = _instructor_attempt_queryset(request.user).get(pk=attempt.pk)
+        return Response(InstructorAttemptReviewSerializer(reviewed).data)
 
 
 class ResearchConsentPolicyView(APIView):
@@ -964,7 +1338,7 @@ class AssignmentViewSet(viewsets.ReadOnlyModelViewSet):
             .prefetch_related(
                 "lesson__competencies",
                 "lesson__procedure_steps",
-                "attempts",
+                "attempts__reviewed_by",
                 "scenario__asset_package__files",
             )
         )
@@ -1084,10 +1458,11 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
                 "assignment__assigned_by",
                 "scenario",
                 "grading_policy",
+                "reviewed_by",
             )
             .prefetch_related(
                 "assignment__lesson__competencies",
-                "assignment__attempts",
+                "assignment__attempts__reviewed_by",
                 "events",
                 "step_results",
                 "competency_results",
@@ -1637,22 +2012,26 @@ class InstructorRosterView(APIView):
         attempts = list(_instructor_attempt_queryset(request.user))
 
         now = timezone.now()
+        submitted_assignment_ids = {
+            attempt.assignment_id for attempt in attempts if attempt.status in SUBMITTED_STATUSES
+        }
         assignment_counts = {}
+        completed_assignment_counts = {}
         overdue_counts = {}
         for assignment in assignments:
             assignment_counts[assignment.learner_id] = (
                 assignment_counts.get(assignment.learner_id, 0) + 1
             )
-            if assignment.due_at and assignment.due_at < now:
-                completed = any(
-                    attempt.assignment_id == assignment.pk
-                    and attempt.status == Attempt.Status.COMPLETED
-                    for attempt in attempts
+            # Progress is assignments finished out of assignments given; counting attempts read
+            # as "3/1" for a learner who practised one lesson three times.
+            if assignment.pk in submitted_assignment_ids:
+                completed_assignment_counts[assignment.learner_id] = (
+                    completed_assignment_counts.get(assignment.learner_id, 0) + 1
                 )
-                if not completed:
-                    overdue_counts[assignment.learner_id] = (
-                        overdue_counts.get(assignment.learner_id, 0) + 1
-                    )
+            elif assignment.due_at and assignment.due_at < now:
+                overdue_counts[assignment.learner_id] = (
+                    overdue_counts.get(assignment.learner_id, 0) + 1
+                )
 
         per_learner = {}
         for attempt in attempts:
@@ -1661,12 +2040,8 @@ class InstructorRosterView(APIView):
                 {"attempts": 0, "completed": 0, "safety": 0, "scores": [], "last": None},
             )
             entry["attempts"] += 1
-            entry["completed"] += int(attempt.status == Attempt.Status.COMPLETED)
-            entry["safety"] += sum(
-                event.event_type == "incorrect_action"
-                and event.payload.get("safetyCritical") is True
-                for event in attempt.events.all()
-            )
+            entry["completed"] += int(attempt.status in SUBMITTED_STATUSES)
+            entry["safety"] += sum(_is_safety_error(event) for event in attempt.events.all())
             if attempt.score is not None:
                 entry["scores"].append(attempt.score)
             if entry["last"] is None or attempt.updated_at > entry["last"]:
@@ -1693,6 +2068,7 @@ class InstructorRosterView(APIView):
                     "assignments": assignment_counts.get(membership.user_id, 0),
                     "attempts": stats["attempts"] if stats else 0,
                     "completedAttempts": stats["completed"] if stats else 0,
+                    "completedAssignments": completed_assignment_counts.get(membership.user_id, 0),
                     "safetyErrors": stats["safety"] if stats else 0,
                     "overdueAssignments": overdue_counts.get(membership.user_id, 0),
                     "averageScore": (sum(scores) / len(scores)) if scores else None,
@@ -1747,11 +2123,7 @@ class InstructorLearnerDetailView(APIView):
             attempts_by_assignment.setdefault(attempt.assignment_id, []).append(attempt)
 
         def safety_errors(attempt):
-            return sum(
-                event.event_type == "incorrect_action"
-                and event.payload.get("safetyCritical") is True
-                for event in attempt.events.all()
-            )
+            return sum(_is_safety_error(event) for event in attempt.events.all())
 
         assignments = (
             Assignment.objects.filter(learner=learner, lesson__course__school_id__in=school_ids)
@@ -1760,28 +2132,10 @@ class InstructorLearnerDetailView(APIView):
             .distinct()
         )
 
-        assignment_rows = []
-        for assignment in assignments:
-            related = attempts_by_assignment.get(assignment.pk, [])
-            latest = related[0] if related else None
-            completed = any(attempt.status == Attempt.Status.COMPLETED for attempt in related)
-            assignment_rows.append(
-                {
-                    "id": assignment.pk,
-                    "lessonTitle": assignment.lesson.title,
-                    "courseTitle": assignment.lesson.course.title,
-                    "trade": assignment.lesson.course.trade,
-                    "dueAt": assignment.due_at,
-                    "availableAt": assignment.available_at,
-                    "attemptLimit": assignment.attempt_limit,
-                    "attemptsUsed": len(related),
-                    "isOverdue": bool(
-                        assignment.due_at and assignment.due_at < now and not completed
-                    ),
-                    "latestStatus": latest.status if latest else None,
-                    "latestScore": latest.score if latest else None,
-                }
-            )
+        assignment_rows = [
+            _assignment_row(assignment, attempts_by_assignment.get(assignment.pk, []), now)
+            for assignment in assignments
+        ]
 
         competency_aggregation = {}
         for attempt in attempts:
@@ -1791,7 +2145,7 @@ class InstructorLearnerDetailView(APIView):
                     {
                         "code": result.competency.code,
                         "title": result.competency.title,
-                        "masteryState": result.mastery_state,
+                        "masteryState": _effective_mastery(result, attempt),
                         "masteryPercentage": str(result.mastery_percentage),
                         "attempts": 0,
                     },
@@ -1819,7 +2173,11 @@ class InstructorLearnerDetailView(APIView):
                     "assignments": len(assignment_rows),
                     "attempts": len(attempts),
                     "completedAttempts": sum(
-                        attempt.status == Attempt.Status.COMPLETED for attempt in attempts
+                        attempt.status in SUBMITTED_STATUSES for attempt in attempts
+                    ),
+                    "completedAssignments": sum(
+                        row["latestStatus"] is not None and row["submitted"]
+                        for row in assignment_rows
                     ),
                     "safetyErrors": sum(safety_errors(attempt) for attempt in attempts),
                     "overdueAssignments": sum(row["isOverdue"] for row in assignment_rows),

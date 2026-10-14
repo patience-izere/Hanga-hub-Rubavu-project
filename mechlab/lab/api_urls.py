@@ -14,9 +14,12 @@ from .content_views import (
 from .learning_views import (
     AssignmentViewSet,
     AttemptViewSet,
+    InstructorAssignmentDetailView,
     InstructorAssignmentView,
+    InstructorAttemptReviewDecisionView,
     InstructorAttemptReviewView,
     InstructorEvidenceExportView,
+    InstructorFeedbackDetailView,
     InstructorLearnerDetailView,
     InstructorOverviewView,
     InstructorRosterView,
@@ -124,6 +127,21 @@ urlpatterns = [
         "instructor/attempts/<int:pk>/",
         InstructorAttemptReviewView.as_view(),
         name="instructor-attempt-review",
+    ),
+    path(
+        "instructor/attempts/<int:pk>/review/",
+        InstructorAttemptReviewDecisionView.as_view(),
+        name="instructor-attempt-review-decision",
+    ),
+    path(
+        "instructor/attempts/<int:pk>/feedback/<int:feedback_id>/",
+        InstructorFeedbackDetailView.as_view(),
+        name="instructor-feedback-detail",
+    ),
+    path(
+        "instructor/assignments/<int:pk>/",
+        InstructorAssignmentDetailView.as_view(),
+        name="instructor-assignment-detail",
     ),
     path("", include(router.urls)),
 ]

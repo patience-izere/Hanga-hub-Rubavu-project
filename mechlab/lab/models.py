@@ -1127,6 +1127,11 @@ class Attempt(models.Model):
         REQUIRES_REVIEW = "requires_review", "Requires review"
         MASTERED = "mastered", "Mastered"
 
+    class ReviewDecision(models.TextChoices):
+        NONE = "", "Not reviewed"
+        COMPETENT = "competent", "Competent"
+        NOT_YET_COMPETENT = "not_yet_competent", "Not yet competent"
+
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name="attempts")
     scenario = models.ForeignKey(
         SimulationScenario,
@@ -1161,6 +1166,20 @@ class Attempt(models.Model):
     started_at = models.DateTimeField(default=timezone.now)
     completed_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # An instructor's sign-off on an attempt held for review. Step and competency results stay as
+    # graded; the decision decides how the attempt counts.
+    review_decision = models.CharField(
+        max_length=24, choices=ReviewDecision.choices, default=ReviewDecision.NONE, blank=True
+    )
+    review_note = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attempts_reviewed",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-started_at"]

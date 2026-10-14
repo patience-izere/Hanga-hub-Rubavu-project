@@ -3550,3 +3550,283 @@ class OperationsTests(TestCase):
         call_command("run_scheduled_jobs", stdout=output)
         self.assertIn("LRS delivery is disabled", output.getvalue())
         self.assertIn("consent receipt(s)", output.getvalue())
+
+
+class InstructorWorkflowTests(TestCase):
+    """Sign-off, feedback, assignment changes and the evidence counts instructors rely on."""
+
+    start_attempt = TenantIsolationTests.start_attempt
+    act = TenantIsolationTests.act
+
+    def setUp(self):
+        LearningApiTests.setUp(self)
+        self.learner.email = "learner@example.com"
+        self.learner.save(update_fields=["email"])
+
+    def held_for_review(self):
+        GradingPolicy.objects.filter(pk=self.grading_policy.pk).update(
+            requires_review_on_safety_error=True
+        )
+        attempt_id = self.start_attempt()
+        # A safety-critical mistake first, then the correct procedure.
+        self.assertEqual(self.act(attempt_id, "set_meter_dc").status_code, 200)
+        self.assertEqual(self.act(attempt_id, "confirm_ppe").status_code, 200)
+        self.assertEqual(self.act(attempt_id, "set_meter_dc").status_code, 200)
+        completed = self.client.post(f"/api/v1/attempts/{attempt_id}/complete/")
+        self.assertEqual(completed.json()["attempt"]["status"], "requires_review")
+        return attempt_id
+
+    def sign_off(self, attempt_id, decision, note="Observed the learner restore the safe order."):
+        return self.client.post(
+            f"/api/v1/instructor/attempts/{attempt_id}/review/",
+            {"decision": decision, "note": note},
+            content_type="application/json",
+        )
+
+    def test_instructor_signs_off_an_attempt_held_for_review(self):
+        attempt_id = self.held_for_review()
+
+        self.assertEqual(self.sign_off(attempt_id, "competent").status_code, 403)  # the learner
+
+        self.client.force_login(self.instructor)
+        overview = self.client.get("/api/v1/instructor/overview/").json()
+        self.assertEqual(overview["metrics"]["requiresReview"], 1)
+        self.assertEqual(overview["metrics"]["safetyErrors"], 1)
+        self.assertEqual(overview["attempts"][0]["safety_errors"], 1)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.sign_off(attempt_id, "competent")
+        self.assertEqual(response.status_code, 200, response.content)
+        body = response.json()
+        self.assertEqual(body["status"], "completed")
+        self.assertEqual(body["review_decision"], "competent")
+        # The graded score still decides how a confirmed attempt counts.
+        self.assertEqual(body["outcome"], "passed")
+        self.assertEqual(body["recommendations"][0]["kind"], "complete")
+        self.assertEqual(self.sign_off(attempt_id, "competent").status_code, 409)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(f"/learn/attempts/{attempt_id}", mail.outbox[0].body)
+        self.assertTrue(
+            AuditEvent.objects.filter(event_type="assessment.review_signed_off").exists()
+        )
+        profile = self.client.get(f"/api/v1/instructor/learners/{self.learner.pk}/").json()
+        # Below the 100% threshold, so an accepted result still reads as developing.
+        self.assertEqual(profile["competencies"][0]["masteryState"], "developing")
+
+        self.client.force_login(self.learner)
+        detail = self.client.get(f"/api/v1/attempts/{attempt_id}/").json()
+        self.assertEqual(detail["review_decision"], "competent")
+        self.assertEqual(detail["review_note"], "Observed the learner restore the safe order.")
+        self.assertTrue(detail["reviewed_by_name"])
+
+    def test_sign_off_needs_a_reason_and_stays_in_the_lessons_school(self):
+        attempt_id = self.held_for_review()
+        self.client.force_login(self.instructor)
+        self.assertEqual(self.sign_off(attempt_id, "competent", note="ok").status_code, 400)
+        self.assertEqual(self.sign_off(attempt_id, "excellent").status_code, 400)
+
+        outsider = User.objects.create_user("outsider@example.com", password="pw-123")
+        other = School.objects.create(name="Other", code="other-school")
+        SchoolMembership.objects.create(
+            school=other, user=outsider, role=SchoolMembership.Role.INSTRUCTOR
+        )
+        self.client.force_login(outsider)
+        self.assertEqual(self.sign_off(attempt_id, "not_yet_competent").status_code, 404)
+
+        self.client.force_login(self.instructor)
+        response = self.sign_off(attempt_id, "not_yet_competent")
+        self.assertEqual(response.json()["outcome"], "failed")
+        self.assertEqual(response.json()["recommendations"][0]["kind"], "remediate")
+
+    def test_feedback_can_be_drafted_published_and_withdrawn_without_leaking_notes(self):
+        attempt_id = self.start_attempt()
+        self.client.force_login(self.instructor)
+        url = f"/api/v1/instructor/attempts/{attempt_id}/"
+        created = self.client.post(
+            url,
+            {"observation": "Hesitated at the meter.", "feedback": "Good safety order."},
+            content_type="application/json",
+        )
+        self.assertEqual(created.status_code, 201)
+        feedback_id = created.json()["id"]
+        self.assertFalse(created.json()["is_published"])
+        too_long = self.client.post(url, {"feedback": "x" * 5001}, content_type="application/json")
+        self.assertEqual(too_long.status_code, 400)
+
+        detail_url = f"/api/v1/instructor/attempts/{attempt_id}/feedback/{feedback_id}/"
+        self.client.force_login(User.objects.create_user("peer@example.com", password="pw-123"))
+        SchoolMembership.objects.create(
+            school=self.school,
+            user=User.objects.get(username="peer@example.com"),
+            role=SchoolMembership.Role.INSTRUCTOR,
+        )
+        peer = self.client.patch(
+            detail_url, {"is_published": True}, content_type="application/json"
+        )
+        self.assertEqual(peer.status_code, 403)
+
+        self.client.force_login(self.instructor)
+        with self.captureOnCommitCallbacks(execute=True):
+            published = self.client.patch(
+                detail_url, {"is_published": True}, content_type="application/json"
+            )
+        self.assertEqual(published.status_code, 200)
+        self.assertTrue(published.json()["published_at"])
+        self.assertEqual(len(mail.outbox), 1)
+
+        self.client.force_login(self.learner)
+        learner_feedback = self.client.get(f"/api/v1/attempts/{attempt_id}/").json()["feedback"]
+        self.assertEqual(learner_feedback[0]["feedback"], "Good safety order.")
+        self.assertNotIn("observation", learner_feedback[0])
+
+        self.client.force_login(self.school_admin)
+        withdrawn = self.client.patch(
+            detail_url, {"is_published": False}, content_type="application/json"
+        )
+        self.assertEqual(withdrawn.status_code, 200)
+        self.client.force_login(self.learner)
+        self.assertEqual(self.client.get(f"/api/v1/attempts/{attempt_id}/").json()["feedback"], [])
+
+    def test_instructor_extends_a_deadline_and_allows_another_attempt(self):
+        Assignment.objects.filter(pk=self.assignment.pk).update(attempt_limit=1)
+        attempt_id = self.start_attempt()
+        self.client.post(f"/api/v1/attempts/{attempt_id}/abandon/")
+        self.assertEqual(
+            self.client.post(f"/api/v1/assignments/{self.assignment.pk}/start/").status_code, 409
+        )
+
+        url = f"/api/v1/instructor/assignments/{self.assignment.pk}/"
+        self.client.force_login(self.instructor)
+        past = (timezone.now() - timedelta(days=1)).isoformat()
+        self.assertEqual(
+            self.client.patch(url, {"dueAt": past}, content_type="application/json").status_code,
+            400,
+        )
+        too_low = self.client.patch(url, {"attemptLimit": 1}, content_type="application/json")
+        self.assertEqual(too_low.status_code, 200)  # unchanged and still valid
+        future = (timezone.now() + timedelta(days=7)).isoformat()
+        response = self.client.patch(
+            url, {"attemptLimit": 2, "dueAt": future}, content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["attemptLimit"], 2)
+        self.assertEqual(response.json()["attemptsUsed"], 1)
+        self.assertTrue(AuditEvent.objects.filter(event_type="assignment.updated").exists())
+
+        self.client.force_login(self.learner)
+        self.assertEqual(
+            self.client.post(f"/api/v1/assignments/{self.assignment.pk}/start/").status_code, 201
+        )
+        self.client.force_login(self.instructor)
+        below_used = self.client.patch(url, {"attemptLimit": 1}, content_type="application/json")
+        self.assertEqual(below_used.status_code, 400)
+
+    def test_cohort_assignment_skips_suspended_learners(self):
+        program = Program.objects.create(school=self.school, code="auto", name="Automotive")
+        cohort = Cohort.objects.create(
+            school=self.school, program=program, name="Auto 2026", code="auto-2026"
+        )
+        Enrollment.objects.create(cohort=cohort, learner=self.learner)
+        suspended = User.objects.create_user("suspended@example.com", password="pw-123")
+        membership = SchoolMembership.objects.create(
+            school=self.school, user=suspended, role=SchoolMembership.Role.LEARNER
+        )
+        Enrollment.objects.create(cohort=cohort, learner=suspended)
+        SchoolMembership.objects.filter(pk=membership.pk).update(is_active=False)
+        self.client.force_login(self.instructor)
+        response = self.client.post(
+            "/api/v1/instructor/assignments/",
+            {"scenarioId": self.scenario.pk, "cohortIds": [cohort.pk]},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["skipped"], 1)
+        self.assertEqual(response.json()["existing"], 1)
+        self.assertFalse(Assignment.objects.filter(learner=suspended).exists())
+
+    def test_evidence_counts_cover_tolerance_and_hints(self):
+        attempt_id = self.start_attempt()
+        self.client.post(
+            f"/api/v1/attempts/{attempt_id}/hints/", {}, content_type="application/json"
+        )
+        attempt = Attempt.objects.get(pk=attempt_id)
+        AttemptEvent.objects.create(
+            attempt=attempt,
+            sequence=attempt.events.count() + 1,
+            event_type="tolerance_failed",
+            payload={"stepCode": "ppe", "safetyCritical": True},
+        )
+        self.client.force_login(self.instructor)
+        overview = self.client.get("/api/v1/instructor/overview/").json()
+        self.assertEqual(overview["metrics"]["safetyErrors"], 1)
+        self.assertEqual(overview["attempts"][0]["incorrect_actions"], 1)
+        rows = list(
+            csv.DictReader(
+                StringIO(self.client.get("/api/v1/instructor/evidence.csv").content.decode())
+            )
+        )
+        self.assertEqual(rows[0]["hints"], "1")
+        self.assertEqual(rows[0]["safety_errors"], "1")
+        roster = self.client.get("/api/v1/instructor/learners/").json()["learners"]
+        learner = next(item for item in roster if item["id"] == self.learner.pk)
+        self.assertEqual(learner["safetyErrors"], 1)
+        self.assertEqual(learner["completedAssignments"], 0)
+
+    def test_csv_cells_cannot_run_as_spreadsheet_formulas(self):
+        self.learner.first_name = "=HYPERLINK(1)"
+        self.learner.save()
+        self.start_attempt()
+        self.client.force_login(self.instructor)
+        rows = list(
+            csv.DictReader(
+                StringIO(self.client.get("/api/v1/instructor/evidence.csv").content.decode())
+            )
+        )
+        self.assertTrue(rows[0]["learner"].startswith("'="))
+
+    def test_recommendation_override_survives_the_learner_reopening_the_result(self):
+        attempt_id = self.start_attempt()
+        self.act(attempt_id, "confirm_ppe")
+        self.act(attempt_id, "set_meter_dc")
+        self.client.post(f"/api/v1/attempts/{attempt_id}/complete/")
+        self.client.force_login(self.instructor)
+        override = self.client.patch(
+            f"/api/v1/instructor/attempts/{attempt_id}/",
+            {"kind": "retry", "reason": "Repeat it once without the hint panel."},
+            content_type="application/json",
+        )
+        self.assertEqual(override.status_code, 200, override.content)
+        self.client.force_login(self.learner)
+        recommendation = self.client.get(f"/api/v1/attempts/{attempt_id}/recommendation/").json()
+        self.assertEqual(recommendation["override_kind"], "retry")
+        self.assertEqual(Attempt.objects.get(pk=attempt_id).recommendations.count(), 1)
+
+    def test_overview_query_count_does_not_grow_with_attempts(self):
+        from django.db import connection as db_connection
+        from django.test.utils import CaptureQueriesContext
+
+        self.start_attempt()
+        self.client.force_login(self.instructor)
+        with CaptureQueriesContext(db_connection) as small:
+            self.client.get("/api/v1/instructor/overview/")
+        for index in range(5):
+            learner = User.objects.create_user(f"extra{index}@example.com", password="pw-123")
+            SchoolMembership.objects.create(
+                school=self.school, user=learner, role=SchoolMembership.Role.LEARNER
+            )
+            assignment = Assignment.objects.create(
+                lesson=self.lesson,
+                scenario=self.scenario,
+                learner=learner,
+                assigned_by=self.instructor,
+            )
+            Attempt.objects.create(
+                assignment=assignment,
+                learner=learner,
+                scenario=self.scenario,
+                grading_policy=self.grading_policy,
+            )
+        with CaptureQueriesContext(db_connection) as large:
+            overview = self.client.get("/api/v1/instructor/overview/").json()
+        self.assertEqual(overview["metrics"]["attempts"], 6)
+        self.assertEqual(len(large.captured_queries), len(small.captured_queries))

@@ -80,6 +80,31 @@ export async function submitInstructorFeedback(
   });
 }
 
+export async function updateInstructorFeedback(
+  attemptId: number,
+  feedbackId: number,
+  input: { observation?: string; feedback?: string; is_published?: boolean },
+): Promise<InstructorFeedback> {
+  await ensureCsrf();
+  return apiFetch<InstructorFeedback>(
+    `/api/v1/instructor/attempts/${attemptId}/feedback/${feedbackId}/`,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+}
+
+export type ReviewDecision = "competent" | "not_yet_competent";
+
+export async function signOffAttempt(
+  id: number,
+  input: { decision: ReviewDecision; note: string },
+): Promise<InstructorAttemptReview> {
+  await ensureCsrf();
+  return apiFetch<InstructorAttemptReview>(`/api/v1/instructor/attempts/${id}/review/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function overrideAttemptRecommendation(
   id: number,
   input: {
@@ -106,7 +131,7 @@ export async function createInstructorAssignments(input: {
   dueAt: string | null;
   attemptLimit: number;
   instructions: string;
-}): Promise<{ assignmentIds: number[]; created: number; existing: number }> {
+}): Promise<{ assignmentIds: number[]; created: number; existing: number; skipped: number }> {
   await ensureCsrf();
   return apiFetch("/api/v1/instructor/assignments/", {
     method: "POST",
@@ -124,6 +149,8 @@ export type InstructorRosterEntry = {
   assignments: number;
   attempts: number;
   completedAttempts: number;
+  /** Assignments with at least one submitted attempt. */
+  completedAssignments: number;
   safetyErrors: number;
   overdueAssignments: number;
   averageScore: string | null;
@@ -148,7 +175,27 @@ export type InstructorLearnerAssignment = {
   isOverdue: boolean;
   latestStatus: string | null;
   latestScore: string | null;
+  instructions: string;
+  submitted: boolean;
 };
+
+export type InstructorAssignmentChanges = {
+  availableAt?: string | null;
+  dueAt?: string | null;
+  attemptLimit?: number;
+  instructions?: string;
+};
+
+export async function updateInstructorAssignment(
+  id: number,
+  changes: InstructorAssignmentChanges,
+): Promise<InstructorLearnerAssignment> {
+  await ensureCsrf();
+  return apiFetch<InstructorLearnerAssignment>(`/api/v1/instructor/assignments/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(changes),
+  });
+}
 
 export type InstructorLearnerAttempt = {
   id: number;

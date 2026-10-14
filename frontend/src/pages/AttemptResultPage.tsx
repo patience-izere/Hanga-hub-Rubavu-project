@@ -69,6 +69,17 @@ export function AttemptResultBody({ attempt }: { attempt: AttemptDetail }) {
       </div>
       <h1>{lesson.title}</h1>
       <p>{heading.summary}</p>
+      {attempt.review_decision ? (
+        <div className="result-feedback" role="status">
+          <strong>
+            {attempt.review_decision === "competent"
+              ? "Your instructor reviewed this attempt and accepted the result"
+              : "Your instructor reviewed this attempt: practise it again before it counts"}
+          </strong>
+          {attempt.review_note ? <blockquote>{attempt.review_note}</blockquote> : null}
+          {attempt.reviewed_by_name ? <small>{attempt.reviewed_by_name}</small> : null}
+        </div>
+      ) : null}
 
       <div className="result-evidence">
         <div>
@@ -106,8 +117,10 @@ export function AttemptResultBody({ attempt }: { attempt: AttemptDetail }) {
                   needed
                 </span>
                 <strong>
-                  {MASTERY_LABELS[result.mastery_state] ??
-                    result.mastery_state.replaceAll("_", " ")}
+                  {result.mastery_state === "requires_review" && attempt.review_decision
+                    ? "Reviewed by your instructor"
+                    : (MASTERY_LABELS[result.mastery_state] ??
+                      result.mastery_state.replaceAll("_", " "))}
                 </strong>
               </li>
             ))}

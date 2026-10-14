@@ -148,6 +148,18 @@ describe("competencyProfile", () => {
     expect(profile.map((item) => item.competency_code)).toEqual(["AUTO-01", "AUTO-02"]);
   });
 
+  it("reads a result held for review through the instructor's sign-off", () => {
+    const held = { ...result("AUTO-01", "requires_review"), mastery_percentage: "90.00" };
+    const reviewed = (decision: AttemptDetail["review_decision"]) =>
+      competencyProfile([
+        { ...attempt("2026-06-01T09:00:00Z", [held]), review_decision: decision } as AttemptDetail,
+      ])[0].mastery_state;
+
+    expect(reviewed("")).toBe("requires_review");
+    expect(reviewed("competent")).toBe("mastered");
+    expect(reviewed("not_yet_competent")).toBe("developing");
+  });
+
   it("is empty when no attempt has results", () => {
     expect(competencyProfile([attempt("2026-06-01T09:00:00Z", [])])).toEqual([]);
   });
