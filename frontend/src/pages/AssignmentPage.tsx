@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { describeApiError } from "../api/client";
 import {
   useAssignment,
   useKnowledgeCheck,
@@ -67,6 +68,10 @@ export function AssignmentPage() {
     installedVersion !== null &&
     installedVersion !== assignment.data.scenario.version;
   const activeAttempt = start.data || latestAttempt;
+  const attemptOpen = activeAttempt?.status === "in_progress";
+  const remaining = Math.max(0, assignment.data.attempt_limit - used);
+  const opensAt = assignment.data.available_at ? new Date(assignment.data.available_at) : null;
+  const notOpenYet = opensAt !== null && opensAt > new Date();
   const packageFiles = assignment.data.scenario.asset_package?.files ?? [];
   const qualityScene =
     packageFiles.find((file) =>
@@ -123,10 +128,17 @@ export function AssignmentPage() {
             ) : null}
           </dd>
         </div>
-        <div className="lesson-term">
+        <div className={`lesson-term${remaining === 0 && !attemptOpen ? " due-overdue" : ""}`}>
           <dt>Attempts</dt>
           <dd>
             {used} of {assignment.data.attempt_limit} used
+            <small>
+              {remaining === 0
+                ? attemptOpen
+                  ? "This is your last attempt"
+                  : "No attempts left"
+                : `${remaining} left`}
+            </small>
           </dd>
         </div>
       </div>
@@ -335,21 +347,38 @@ export function AssignmentPage() {
       <div className="lesson-launch">
         <div>
           <h2>
-            {activeAttempt?.status === "in_progress" ? "Attempt ready" : "Ready to practise?"}
+            {attemptOpen
+              ? "Attempt ready"
+              : remaining === 0
+                ? "No attempts left"
+                : notOpenYet
+                  ? "Not open yet"
+                  : "Ready to practise?"}
           </h2>
           <p>
-            {activeAttempt?.status === "in_progress"
-              ? `Attempt ${activeAttempt.id} is saved and ready for the 3D procedure workspace.`
-              : "Starting creates a resumable learning attempt before the simulation opens."}
+            {attemptOpen
+              ? `Attempt ${activeAttempt.id} is saved. You can pick up where you left off.`
+              : remaining === 0
+                ? `You have used all ${assignment.data.attempt_limit} attempts for this lesson. Ask your instructor if you need another one.`
+                : notOpenYet
+                  ? `Your instructor opens this lesson on ${opensAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.`
+                  : used > 0
+                    ? `Starting uses attempt ${used + 1} of ${assignment.data.attempt_limit}. Your earlier attempts stay in your history.`
+                    : "Starting creates an attempt that is saved as you go, so you can stop and resume."}
           </p>
+          {start.isError ? (
+            <p className="form-error" role="alert">
+              {describeApiError(start.error, "The attempt could not be started. Try again.")}
+            </p>
+          ) : null}
         </div>
-        {activeAttempt?.status === "in_progress" ? (
+        {attemptOpen ? (
           <Link className="button button-primary" to={`/attempts/${activeAttempt.id}`}>
             {activeAttempt.resume_state?.completedSteps?.length
               ? "Resume simulation"
               : "Open simulation"}
           </Link>
-        ) : (
+        ) : remaining === 0 || notOpenYet ? null : (
           <button
             className="button button-primary"
             onClick={() =>

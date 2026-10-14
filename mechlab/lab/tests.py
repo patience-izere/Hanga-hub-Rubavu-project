@@ -1,3 +1,4 @@
+import csv
 import hashlib
 import json
 import struct
@@ -7,6 +8,7 @@ from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
@@ -887,6 +889,11 @@ class ContentWorkflowTests(TestCase):
             title="Workflow Lesson",
             slug="workflow-lesson",
             summary="A governed lesson.",
+            objectives=["Follow the governed procedure"],
+            safety_notes=["Isolate the rig before starting"],
+        )
+        self.lesson.competencies.add(
+            Competency.objects.create(course=course, code="WF-01", title="Work to procedure")
         )
         self.url = f"/api/v1/content/lessons/{self.lesson.pk}/transition/"
 
@@ -948,6 +955,8 @@ class ContentWorkflowTests(TestCase):
             name="Workflow policy",
             status=GradingPolicy.Status.PUBLISHED,
         )
+        # Publication requires step competency codes to exist in the course.
+        Competency.objects.create(course=self.course, code="safe-working", title="Work safely")
         payload = {
             "lesson": self.lesson.pk,
             "version": 1,
@@ -1056,19 +1065,21 @@ class ContentWorkflowTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         scenario_id = response.json()["id"]
-        self.client.post(
+        # Incomplete evidence is now refused at submission, before a reviewer's time is spent.
+        submission = self.client.post(
             f"/api/v1/content/scenarios/{scenario_id}/transition/",
             {"action": "submit"},
             content_type="application/json",
         )
+        self.assertEqual(submission.status_code, 400)
+        self.assertIn("publication", submission.json())
         self.client.force_login(self.admin)
         approval = self.client.post(
             f"/api/v1/content/scenarios/{scenario_id}/transition/",
             {"action": "approve"},
             content_type="application/json",
         )
-        self.assertEqual(approval.status_code, 400)
-        self.assertIn("publication", approval.json())
+        self.assertEqual(approval.status_code, 409)
 
     def test_asset_upload_validates_glb_license_checksum_and_admin_publication(self):
         temporary_media = tempfile.TemporaryDirectory()
@@ -2221,6 +2232,15 @@ class LearningApiTests(TestCase):
         self.assertEqual(operational["Cache-Control"], "private, no-store")
         self.assertIn("learner@example.com", operational.content.decode())
 
+        # Research rows only cover learners with active consent.
+        ResearchConsentReceipt.objects.create(
+            school=self.school,
+            participant_code=research_participant_code(self.school.pk, self.learner.pk),
+            consent_version="opedu-pilot-consent-v1",
+            status=ResearchConsentReceipt.Status.ACTIVE,
+            consented_at=timezone.now(),
+            expires_at=timezone.now() + timedelta(days=30),
+        )
         research = self.client.get("/api/v1/instructor/evidence.csv?scope=research")
         self.assertEqual(research.status_code, 200)
         self.assertNotIn("learner@example.com", research.content.decode())
@@ -2286,7 +2306,8 @@ class LearningApiTests(TestCase):
         membership.refresh_from_db()
         self.learner.refresh_from_db()
         self.assertFalse(membership.is_active)
-        self.assertFalse(self.learner.is_active)
+        # Suspension is school-scoped; the platform-wide account switch is left alone.
+        self.assertTrue(self.learner.is_active)
 
         own_membership = SchoolMembership.objects.get(school=self.school, user=self.school_admin)
         self.assertEqual(
@@ -2614,3 +2635,1439 @@ class PilotWorkflowTests(TestCase):
         self.assertIsNotNone(report["learning"]["cohensDz"])
         self.assertEqual(len(report["learning"]["meanChange95Ci"]), 2)
         self.assertIsNotNone(report["acceptance"]["susAlpha"])
+
+
+class TenantIsolationTests(TestCase):
+    """Regression tests for evidence, membership and content scoping across schools."""
+
+    setUp = LearningApiTests.setUp
+
+    def setUp_second_school(self):
+        self.school_b = School.objects.create(name="Gisenyi Test School", code="gisenyi-test")
+        self.instructor_b = User.objects.create_user("instructor-b@example.com", password="pw-123")
+        SchoolMembership.objects.create(
+            school=self.school_b, user=self.instructor_b, role=SchoolMembership.Role.INSTRUCTOR
+        )
+
+    def start_attempt(self):
+        self.client.force_login(self.learner)
+        response = self.client.post(f"/api/v1/assignments/{self.assignment.pk}/start/")
+        self.assertIn(response.status_code, {200, 201}, response.content)
+        return response.json()["attempt"]["id"]
+
+    def act(self, attempt_id, action):
+        return self.client.post(
+            f"/api/v1/attempts/{attempt_id}/actions/",
+            {"action": action, "metadata": {}},
+            content_type="application/json",
+        )
+
+    def complete_attempt(self):
+        attempt_id = self.start_attempt()
+        self.assertEqual(self.act(attempt_id, "confirm_ppe").status_code, 200)
+        self.assertEqual(self.act(attempt_id, "set_meter_dc").status_code, 200)
+        completed = self.client.post(f"/api/v1/attempts/{attempt_id}/complete/")
+        self.assertEqual(completed.status_code, 200, completed.content)
+        return attempt_id
+
+    def test_multi_school_learner_does_not_leak_evidence_to_their_other_school(self):
+        self.setUp_second_school()
+        SchoolMembership.objects.create(
+            school=self.school_b, user=self.learner, role=SchoolMembership.Role.CONTENT_AUTHOR
+        )
+        attempt_id = self.start_attempt()
+
+        self.client.force_login(self.instructor_b)
+        overview = self.client.get("/api/v1/instructor/overview/").json()
+        self.assertEqual(overview["metrics"]["attempts"], 0)
+        self.assertEqual(overview["attempts"], [])
+        review_url = f"/api/v1/instructor/attempts/{attempt_id}/"
+        self.assertEqual(self.client.get(review_url).status_code, 404)
+        feedback = self.client.post(
+            review_url,
+            {"feedback": "Planted from another school", "is_published": True},
+            content_type="application/json",
+        )
+        self.assertEqual(feedback.status_code, 404)
+        csv_rows = self.client.get("/api/v1/instructor/evidence.csv").content.decode().splitlines()
+        self.assertEqual(len(csv_rows), 1)
+
+        self.client.force_login(self.instructor)
+        self.assertEqual(self.client.get(review_url).status_code, 200)
+        overview = self.client.get("/api/v1/instructor/overview/").json()
+        self.assertEqual(overview["metrics"]["attempts"], 1)
+
+    def test_suspended_learner_loses_access_to_that_schools_work(self):
+        attempt_id = self.start_attempt()
+        SchoolMembership.objects.filter(user=self.learner, school=self.school).update(
+            is_active=False
+        )
+        self.client.force_login(self.learner)
+        self.assertEqual(self.client.get("/api/v1/assignments/").json()["count"], 0)
+        start = self.client.post(f"/api/v1/assignments/{self.assignment.pk}/start/")
+        self.assertEqual(start.status_code, 404)
+        self.assertEqual(self.act(attempt_id, "confirm_ppe").status_code, 404)
+
+        SchoolMembership.objects.filter(user=self.learner, school=self.school).update(
+            is_active=True
+        )
+        self.school.is_active = False
+        self.school.save(update_fields=["is_active"])
+        self.assertEqual(self.client.get("/api/v1/assignments/").json()["count"], 0)
+
+    def test_school_suspension_keeps_the_platform_account_switch_untouched(self):
+        superuser = User.objects.create_superuser(
+            "platform@example.com", "platform@example.com", "pw-123"
+        )
+        superuser_membership = SchoolMembership.objects.create(
+            school=self.school, user=superuser, role=SchoolMembership.Role.LEARNER
+        )
+        learner_membership = SchoolMembership.objects.get(user=self.learner, school=self.school)
+        learner_client = Client()
+        learner_client.force_login(self.learner)
+
+        self.client.force_login(self.school_admin)
+        for membership in [superuser_membership, learner_membership]:
+            response = self.client.patch(
+                f"/api/v1/school/members/{membership.pk}/",
+                {"isActive": False},
+                content_type="application/json",
+            )
+            self.assertEqual(response.status_code, 200, response.content)
+
+        superuser.refresh_from_db()
+        self.learner.refresh_from_db()
+        self.assertTrue(superuser.is_active)
+        self.assertTrue(self.learner.is_active)
+        # The suspended learner's existing session ends and sign-in explains why.
+        self.assertEqual(learner_client.get("/api/v1/auth/me/").status_code, 401)
+        login = Client().post(
+            "/api/v1/auth/login/",
+            {"email": "learner@example.com", "password": "password-123"},
+            content_type="application/json",
+        )
+        self.assertEqual(login.status_code, 403)
+        self.assertEqual(login.json()["code"], "membership_suspended")
+
+    def test_attempt_evidence_is_locked_once_the_attempt_ends(self):
+        attempt_id = self.complete_attempt()
+        renderer = self.client.post(
+            f"/api/v1/attempts/{attempt_id}/renderer/",
+            {"mode": "accessible_2d", "learningMode": "independent"},
+            content_type="application/json",
+        )
+        self.assertEqual(renderer.status_code, 409)
+        batch = self.client.post(
+            f"/api/v1/attempts/{attempt_id}/events/batch/",
+            {
+                "events": [
+                    {
+                        "eventId": str(uuid.uuid4()),
+                        "eventType": "performance_sample",
+                        "rendererMode": "desktop_3d",
+                        "occurredAt": timezone.now().isoformat(),
+                        "payload": {"framesPerSecond": 60},
+                    }
+                ]
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(batch.status_code, 409)
+        self.assertEqual(Attempt.objects.get(pk=attempt_id).learning_mode, "guided")
+
+    def test_learning_mode_cannot_change_after_the_first_action(self):
+        attempt_id = self.start_attempt()
+        self.assertEqual(self.act(attempt_id, "confirm_ppe").status_code, 200)
+        switched = self.client.post(
+            f"/api/v1/attempts/{attempt_id}/renderer/",
+            {"mode": "desktop_3d", "learningMode": "independent"},
+            content_type="application/json",
+        )
+        self.assertEqual(switched.status_code, 409)
+        same_mode = self.client.post(
+            f"/api/v1/attempts/{attempt_id}/renderer/",
+            {"mode": "accessible_2d", "learningMode": "guided"},
+            content_type="application/json",
+        )
+        self.assertEqual(same_mode.status_code, 200)
+
+    def test_client_supplied_json_is_bounded_and_validated(self):
+        attempt_id = self.start_attempt()
+        oversized = self.client.post(
+            f"/api/v1/attempts/{attempt_id}/events/batch/",
+            {
+                "events": [
+                    {
+                        "eventId": str(uuid.uuid4()),
+                        "eventType": "performance_sample",
+                        "rendererMode": "desktop_3d",
+                        "occurredAt": timezone.now().isoformat(),
+                        "payload": {"blob": "x" * 20000},
+                    }
+                ]
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(oversized.status_code, 400)
+        big_action = self.client.post(
+            f"/api/v1/attempts/{attempt_id}/actions/",
+            {"action": "confirm_ppe", "metadata": {"blob": "x" * 20000}},
+            content_type="application/json",
+        )
+        self.assertEqual(big_action.status_code, 400)
+        malformed = self.client.post(
+            f"/api/v1/assignments/{self.assignment.pk}/knowledge-check/",
+            {"answers": "nope"},
+            content_type="application/json",
+        )
+        self.assertEqual(malformed.status_code, 400)
+
+    def test_audit_events_belong_to_the_school_that_owns_the_attempt(self):
+        self.setUp_second_school()
+        # The learner's first membership is in school B, which used to receive the audit trail.
+        SchoolMembership.objects.filter(user=self.learner).delete()
+        SchoolMembership.objects.create(
+            school=self.school_b, user=self.learner, role=SchoolMembership.Role.LEARNER
+        )
+        SchoolMembership.objects.create(
+            school=self.school, user=self.learner, role=SchoolMembership.Role.LEARNER
+        )
+        attempt_id = self.complete_attempt()
+        events = AuditEvent.objects.filter(target_type="lab.attempt", target_id=str(attempt_id))
+        self.assertTrue(events.exists())
+        self.assertEqual(set(events.values_list("school_id", flat=True)), {self.school.pk})
+
+    def test_request_logs_do_not_contain_url_tokens(self):
+        with self.assertLogs("opedu.requests", level="INFO") as logs:
+            self.client.get("/api/v1/school/invitations/accept/secret-invitation-token-123456/")
+        self.assertTrue(logs.output)
+        self.assertNotIn("secret-invitation-token-123456", "\n".join(logs.output))
+
+
+class ContentTenantTests(TestCase):
+    def setUp(self):
+        self.school = School.objects.create(name="Author School", code="author-school")
+        self.other_school = School.objects.create(name="Other School", code="other-school")
+        self.author = User.objects.create_user("author@example.com", password="pw-123")
+        self.second_author = User.objects.create_user("author-2@example.com", password="pw-123")
+        for user in [self.author, self.second_author]:
+            SchoolMembership.objects.create(
+                school=self.school, user=user, role=SchoolMembership.Role.CONTENT_AUTHOR
+            )
+        self.course = Course.objects.create(
+            school=self.school, title="Electrical", slug="electrical", trade="Electrical"
+        )
+        self.other_course = Course.objects.create(
+            school=self.other_school, title="Other", slug="other", trade="Other"
+        )
+        self.lesson = Lesson.objects.create(
+            course=self.course, title="Wiring", slug="wiring", summary="Wire a circuit."
+        )
+        self.other_lesson = Lesson.objects.create(
+            course=self.other_course, title="Other", slug="other", summary="Other school."
+        )
+        ProcedureStep.objects.create(
+            lesson=self.lesson,
+            order=1,
+            code="isolate",
+            title="Isolate the supply",
+            instruction="Switch off and lock out the supply.",
+            action_code="isolate_supply",
+            safety_critical=True,
+        )
+        policy = GradingPolicy.objects.create(
+            code="wiring", version=1, name="Wiring", status=GradingPolicy.Status.PUBLISHED
+        )
+        self.scenario = SimulationScenario.objects.create(
+            lesson=self.lesson,
+            version=1,
+            title="Wiring v1",
+            definition=build_scenario_definition(self.lesson),
+            grading_policy=policy,
+            authored_by=self.author,
+        )
+        self.package = AssetPackage.objects.create(
+            course=self.course, code="wiring", version=1, name="Wiring", sha256="0" * 64
+        )
+
+    def test_drafts_cannot_move_into_another_school(self):
+        self.client.force_login(self.author)
+        moved = self.client.patch(
+            f"/api/v1/content/scenarios/{self.scenario.pk}/",
+            {"lesson": self.other_lesson.pk},
+            content_type="application/json",
+        )
+        self.assertEqual(moved.status_code, 400)
+        self.scenario.refresh_from_db()
+        self.assertEqual(self.scenario.lesson, self.lesson)
+        moved_package = self.client.patch(
+            f"/api/v1/content/asset-packages/{self.package.pk}/",
+            {"course": self.other_course.pk},
+            content_type="application/json",
+        )
+        self.assertEqual(moved_package.status_code, 400)
+        self.package.refresh_from_db()
+        self.assertEqual(self.package.course, self.course)
+
+    def test_only_the_author_or_an_admin_may_change_a_draft(self):
+        self.client.force_login(self.second_author)
+        edited = self.client.patch(
+            f"/api/v1/content/scenarios/{self.scenario.pk}/",
+            {"title": "Hijacked"},
+            content_type="application/json",
+        )
+        self.assertEqual(edited.status_code, 403)
+        deleted = self.client.delete(f"/api/v1/content/scenarios/{self.scenario.pk}/")
+        self.assertEqual(deleted.status_code, 403)
+
+        self.client.force_login(self.author)
+        renamed = self.client.patch(
+            f"/api/v1/content/scenarios/{self.scenario.pk}/",
+            {"title": "Wiring practice"},
+            content_type="application/json",
+        )
+        self.assertEqual(renamed.status_code, 200, renamed.content)
+        self.assertTrue(AuditEvent.objects.filter(event_type="content.scenario_updated").exists())
+
+
+class ModuleStudioTests(TestCase):
+    """An author can build a module from course to learner-ready practical without Django admin."""
+
+    def setUp(self):
+        self.school = School.objects.create(name="Studio School", code="studio-school")
+        self.other_school = School.objects.create(name="Elsewhere School", code="elsewhere")
+        self.author = User.objects.create_user("studio-author@example.com", password="pw-123")
+        self.admin = User.objects.create_user("studio-admin@example.com", password="pw-123")
+        self.instructor = User.objects.create_user("studio-teacher@example.com", password="pw-123")
+        self.learner = User.objects.create_user("studio-learner@example.com", password="pw-123")
+        for user, role in [
+            (self.author, SchoolMembership.Role.CONTENT_AUTHOR),
+            (self.admin, SchoolMembership.Role.ADMIN),
+            (self.instructor, SchoolMembership.Role.INSTRUCTOR),
+            (self.learner, SchoolMembership.Role.LEARNER),
+        ]:
+            SchoolMembership.objects.create(school=self.school, user=user, role=role)
+        self.policy = GradingPolicy.objects.create(
+            code="studio-standard",
+            version=1,
+            name="Standard",
+            status=GradingPolicy.Status.PUBLISHED,
+        )
+
+    def post(self, user, url, data):
+        self.client.force_login(user)
+        return self.client.post(url, data, content_type="application/json")
+
+    def patch(self, user, url, data):
+        self.client.force_login(user)
+        return self.client.patch(url, data, content_type="application/json")
+
+    def build_lesson(self):
+        course = self.post(
+            self.author,
+            "/api/v1/content/courses/",
+            {"title": "Solar installation", "trade": "Electrical", "description": ""},
+        )
+        self.assertEqual(course.status_code, 201, course.content)
+        course_id = course.json()["id"]
+        competency = self.post(
+            self.author,
+            f"/api/v1/content/courses/{course_id}/competencies/",
+            {"code": "sol-01", "title": "Isolate a PV array safely"},
+        )
+        self.assertEqual(competency.status_code, 201, competency.content)
+        self.assertEqual(competency.json()["code"], "SOL-01")
+        module = self.post(
+            self.author, f"/api/v1/content/courses/{course_id}/modules/", {"title": "PV safety"}
+        )
+        self.assertEqual(module.status_code, 201, module.content)
+        lesson = self.post(
+            self.author,
+            "/api/v1/content/lessons/",
+            {
+                "course": course_id,
+                "module": module.json()["id"],
+                "title": "Isolate a PV array",
+                "summary": "Make a rooftop array safe before maintenance.",
+                "objectives": ["Identify the DC isolator", "Verify zero voltage"],
+                "safetyNotes": ["Treat every conductor as live until proven dead"],
+                "competencies": [competency.json()["id"]],
+                "language": "en",
+            },
+        )
+        self.assertEqual(lesson.status_code, 201, lesson.content)
+        return lesson.json()
+
+    def publish_lesson(self, lesson_id):
+        url = f"/api/v1/content/lessons/{lesson_id}/transition/"
+        self.assertEqual(self.post(self.author, url, {"action": "submit"}).status_code, 200)
+        self.assertEqual(self.post(self.admin, url, {"action": "approve"}).status_code, 200)
+        self.assertEqual(self.post(self.admin, url, {"action": "publish"}).status_code, 200)
+
+    def test_author_builds_a_module_that_a_learner_can_complete(self):
+        lesson = self.build_lesson()
+        self.assertEqual(lesson["status"], "draft")
+        scenario = self.post(self.author, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {})
+        self.assertEqual(scenario.status_code, 201, scenario.content)
+        scenario_id = scenario.json()["id"]
+        definition = scenario.json()["definition"]
+        self.assertFalse(definition["renderers"]["desktop_3d"]["enabled"])
+
+        # Exactly the shape the Studio's "Add procedure step" button writes.
+        definition["steps"] = [
+            {
+                "order": 1,
+                "code": "isolate",
+                "title": "Open the DC isolator",
+                "instruction": "Switch the DC isolator to OFF.",
+                "action_code": "open_dc_isolator",
+                "acceptable_actions": [
+                    {"action_code": "open_dc_isolator", "label": "Open", "is_primary": True}
+                ],
+                "tools": [],
+                "hazards": [],
+                "hints": [{"text": "The isolator is beside the inverter."}],
+                "competency_codes": ["SOL-01"],
+                "safety_critical": True,
+            },
+            {
+                "order": 2,
+                "code": "verify",
+                "title": "Verify zero voltage",
+                "instruction": "Measure across the DC terminals.",
+                "action_code": "verify_zero",
+                "competency_codes": ["SOL-01"],
+            },
+        ]
+        saved = self.patch(
+            self.author, f"/api/v1/content/scenarios/{scenario_id}/", {"definition": definition}
+        )
+        self.assertEqual(saved.status_code, 200, saved.content)
+        stored = SimulationScenario.objects.get(pk=scenario_id).definition
+        for step in stored["steps"]:
+            for key in ["id", "feedback", "points", "metadata", "feedback_rules", "hints"]:
+                self.assertIn(key, step)
+        self.assertEqual(stored["steps"][0]["hints"][0]["code"], "hint-1")
+        self.assertEqual([item["code"] for item in stored["competencies"]], ["SOL-01"])
+
+        self.publish_lesson(lesson["id"])
+        transition = f"/api/v1/content/scenarios/{scenario_id}/transition/"
+        submitted = self.post(self.author, transition, {"action": "submit"})
+        self.assertEqual(submitted.status_code, 200, submitted.content)
+        approved = self.post(self.admin, transition, {"action": "approve"})
+        self.assertEqual(approved.status_code, 200, approved.content)
+        published = self.post(self.admin, f"/api/v1/content/scenarios/{scenario_id}/publish/", {})
+        self.assertEqual(published.status_code, 200, published.content)
+
+        assigned = self.post(
+            self.instructor,
+            "/api/v1/instructor/assignments/",
+            {"scenarioId": scenario_id, "learnerIds": [self.learner.pk], "cohortIds": []},
+        )
+        self.assertEqual(assigned.status_code, 201, assigned.content)
+        self.client.force_login(self.learner)
+        listing = self.client.get("/api/v1/assignments/")
+        self.assertEqual(listing.status_code, 200, listing.content)
+        assignment_id = listing.json()["results"][0]["id"]
+        attempt_id = self.client.post(f"/api/v1/assignments/{assignment_id}/start/").json()[
+            "attempt"
+        ]["id"]
+        for action_code in ["open_dc_isolator", "verify_zero"]:
+            response = self.post(
+                self.learner,
+                f"/api/v1/attempts/{attempt_id}/actions/",
+                {"action": action_code, "metadata": {}},
+            )
+            self.assertTrue(response.json()["correct"], response.content)
+        completed = self.post(self.learner, f"/api/v1/attempts/{attempt_id}/complete/", {})
+        self.assertEqual(completed.status_code, 200, completed.content)
+        attempt = Attempt.objects.get(pk=attempt_id)
+        self.assertEqual(attempt.competency_results.get().competency.code, "SOL-01")
+
+    def test_unknown_competency_codes_block_publication(self):
+        lesson = self.build_lesson()
+        scenario = self.post(self.author, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {})
+        definition = scenario.json()["definition"]
+        definition["steps"][0]["competency_codes"] = ["NOT-A-REAL-CODE"]
+        saved = self.patch(
+            self.author,
+            f"/api/v1/content/scenarios/{scenario.json()['id']}/",
+            {"definition": definition},
+        )
+        errors = saved.json()["publicationChecks"]["errors"]
+        self.assertTrue(any("NOT-A-REAL-CODE" in error for error in errors), errors)
+
+    def test_published_snapshots_missing_optional_step_keys_still_render(self):
+        lesson = self.build_lesson()
+        self.publish_lesson(lesson["id"])
+        scenario = SimulationScenario.objects.create(
+            lesson_id=lesson["id"],
+            version=1,
+            title="Legacy snapshot",
+            definition={
+                "steps": [
+                    {
+                        "order": 1,
+                        "code": "legacy",
+                        "title": "Legacy step",
+                        "instruction": "Do it.",
+                        "action_code": "do_it",
+                    }
+                ]
+            },
+            grading_policy=self.policy,
+            status=SimulationScenario.Status.PUBLISHED,
+        )
+        Assignment.objects.create(
+            lesson_id=lesson["id"],
+            scenario=scenario,
+            learner=self.learner,
+            assigned_by=self.instructor,
+        )
+        self.client.force_login(self.learner)
+        response = self.client.get("/api/v1/assignments/")
+        self.assertEqual(response.status_code, 200, response.content)
+
+    def test_authoring_is_scoped_to_the_authors_school(self):
+        foreign_course = Course.objects.create(
+            school=self.other_school, title="Foreign", slug="foreign", trade="Other"
+        )
+        lesson = self.post(
+            self.author,
+            "/api/v1/content/lessons/",
+            {"course": foreign_course.pk, "title": "Planted", "summary": "Not allowed."},
+        )
+        self.assertEqual(lesson.status_code, 403)
+        course = self.post(
+            self.author,
+            "/api/v1/content/courses/",
+            {"school": self.other_school.pk, "title": "Planted", "trade": "Other"},
+        )
+        self.assertEqual(course.status_code, 403)
+        self.client.force_login(self.author)
+        self.assertEqual(
+            self.client.get(f"/api/v1/content/courses/{foreign_course.pk}/").status_code, 404
+        )
+        self.client.force_login(self.learner)
+        self.assertEqual(self.client.get("/api/v1/content/lessons/").status_code, 403)
+
+    def test_only_draft_lessons_can_be_edited_by_their_author(self):
+        lesson = self.build_lesson()
+        url = f"/api/v1/content/lessons/{lesson['id']}/"
+        second_author = User.objects.create_user("second@example.com", password="pw-123")
+        SchoolMembership.objects.create(
+            school=self.school, user=second_author, role=SchoolMembership.Role.CONTENT_AUTHOR
+        )
+        self.assertEqual(self.patch(second_author, url, {"title": "Mine now"}).status_code, 403)
+        self.assertEqual(
+            self.patch(self.author, url, {"title": "Isolate a PV string"}).status_code, 200
+        )
+        self.publish_lesson(lesson["id"])
+        self.assertEqual(self.patch(self.author, url, {"title": "Changed live"}).status_code, 409)
+
+
+class ApprovalWorkflowTests(TestCase):
+    """Separation of duties, immutability and review history for governed content."""
+
+    setUp = ModuleStudioTests.setUp
+    build_lesson = ModuleStudioTests.build_lesson
+    post = ModuleStudioTests.post
+    patch = ModuleStudioTests.patch
+
+    def add_admin(self, email):
+        user = User.objects.create_user(email, password="pw-123")
+        SchoolMembership.objects.create(
+            school=self.school, user=user, role=SchoolMembership.Role.ADMIN
+        )
+        return user
+
+    def lesson_url(self, lesson_id):
+        return f"/api/v1/content/lessons/{lesson_id}/transition/"
+
+    def test_an_administrator_cannot_approve_their_own_lesson(self):
+        self.author = self.admin  # the administrator writes the lesson themselves
+        lesson = self.build_lesson()
+        url = self.lesson_url(lesson["id"])
+        self.assertEqual(self.post(self.admin, url, {"action": "submit"}).status_code, 200)
+        own = self.post(self.admin, url, {"action": "approve"})
+        self.assertEqual(own.status_code, 403)
+        self.assertEqual(own.json()["code"], "self_approval_blocked")
+
+        second_admin = self.add_admin("second-admin@example.com")
+        self.assertEqual(self.post(second_admin, url, {"action": "approve"}).status_code, 200)
+
+    def test_a_one_reviewer_school_can_opt_in_to_self_approval(self):
+        self.school.allow_self_approval = True
+        self.school.save(update_fields=["allow_self_approval"])
+        self.author = self.admin
+        lesson = self.build_lesson()
+        url = self.lesson_url(lesson["id"])
+        self.post(self.admin, url, {"action": "submit"})
+        self.assertEqual(self.post(self.admin, url, {"action": "approve"}).status_code, 200)
+
+    def test_an_author_cannot_approve_their_own_practical(self):
+        self.author = self.admin
+        lesson = self.build_lesson()
+        scenario = self.post(self.admin, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {})
+        transition = f"/api/v1/content/scenarios/{scenario.json()['id']}/transition/"
+        submitted = self.post(self.admin, transition, {"action": "submit"})
+        self.assertEqual(submitted.status_code, 200, submitted.content)
+        self.assertEqual(self.post(self.admin, transition, {"action": "approve"}).status_code, 403)
+        second_admin = self.add_admin("reviewer@example.com")
+        self.assertEqual(
+            self.post(second_admin, transition, {"action": "approve"}).status_code, 200
+        )
+
+    def test_incomplete_content_cannot_be_submitted(self):
+        lesson = self.build_lesson()
+        self.patch(self.author, f"/api/v1/content/lessons/{lesson['id']}/", {"safetyNotes": []})
+        refused = self.post(self.author, self.lesson_url(lesson["id"]), {"action": "submit"})
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("Add at least one safety note.", refused.json()["publication"])
+
+        scenario = self.post(self.author, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {})
+        definition = scenario.json()["definition"]
+        definition["steps"][0]["competency_codes"] = []
+        self.patch(
+            self.author,
+            f"/api/v1/content/scenarios/{scenario.json()['id']}/",
+            {"definition": definition},
+        )
+        not_ready = self.post(
+            self.author,
+            f"/api/v1/content/scenarios/{scenario.json()['id']}/transition/",
+            {"action": "submit"},
+        )
+        self.assertEqual(not_ready.status_code, 400)
+
+    def test_published_lessons_are_frozen_and_revised_as_a_new_version(self):
+        lesson = self.build_lesson()
+        scenario = self.post(self.author, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {})
+        ModuleStudioTests.publish_lesson(self, lesson["id"])
+        record = Lesson.objects.get(pk=lesson["id"])
+        record.safety_notes = ["Quietly changed"]
+        with self.assertRaises(ValidationError):
+            record.save()
+
+        revision = self.post(self.author, f"/api/v1/content/lessons/{lesson['id']}/revise/", {})
+        self.assertEqual(revision.status_code, 201, revision.content)
+        self.assertEqual(revision.json()["status"], "draft")
+        self.assertEqual(revision.json()["contentVersion"], 2)
+        self.assertEqual(revision.json()["scenarios"][0]["status"], "draft")
+        copied = SimulationScenario.objects.get(pk=revision.json()["scenarios"][0]["id"])
+        self.assertEqual(
+            copied.definition["steps"],
+            SimulationScenario.objects.get(pk=scenario.json()["id"]).definition["steps"],
+        )
+        self.assertEqual(
+            self.post(
+                self.author, f"/api/v1/content/lessons/{revision.json()['id']}/revise/", {}
+            ).status_code,
+            409,
+        )
+
+    def test_review_notes_survive_resubmission_in_the_history(self):
+        lesson = self.build_lesson()
+        url = self.lesson_url(lesson["id"])
+        self.post(self.author, url, {"action": "submit"})
+        self.post(
+            self.admin,
+            url,
+            {"action": "return_to_draft", "reviewNotes": "Add the lock-out tag step."},
+        )
+        self.post(self.author, url, {"action": "submit"})
+        self.client.force_login(self.author)
+        history = self.client.get(f"/api/v1/content/lessons/{lesson['id']}/history/").json()
+        self.assertEqual(history[0]["summary"], "Submitted for review")
+        returned = next(item for item in history if item["eventType"].endswith("return_to_draft"))
+        self.assertEqual(returned["reviewNotes"], "Add the lock-out tag step.")
+        self.assertEqual(returned["actorName"], self.admin.get_username())
+
+    def test_retiring_cannot_strand_dependent_content_or_learners(self):
+        lesson = self.build_lesson()
+        scenario_id = self.post(
+            self.author, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {}
+        ).json()["id"]
+        ModuleStudioTests.publish_lesson(self, lesson["id"])
+        transition = f"/api/v1/content/scenarios/{scenario_id}/transition/"
+        self.post(self.author, transition, {"action": "submit"})
+        self.post(self.admin, transition, {"action": "approve"})
+        self.post(self.admin, f"/api/v1/content/scenarios/{scenario_id}/publish/", {})
+
+        blocked = self.post(self.admin, self.lesson_url(lesson["id"]), {"action": "retire"})
+        self.assertEqual(blocked.status_code, 409)
+
+        self.post(
+            self.instructor,
+            "/api/v1/instructor/assignments/",
+            {"scenarioId": scenario_id, "learnerIds": [self.learner.pk], "cohortIds": []},
+        )
+        self.client.force_login(self.learner)
+        assignment_id = self.client.get("/api/v1/assignments/").json()["results"][0]["id"]
+        self.client.post(f"/api/v1/assignments/{assignment_id}/start/")
+        self.assertEqual(self.post(self.admin, transition, {"action": "retire"}).status_code, 200)
+        self.client.force_login(self.learner)
+        self.assertEqual(self.client.get("/api/v1/assignments/").json()["count"], 1)
+
+    def test_instructors_are_offered_only_the_newest_published_version(self):
+        lesson = self.build_lesson()
+        ModuleStudioTests.publish_lesson(self, lesson["id"])
+        for _ in range(2):
+            scenario_id = self.post(
+                self.author, f"/api/v1/content/lessons/{lesson['id']}/scenarios/", {}
+            ).json()["id"]
+            transition = f"/api/v1/content/scenarios/{scenario_id}/transition/"
+            self.post(self.author, transition, {"action": "submit"})
+            self.post(self.admin, transition, {"action": "approve"})
+            self.post(self.admin, f"/api/v1/content/scenarios/{scenario_id}/publish/", {})
+        self.client.force_login(self.instructor)
+        options = self.client.get("/api/v1/instructor/assignments/").json()["scenarios"]
+        self.assertEqual([item["version"] for item in options], [2])
+
+
+@override_settings(ALLOWED_HOSTS=["testserver"], RESEARCH_CONSENT_STATUS="approved")
+class ResearchConsentTests(TestCase):
+    """Research data only covers people who consented, and expires with their consent."""
+
+    setUp = PilotWorkflowTests.setUp
+    create_study = PilotWorkflowTests.create_study
+    freeze_and_start = PilotWorkflowTests.freeze_and_start
+
+    def learner_attempt(self):
+        assignment = Assignment.objects.get(learner=self.learner)
+        self.client.force_login(self.learner)
+        return self.client.post(f"/api/v1/assignments/{assignment.pk}/start/").json()["attempt"]
+
+    def test_learner_consents_before_the_pre_test_is_recorded(self):
+        study = self.create_study()
+        self.freeze_and_start(study)
+        observations_url = f"/api/v1/research/pilots/{study.pk}/observations/"
+        pre_test = {
+            "instrument": "pre_test",
+            "responses": {"score": 40},
+            "learner_id": self.learner.pk,
+        }
+
+        self.client.force_login(self.instructor)
+        participants = self.client.get(f"/api/v1/research/pilots/{study.pk}/participants/").json()
+        self.assertFalse(
+            next(p for p in participants if p["learnerId"] == self.learner.pk)["consented"]
+        )
+        self.assertEqual(
+            self.client.post(
+                observations_url, pre_test, content_type="application/json"
+            ).status_code,
+            409,
+        )
+
+        self.client.force_login(self.learner)
+        consent_url = f"/api/v1/research/pilots/{study.pk}/consent/"
+        self.assertFalse(self.client.get(consent_url).json()["consented"])
+        refused = self.client.post(
+            consent_url, {"consentAccepted": False}, content_type="application/json"
+        )
+        self.assertEqual(refused.status_code, 400)
+        given = self.client.post(
+            consent_url, {"consentAccepted": True}, content_type="application/json"
+        )
+        self.assertEqual(given.status_code, 201, given.content)
+        self.assertTrue(self.client.get(consent_url).json()["consented"])
+
+        self.client.force_login(self.instructor)
+        recorded = self.client.post(observations_url, pre_test, content_type="application/json")
+        self.assertEqual(recorded.status_code, 201, recorded.content)
+        participants = self.client.get(f"/api/v1/research/pilots/{study.pk}/participants/").json()
+        row = next(p for p in participants if p["learnerId"] == self.learner.pk)
+        self.assertTrue(row["consented"])
+        self.assertEqual(row["recordedInstruments"], ["pre_test"])
+
+    def test_instructor_self_reports_require_and_record_their_own_consent(self):
+        study = self.create_study()
+        self.freeze_and_start(study)
+        self.client.force_login(self.instructor)
+        workload = {
+            "instrument": "instructor_workload",
+            "responses": {
+                "preparationMinutes": 30,
+                "supportMinutes": 20,
+                "supportIncidents": 1,
+                "acceptable": True,
+            },
+        }
+        url = f"/api/v1/research/pilots/{study.pk}/observations/"
+        missing = self.client.post(url, workload, content_type="application/json")
+        self.assertEqual(missing.status_code, 400)
+        given = self.client.post(
+            url, {**workload, "consent_accepted": True}, content_type="application/json"
+        )
+        self.assertEqual(given.status_code, 201, given.content)
+
+    def test_research_export_excludes_non_consenting_learners_and_cannot_be_joined(self):
+        attempt = self.learner_attempt()
+        self.client.force_login(self.instructor)
+        rows = list(
+            csv.reader(
+                StringIO(
+                    self.client.get(
+                        "/api/v1/instructor/evidence.csv?scope=research"
+                    ).content.decode()
+                )
+            )
+        )
+        self.assertEqual(rows[0][0], "attempt_code")
+        self.assertEqual(len(rows), 1)
+
+        ResearchConsentReceipt.objects.create(
+            school=self.school,
+            participant_code=research_participant_code(self.school.pk, self.learner.pk),
+            consent_version="opedu-pilot-consent-v1",
+            status=ResearchConsentReceipt.Status.ACTIVE,
+            consented_at=timezone.now(),
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+        rows = list(
+            csv.reader(
+                StringIO(
+                    self.client.get(
+                        "/api/v1/instructor/evidence.csv?scope=research"
+                    ).content.decode()
+                )
+            )
+        )
+        self.assertEqual(len(rows), 2)
+        self.assertNotEqual(rows[1][0], str(attempt["id"]))
+        operational = list(
+            csv.reader(
+                StringIO(self.client.get("/api/v1/instructor/evidence.csv").content.decode())
+            )
+        )
+        self.assertEqual(operational[1][0], str(attempt["id"]))
+        self.assertNotIn(rows[1][0], {row[0] for row in operational})
+
+    def test_retention_purge_also_deletes_pilot_observations(self):
+        study = self.create_study()
+        self.freeze_and_start(study)
+        self.client.force_login(self.learner)
+        self.client.post(
+            f"/api/v1/research/pilots/{study.pk}/consent/",
+            {"consentAccepted": True},
+            content_type="application/json",
+        )
+        self.client.force_login(self.instructor)
+        self.client.post(
+            f"/api/v1/research/pilots/{study.pk}/observations/",
+            {"instrument": "pre_test", "responses": {"score": 55}, "learner_id": self.learner.pk},
+            content_type="application/json",
+        )
+        code = research_participant_code(self.school.pk, self.learner.pk)
+        self.assertTrue(PilotObservation.objects.filter(participant_code=code).exists())
+        ResearchConsentReceipt.objects.filter(participant_code=code).update(
+            consented_at=timezone.now() - timedelta(days=400),
+            expires_at=timezone.now() - timedelta(days=1),
+        )
+        call_command("purge_expired_research", stdout=StringIO())
+        self.assertFalse(PilotObservation.objects.filter(participant_code=code).exists())
+
+    def test_general_survey_accepts_ratings_only(self):
+        self.client.force_login(self.learner)
+        base = {
+            "instrument": "sus",
+            "consent_version": "opedu-pilot-consent-v1",
+            "consent_accepted": True,
+        }
+        with self.settings(RESEARCH_CONSENT_VERSION="opedu-pilot-consent-v1"):
+            transcript = self.client.post(
+                "/api/v1/research/surveys/",
+                {**base, "responses": {"notes": "Jean, 0788 123 456, said it was fine"}},
+                content_type="application/json",
+            )
+            self.assertEqual(transcript.status_code, 400)
+            ratings = self.client.post(
+                "/api/v1/research/surveys/",
+                {**base, "responses": {"item_1": 4, "item_2": 2}},
+                content_type="application/json",
+            )
+            self.assertEqual(ratings.status_code, 201, ratings.content)
+
+    def test_http_options_is_not_shadowed_by_the_options_action(self):
+        study = self.create_study()
+        self.client.force_login(self.admin)
+        response = self.client.options(f"/api/v1/research/pilots/{study.pk}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.get("/api/v1/research/pilots/options/").status_code, 200)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class OperationsTests(TestCase):
+    """Delivery failures degrade gracefully and scheduled jobs run."""
+
+    setUp = LearningApiTests.setUp
+
+    def test_invitation_survives_a_mail_outage_and_tells_the_admin(self):
+        self.client.force_login(self.school_admin)
+        with mock.patch("lab.notifications.send_mail", side_effect=OSError("SMTP down")):
+            with self.assertLogs("opedu.email", level="ERROR"):
+                response = self.client.post(
+                    "/api/v1/school/invitations/",
+                    {"email": "late@example.com", "role": SchoolMembership.Role.LEARNER},
+                    content_type="application/json",
+                )
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertFalse(response.json()["emailSent"])
+        self.assertIn("/join/", response.json()["acceptUrl"])
+        invitation = SchoolInvitation.objects.get(email="late@example.com")
+        audit = AuditEvent.objects.get(event_type="membership.invitation_created")
+        self.assertEqual(audit.target_id, str(invitation.pk))
+        self.assertNotIn("late@example.com", json.dumps(audit.payload))
+
+        delivered = self.client.post(
+            "/api/v1/school/invitations/",
+            {"email": "on-time@example.com", "role": SchoolMembership.Role.LEARNER},
+            content_type="application/json",
+        )
+        self.assertTrue(delivered.json()["emailSent"])
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_password_reset_answers_the_same_whether_or_not_mail_works(self):
+        self.learner.email = "learner@example.com"
+        self.learner.save(update_fields=["email"])
+        client = Client()
+        answers = []
+        with mock.patch("lab.notifications.send_mail", side_effect=OSError("SMTP down")):
+            with self.assertLogs("opedu.email", level="ERROR"):
+                for email in ["learner@example.com", "nobody@example.com"]:
+                    response = client.post(
+                        "/api/v1/auth/password/reset/",
+                        {"email": email},
+                        content_type="application/json",
+                    )
+                    answers.append((response.status_code, response.json()))
+        self.assertEqual(answers[0], answers[1])
+        self.assertEqual(answers[0][0], 200)
+
+    def test_scheduled_jobs_run_and_report(self):
+        output = StringIO()
+        call_command("run_scheduled_jobs", stdout=output)
+        self.assertIn("LRS delivery is disabled", output.getvalue())
+        self.assertIn("consent receipt(s)", output.getvalue())
+
+
+class InstructorWorkflowTests(TestCase):
+    """Sign-off, feedback, assignment changes and the evidence counts instructors rely on."""
+
+    start_attempt = TenantIsolationTests.start_attempt
+    act = TenantIsolationTests.act
+
+    def setUp(self):
+        LearningApiTests.setUp(self)
+        self.learner.email = "learner@example.com"
+        self.learner.save(update_fields=["email"])
+
+    def held_for_review(self):
+        GradingPolicy.objects.filter(pk=self.grading_policy.pk).update(
+            requires_review_on_safety_error=True
+        )
+        attempt_id = self.start_attempt()
+        # A safety-critical mistake first, then the correct procedure.
+        self.assertEqual(self.act(attempt_id, "set_meter_dc").status_code, 200)
+        self.assertEqual(self.act(attempt_id, "confirm_ppe").status_code, 200)
+        self.assertEqual(self.act(attempt_id, "set_meter_dc").status_code, 200)
+        completed = self.client.post(f"/api/v1/attempts/{attempt_id}/complete/")
+        self.assertEqual(completed.json()["attempt"]["status"], "requires_review")
+        return attempt_id
+
+    def sign_off(self, attempt_id, decision, note="Observed the learner restore the safe order."):
+        return self.client.post(
+            f"/api/v1/instructor/attempts/{attempt_id}/review/",
+            {"decision": decision, "note": note},
+            content_type="application/json",
+        )
+
+    def test_instructor_signs_off_an_attempt_held_for_review(self):
+        attempt_id = self.held_for_review()
+
+        self.assertEqual(self.sign_off(attempt_id, "competent").status_code, 403)  # the learner
+
+        self.client.force_login(self.instructor)
+        overview = self.client.get("/api/v1/instructor/overview/").json()
+        self.assertEqual(overview["metrics"]["requiresReview"], 1)
+        self.assertEqual(overview["metrics"]["safetyErrors"], 1)
+        self.assertEqual(overview["attempts"][0]["safety_errors"], 1)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.sign_off(attempt_id, "competent")
+        self.assertEqual(response.status_code, 200, response.content)
+        body = response.json()
+        self.assertEqual(body["status"], "completed")
+        self.assertEqual(body["review_decision"], "competent")
+        # The graded score still decides how a confirmed attempt counts.
+        self.assertEqual(body["outcome"], "passed")
+        self.assertEqual(body["recommendations"][0]["kind"], "complete")
+        self.assertEqual(self.sign_off(attempt_id, "competent").status_code, 409)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(f"/learn/attempts/{attempt_id}", mail.outbox[0].body)
+        self.assertTrue(
+            AuditEvent.objects.filter(event_type="assessment.review_signed_off").exists()
+        )
+        profile = self.client.get(f"/api/v1/instructor/learners/{self.learner.pk}/").json()
+        # Below the 100% threshold, so an accepted result still reads as developing.
+        self.assertEqual(profile["competencies"][0]["masteryState"], "developing")
+
+        self.client.force_login(self.learner)
+        detail = self.client.get(f"/api/v1/attempts/{attempt_id}/").json()
+        self.assertEqual(detail["review_decision"], "competent")
+        self.assertEqual(detail["review_note"], "Observed the learner restore the safe order.")
+        self.assertTrue(detail["reviewed_by_name"])
+
+    def test_sign_off_needs_a_reason_and_stays_in_the_lessons_school(self):
+        attempt_id = self.held_for_review()
+        self.client.force_login(self.instructor)
+        self.assertEqual(self.sign_off(attempt_id, "competent", note="ok").status_code, 400)
+        self.assertEqual(self.sign_off(attempt_id, "excellent").status_code, 400)
+
+        outsider = User.objects.create_user("outsider@example.com", password="pw-123")
+        other = School.objects.create(name="Other", code="other-school")
+        SchoolMembership.objects.create(
+            school=other, user=outsider, role=SchoolMembership.Role.INSTRUCTOR
+        )
+        self.client.force_login(outsider)
+        self.assertEqual(self.sign_off(attempt_id, "not_yet_competent").status_code, 404)
+
+        self.client.force_login(self.instructor)
+        response = self.sign_off(attempt_id, "not_yet_competent")
+        self.assertEqual(response.json()["outcome"], "failed")
+        self.assertEqual(response.json()["recommendations"][0]["kind"], "remediate")
+
+    def test_feedback_can_be_drafted_published_and_withdrawn_without_leaking_notes(self):
+        attempt_id = self.start_attempt()
+        self.client.force_login(self.instructor)
+        url = f"/api/v1/instructor/attempts/{attempt_id}/"
+        created = self.client.post(
+            url,
+            {"observation": "Hesitated at the meter.", "feedback": "Good safety order."},
+            content_type="application/json",
+        )
+        self.assertEqual(created.status_code, 201)
+        feedback_id = created.json()["id"]
+        self.assertFalse(created.json()["is_published"])
+        too_long = self.client.post(url, {"feedback": "x" * 5001}, content_type="application/json")
+        self.assertEqual(too_long.status_code, 400)
+
+        detail_url = f"/api/v1/instructor/attempts/{attempt_id}/feedback/{feedback_id}/"
+        self.client.force_login(User.objects.create_user("peer@example.com", password="pw-123"))
+        SchoolMembership.objects.create(
+            school=self.school,
+            user=User.objects.get(username="peer@example.com"),
+            role=SchoolMembership.Role.INSTRUCTOR,
+        )
+        peer = self.client.patch(
+            detail_url, {"is_published": True}, content_type="application/json"
+        )
+        self.assertEqual(peer.status_code, 403)
+
+        self.client.force_login(self.instructor)
+        with self.captureOnCommitCallbacks(execute=True):
+            published = self.client.patch(
+                detail_url, {"is_published": True}, content_type="application/json"
+            )
+        self.assertEqual(published.status_code, 200)
+        self.assertTrue(published.json()["published_at"])
+        self.assertEqual(len(mail.outbox), 1)
+
+        self.client.force_login(self.learner)
+        learner_feedback = self.client.get(f"/api/v1/attempts/{attempt_id}/").json()["feedback"]
+        self.assertEqual(learner_feedback[0]["feedback"], "Good safety order.")
+        self.assertNotIn("observation", learner_feedback[0])
+
+        self.client.force_login(self.school_admin)
+        withdrawn = self.client.patch(
+            detail_url, {"is_published": False}, content_type="application/json"
+        )
+        self.assertEqual(withdrawn.status_code, 200)
+        self.client.force_login(self.learner)
+        self.assertEqual(self.client.get(f"/api/v1/attempts/{attempt_id}/").json()["feedback"], [])
+
+    def test_instructor_extends_a_deadline_and_allows_another_attempt(self):
+        Assignment.objects.filter(pk=self.assignment.pk).update(attempt_limit=1)
+        attempt_id = self.start_attempt()
+        self.client.post(f"/api/v1/attempts/{attempt_id}/abandon/")
+        self.assertEqual(
+            self.client.post(f"/api/v1/assignments/{self.assignment.pk}/start/").status_code, 409
+        )
+
+        url = f"/api/v1/instructor/assignments/{self.assignment.pk}/"
+        self.client.force_login(self.instructor)
+        past = (timezone.now() - timedelta(days=1)).isoformat()
+        self.assertEqual(
+            self.client.patch(url, {"dueAt": past}, content_type="application/json").status_code,
+            400,
+        )
+        too_low = self.client.patch(url, {"attemptLimit": 1}, content_type="application/json")
+        self.assertEqual(too_low.status_code, 200)  # unchanged and still valid
+        future = (timezone.now() + timedelta(days=7)).isoformat()
+        response = self.client.patch(
+            url, {"attemptLimit": 2, "dueAt": future}, content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["attemptLimit"], 2)
+        self.assertEqual(response.json()["attemptsUsed"], 1)
+        self.assertTrue(AuditEvent.objects.filter(event_type="assignment.updated").exists())
+
+        self.client.force_login(self.learner)
+        self.assertEqual(
+            self.client.post(f"/api/v1/assignments/{self.assignment.pk}/start/").status_code, 201
+        )
+        self.client.force_login(self.instructor)
+        below_used = self.client.patch(url, {"attemptLimit": 1}, content_type="application/json")
+        self.assertEqual(below_used.status_code, 400)
+
+    def test_cohort_assignment_skips_suspended_learners(self):
+        program = Program.objects.create(school=self.school, code="auto", name="Automotive")
+        cohort = Cohort.objects.create(
+            school=self.school, program=program, name="Auto 2026", code="auto-2026"
+        )
+        Enrollment.objects.create(cohort=cohort, learner=self.learner)
+        suspended = User.objects.create_user("suspended@example.com", password="pw-123")
+        membership = SchoolMembership.objects.create(
+            school=self.school, user=suspended, role=SchoolMembership.Role.LEARNER
+        )
+        Enrollment.objects.create(cohort=cohort, learner=suspended)
+        SchoolMembership.objects.filter(pk=membership.pk).update(is_active=False)
+        self.client.force_login(self.instructor)
+        response = self.client.post(
+            "/api/v1/instructor/assignments/",
+            {"scenarioId": self.scenario.pk, "cohortIds": [cohort.pk]},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["skipped"], 1)
+        self.assertEqual(response.json()["existing"], 1)
+        self.assertFalse(Assignment.objects.filter(learner=suspended).exists())
+
+    def test_evidence_counts_cover_tolerance_and_hints(self):
+        attempt_id = self.start_attempt()
+        self.client.post(
+            f"/api/v1/attempts/{attempt_id}/hints/", {}, content_type="application/json"
+        )
+        attempt = Attempt.objects.get(pk=attempt_id)
+        AttemptEvent.objects.create(
+            attempt=attempt,
+            sequence=attempt.events.count() + 1,
+            event_type="tolerance_failed",
+            payload={"stepCode": "ppe", "safetyCritical": True},
+        )
+        self.client.force_login(self.instructor)
+        overview = self.client.get("/api/v1/instructor/overview/").json()
+        self.assertEqual(overview["metrics"]["safetyErrors"], 1)
+        self.assertEqual(overview["attempts"][0]["incorrect_actions"], 1)
+        rows = list(
+            csv.DictReader(
+                StringIO(self.client.get("/api/v1/instructor/evidence.csv").content.decode())
+            )
+        )
+        self.assertEqual(rows[0]["hints"], "1")
+        self.assertEqual(rows[0]["safety_errors"], "1")
+        roster = self.client.get("/api/v1/instructor/learners/").json()["learners"]
+        learner = next(item for item in roster if item["id"] == self.learner.pk)
+        self.assertEqual(learner["safetyErrors"], 1)
+        self.assertEqual(learner["completedAssignments"], 0)
+
+    def test_csv_cells_cannot_run_as_spreadsheet_formulas(self):
+        self.learner.first_name = "=HYPERLINK(1)"
+        self.learner.save()
+        self.start_attempt()
+        self.client.force_login(self.instructor)
+        rows = list(
+            csv.DictReader(
+                StringIO(self.client.get("/api/v1/instructor/evidence.csv").content.decode())
+            )
+        )
+        self.assertTrue(rows[0]["learner"].startswith("'="))
+
+    def test_recommendation_override_survives_the_learner_reopening_the_result(self):
+        attempt_id = self.start_attempt()
+        self.act(attempt_id, "confirm_ppe")
+        self.act(attempt_id, "set_meter_dc")
+        self.client.post(f"/api/v1/attempts/{attempt_id}/complete/")
+        self.client.force_login(self.instructor)
+        override = self.client.patch(
+            f"/api/v1/instructor/attempts/{attempt_id}/",
+            {"kind": "retry", "reason": "Repeat it once without the hint panel."},
+            content_type="application/json",
+        )
+        self.assertEqual(override.status_code, 200, override.content)
+        self.client.force_login(self.learner)
+        recommendation = self.client.get(f"/api/v1/attempts/{attempt_id}/recommendation/").json()
+        self.assertEqual(recommendation["override_kind"], "retry")
+        self.assertEqual(Attempt.objects.get(pk=attempt_id).recommendations.count(), 1)
+
+    def test_overview_query_count_does_not_grow_with_attempts(self):
+        from django.db import connection as db_connection
+        from django.test.utils import CaptureQueriesContext
+
+        self.start_attempt()
+        self.client.force_login(self.instructor)
+        with CaptureQueriesContext(db_connection) as small:
+            self.client.get("/api/v1/instructor/overview/")
+        for index in range(5):
+            learner = User.objects.create_user(f"extra{index}@example.com", password="pw-123")
+            SchoolMembership.objects.create(
+                school=self.school, user=learner, role=SchoolMembership.Role.LEARNER
+            )
+            assignment = Assignment.objects.create(
+                lesson=self.lesson,
+                scenario=self.scenario,
+                learner=learner,
+                assigned_by=self.instructor,
+            )
+            Attempt.objects.create(
+                assignment=assignment,
+                learner=learner,
+                scenario=self.scenario,
+                grading_policy=self.grading_policy,
+            )
+        with CaptureQueriesContext(db_connection) as large:
+            overview = self.client.get("/api/v1/instructor/overview/").json()
+        self.assertEqual(overview["metrics"]["attempts"], 6)
+        self.assertEqual(len(large.captured_queries), len(small.captured_queries))
+
+
+class SchoolAdministrationTests(TestCase):
+    """Roles, invitations for existing accounts, cohorts and the audit trail."""
+
+    def setUp(self):
+        cache.clear()
+        self.school = School.objects.create(name="Rubavu Admin School", code="rubavu-admin")
+        self.admin = User.objects.create_user("admin@school.test", "admin@school.test", "pw-123")
+        self.colleague = User.objects.create_user("staff@school.test", "staff@school.test", "pw-1")
+        self.learner = User.objects.create_user("learner@school.test", "learner@school.test", "pw")
+        self.admin_membership = SchoolMembership.objects.create(
+            school=self.school, user=self.admin, role=SchoolMembership.Role.ADMIN
+        )
+        self.colleague_membership = SchoolMembership.objects.create(
+            school=self.school, user=self.colleague, role=SchoolMembership.Role.INSTRUCTOR
+        )
+        self.learner_membership = SchoolMembership.objects.create(
+            school=self.school, user=self.learner, role=SchoolMembership.Role.LEARNER
+        )
+        self.client.force_login(self.admin)
+
+    def patch_member(self, membership, body):
+        return self.client.patch(
+            f"/api/v1/school/members/{membership.pk}/", body, content_type="application/json"
+        )
+
+    def test_administrator_changes_a_role_with_safeguards(self):
+        promoted = self.patch_member(self.colleague_membership, {"role": "admin"})
+        self.assertEqual(promoted.status_code, 200, promoted.content)
+        self.assertEqual(promoted.json()["role"], "admin")
+        self.assertTrue(AuditEvent.objects.filter(event_type="membership.role_changed").exists())
+
+        self.assertEqual(
+            self.patch_member(self.admin_membership, {"role": "learner"}).status_code, 409
+        )
+        self.assertEqual(self.patch_member(self.colleague_membership, {}).status_code, 400)
+
+        program = Program.objects.create(school=self.school, code="auto", name="Auto")
+        cohort = Cohort.objects.create(school=self.school, program=program, code="c", name="C")
+        Enrollment.objects.create(cohort=cohort, learner=self.learner)
+        changed = self.patch_member(self.learner_membership, {"role": "instructor"})
+        self.assertEqual(changed.status_code, 200)
+        self.assertTrue(InstructorProfile.objects.filter(user=self.learner).exists())
+        self.assertEqual(Enrollment.objects.get().status, Enrollment.Status.WITHDRAWN)
+
+        # The last active administrator cannot be demoted by a colleague either.
+        self.patch_member(self.colleague_membership, {"role": "instructor"})
+        self.client.force_login(self.colleague)
+        self.assertEqual(self.client.get("/api/v1/school/members/").status_code, 403)
+
+    def test_someone_with_an_account_joins_another_school_by_signing_in(self):
+        other = School.objects.create(name="Gisenyi School", code="gisenyi-admin")
+        SchoolMembership.objects.create(
+            school=other, user=self.admin, role=SchoolMembership.Role.ADMIN
+        )
+        created = self.client.post(
+            "/api/v1/school/invitations/",
+            {"schoolId": other.pk, "email": "learner@school.test", "role": "learner"},
+            content_type="application/json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        token = created.json()["acceptUrl"].rsplit("/", 1)[-1]
+        url = f"/api/v1/school/invitations/accept/{token}/"
+
+        self.client.logout()
+        self.assertTrue(self.client.get(url).json()["accountExists"])
+        anonymous = self.client.post(url, {}, content_type="application/json")
+        self.assertEqual(anonymous.json()["code"], "account_exists")
+
+        self.client.force_login(self.colleague)
+        wrong = self.client.post(url, {}, content_type="application/json")
+        self.assertEqual(wrong.json()["code"], "invitation_email_mismatch")
+
+        self.client.force_login(self.learner)
+        accepted = self.client.post(url, {}, content_type="application/json")
+        self.assertEqual(accepted.status_code, 200, accepted.content)
+        self.assertTrue(
+            SchoolMembership.objects.filter(
+                school=other, user=self.learner, is_active=True
+            ).exists()
+        )
+        self.assertEqual(
+            self.client.get("/api/v1/auth/me/").json()["user"]["email"], "learner@school.test"
+        )
+
+    def test_new_people_still_need_a_name_and_password(self):
+        created = self.client.post(
+            "/api/v1/school/invitations/",
+            {"email": "new@school.test", "role": "instructor"},
+            content_type="application/json",
+        )
+        token = created.json()["acceptUrl"].rsplit("/", 1)[-1]
+        self.client.logout()
+        url = f"/api/v1/school/invitations/accept/{token}/"
+        self.assertFalse(self.client.get(url).json()["accountExists"])
+        missing = self.client.post(url, {"firstName": "Ada"}, content_type="application/json")
+        self.assertEqual(missing.status_code, 400)
+        self.assertIn("password", missing.json())
+
+    def test_audit_filters_reject_bad_input_and_page_backwards(self):
+        for index in range(5):
+            AuditEvent.objects.create(
+                event_type="test.event", actor=self.admin, school=self.school, payload={"i": index}
+            )
+        self.assertEqual(self.client.get("/api/v1/school/audit/?actor=abc").status_code, 400)
+        self.assertEqual(self.client.get("/api/v1/school/audit/?limit=-1").status_code, 400)
+        first = self.client.get("/api/v1/school/audit/?limit=3").json()
+        self.assertEqual(len(first["events"]), 3)
+        self.assertIsNotNone(first["nextBefore"])
+        second = self.client.get(
+            f"/api/v1/school/audit/?limit=3&before={first['nextBefore']}"
+        ).json()
+        self.assertEqual(len(second["events"]), 2)
+        self.assertIsNone(second["nextBefore"])
+        self.assertFalse(
+            {event["id"] for event in first["events"]} & {event["id"] for event in second["events"]}
+        )
+
+    def test_administrator_creates_a_cohort_and_sets_its_learners(self):
+        created = self.client.post(
+            "/api/v1/school/cohorts/",
+            {"name": "Auto Year 1", "programName": "Automobile Technology", "academicYear": "2026"},
+            content_type="application/json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        cohort_id = created.json()["id"]
+        self.assertEqual(created.json()["programName"], "Automobile Technology")
+        url = f"/api/v1/school/cohorts/{cohort_id}/"
+        not_learner = self.client.patch(
+            url, {"learnerIds": [self.colleague.pk]}, content_type="application/json"
+        )
+        self.assertEqual(not_learner.status_code, 400)
+        joined = self.client.patch(
+            url, {"learnerIds": [self.learner.pk]}, content_type="application/json"
+        )
+        self.assertEqual([item["id"] for item in joined.json()["learners"]], [self.learner.pk])
+        emptied = self.client.patch(url, {"learnerIds": []}, content_type="application/json")
+        self.assertEqual(emptied.json()["learners"], [])
+        self.assertEqual(Enrollment.objects.get().status, Enrollment.Status.WITHDRAWN)
+        listed = self.client.get("/api/v1/school/cohorts/").json()
+        self.assertEqual(listed["cohorts"][0]["name"], "Auto Year 1")
+        self.assertEqual([item["id"] for item in listed["learners"]], [self.learner.pk])
+
+        outsider = User.objects.create_user("outsider-admin@x.test", password="pw")
+        elsewhere = School.objects.create(name="Elsewhere", code="elsewhere")
+        SchoolMembership.objects.create(school=elsewhere, user=outsider, role="admin")
+        self.client.force_login(outsider)
+        self.assertEqual(
+            self.client.patch(url, {"name": "Taken"}, content_type="application/json").status_code,
+            404,
+        )
+
+
+class SignInProtectionTests(TestCase):
+    """Brute-force limits keyed by the real client address and by account."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user("person@x.test", "person@x.test", "right-password-1")
+        school = School.objects.create(name="Throttle School", code="throttle")
+        SchoolMembership.objects.create(school=school, user=self.user, role="learner")
+
+    def sign_in(self, password, address="10.0.0.1", email="person@x.test", **headers):
+        return self.client.post(
+            "/api/v1/auth/login/",
+            {"email": email, "password": password},
+            content_type="application/json",
+            REMOTE_ADDR=address,
+            **headers,
+        )
+
+    @override_settings(LOGIN_FAILURE_LIMIT=100, LOGIN_ACCOUNT_FAILURE_LIMIT=3)
+    def test_one_account_is_locked_after_failures_from_many_addresses(self):
+        for index in range(3):
+            self.assertEqual(self.sign_in("wrong", address=f"10.0.0.{index}").status_code, 401)
+        locked = self.sign_in("right-password-1", address="10.9.9.9")
+        self.assertEqual(locked.status_code, 429)
+        self.assertEqual(locked["Retry-After"], "300")
+
+    @override_settings(LOGIN_IP_FAILURE_LIMIT=3)
+    def test_one_address_trying_many_accounts_is_slowed_down(self):
+        for index in range(3):
+            self.sign_in("wrong", email=f"guess{index}@x.test")
+        self.assertEqual(self.sign_in("right-password-1").status_code, 429)
+        self.assertEqual(self.sign_in("right-password-1", address="10.0.0.2").status_code, 200)
+
+    @override_settings(OPEDU_TRUSTED_PROXY_COUNT=1, LOGIN_FAILURE_LIMIT=2)
+    def test_clients_behind_the_proxy_are_told_apart(self):
+        proxy = "172.18.0.5"
+        for _ in range(2):
+            self.sign_in("wrong", address=proxy, HTTP_X_FORWARDED_FOR="spoofed, 41.1.1.1")
+        self.assertEqual(
+            self.sign_in("wrong", address=proxy, HTTP_X_FORWARDED_FOR="41.1.1.1").status_code, 429
+        )
+        # Another learner on a different connection, through the same proxy, can still sign in.
+        allowed = self.sign_in("right-password-1", address=proxy, HTTP_X_FORWARDED_FOR="41.2.2.2")
+        self.assertEqual(allowed.status_code, 200)
+
+    @override_settings(PASSWORD_RESET_EMAIL_LIMIT=2, PASSWORD_RESET_IP_LIMIT=4)
+    def test_password_reset_cannot_flood_an_inbox(self):
+        for _ in range(3):
+            response = self.client.post(
+                "/api/v1/auth/password/reset/",
+                {"email": "person@x.test"},
+                content_type="application/json",
+            )
+            self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 2)
+        self.client.post(
+            "/api/v1/auth/password/reset/", {"email": "a@x.test"}, content_type="application/json"
+        )
+        blocked = self.client.post(
+            "/api/v1/auth/password/reset/", {"email": "b@x.test"}, content_type="application/json"
+        )
+        self.assertEqual(blocked.status_code, 429)
+
+    @override_settings(LOGIN_FAILURE_LIMIT=2)
+    def test_password_change_limits_guesses_of_the_current_password(self):
+        self.client.force_login(self.user)
+        for _ in range(2):
+            wrong = self.client.post(
+                "/api/v1/auth/password/change/",
+                {"currentPassword": "guess", "newPassword": "another-strong-pass-9"},
+                content_type="application/json",
+            )
+            self.assertEqual(wrong.status_code, 400)
+        locked = self.client.post(
+            "/api/v1/auth/password/change/",
+            {"currentPassword": "right-password-1", "newPassword": "another-strong-pass-9"},
+            content_type="application/json",
+        )
+        self.assertEqual(locked.status_code, 429)
+
+    @override_settings(LOGIN_IP_FAILURE_LIMIT=2)
+    def test_django_admin_sign_in_is_limited(self):
+        for _ in range(2):
+            self.client.post("/admin/login/", {"username": "x", "password": "y"})
+        self.assertEqual(
+            self.client.post("/admin/login/", {"username": "x", "password": "y"}).status_code, 429
+        )

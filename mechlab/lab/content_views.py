@@ -5,8 +5,9 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.utils import timezone
+from django.utils.text import slugify
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -19,13 +20,31 @@ from .audit import record_audit_event
 from .content_serializers import (
     AssetPackageAuthoringSerializer,
     AssetUploadSerializer,
+    AuthoringCourseSerializer,
+    AuthoringLessonSerializer,
+    CompetencyOptionSerializer,
+    ContentHistoryEntrySerializer,
+    GradingPolicyOptionSerializer,
     LessonTransitionSerializer,
     LessonWorkflowSerializer,
+    ModuleOptionSerializer,
     ScenarioAuthoringSerializer,
     ScenarioTransitionSerializer,
 )
-from .models import AssetFile, AssetPackage, Lesson, School, SchoolMembership, SimulationScenario
+from .models import (
+    AssetFile,
+    AssetPackage,
+    AuditEvent,
+    Competency,
+    Course,
+    GradingPolicy,
+    Lesson,
+    School,
+    SchoolMembership,
+    SimulationScenario,
+)
 from .permissions import IsContentAuthorOrSchoolAdmin, has_active_school_role
+from .scenario_snapshots import starter_definition
 from .scenario_validation import validate_scenario_for_publication
 
 
@@ -40,6 +59,54 @@ def _content_school_ids(user):
             role__in=[SchoolMembership.Role.ADMIN, SchoolMembership.Role.CONTENT_AUTHOR],
         ).values_list("school_id", flat=True)
     )
+
+
+def _may_edit_draft(user, author_id, school):
+    """Drafts belong to their author; school administrators may step in."""
+
+    return (
+        author_id in {None, user.pk}
+        or user.is_superuser
+        or has_active_school_role(user, [SchoolMembership.Role.ADMIN], school=school)
+    )
+
+
+def _not_your_draft():
+    return Response(
+        {"detail": "Only this draft's author or a school administrator may change it."},
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def _approving_own_work(user, author_id, school):
+    """Separation of duties: safety-critical content needs a second person to approve it."""
+
+    return author_id == user.pk and not (school is not None and school.allow_self_approval)
+
+
+def _own_work_response(noun):
+    return Response(
+        {
+            "detail": f"You wrote this {noun}, so another reviewer must approve it.",
+            "code": "self_approval_blocked",
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def lesson_submission_errors(lesson):
+    """What a lesson needs before anyone is asked to review it."""
+
+    errors = []
+    if not lesson.summary.strip():
+        errors.append("Write a summary for learners.")
+    if not lesson.objectives:
+        errors.append("Add at least one learning objective.")
+    if not lesson.safety_notes:
+        errors.append("Add at least one safety note.")
+    if not lesson.competencies.exists():
+        errors.append("Map the lesson to at least one course competency.")
+    return errors
 
 
 class LessonTransitionView(APIView):
@@ -88,6 +155,9 @@ class LessonTransitionView(APIView):
             if action == LessonTransitionSerializer.Action.SUBMIT:
                 if lesson.status != Lesson.Status.DRAFT:
                     return self._conflict("Only a draft lesson can be submitted for review.")
+                errors = lesson_submission_errors(lesson)
+                if errors:
+                    return Response({"publication": errors}, status=status.HTTP_400_BAD_REQUEST)
                 lesson.status = Lesson.Status.REVIEW
                 lesson.authored_by = lesson.authored_by or request.user
                 lesson.submitted_at = now
@@ -99,6 +169,8 @@ class LessonTransitionView(APIView):
                     return self._forbidden_reviewer()
                 if lesson.status != Lesson.Status.REVIEW:
                     return self._conflict("Only a lesson in review can be approved.")
+                if _approving_own_work(request.user, lesson.authored_by_id, school):
+                    return _own_work_response("lesson")
                 lesson.status = Lesson.Status.APPROVED
                 lesson.reviewed_by = request.user
                 lesson.reviewed_at = now
@@ -133,6 +205,11 @@ class LessonTransitionView(APIView):
                     return self._forbidden_reviewer()
                 if lesson.status != Lesson.Status.PUBLISHED:
                     return self._conflict("Only a published lesson can be retired.")
+                if lesson.scenarios.filter(status=SimulationScenario.Status.PUBLISHED).exists():
+                    return self._conflict(
+                        "Retire this lesson's published practical versions first, so no "
+                        "learner is left with a practical for a retired lesson."
+                    )
                 lesson.status = Lesson.Status.RETIRED
 
             lesson.save()
@@ -145,6 +222,7 @@ class LessonTransitionView(APIView):
                     "fromStatus": previous_status,
                     "toStatus": lesson.status,
                     "contentVersion": lesson.content_version,
+                    "reviewNotes": review_notes,
                 },
             )
         return Response(LessonWorkflowSerializer(lesson).data)
@@ -172,7 +250,9 @@ class ScenarioAuthoringViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return SimulationScenario.objects.filter(
             lesson__course__school_id__in=_content_school_ids(self.request.user)
-        ).select_related("lesson", "lesson__course", "grading_policy", "asset_package")
+        ).select_related(
+            "lesson", "lesson__course", "grading_policy", "asset_package", "authored_by"
+        )
 
     def perform_create(self, serializer):
         lesson = serializer.validated_data["lesson"]
@@ -191,19 +271,44 @@ class ScenarioAuthoringViewSet(viewsets.ModelViewSet):
         )
 
     def update(self, request, *args, **kwargs):
-        if self.get_object().status != SimulationScenario.Status.DRAFT:
+        scenario = self.get_object()
+        if scenario.status != SimulationScenario.Status.DRAFT:
             return Response(
                 {"detail": "Published or retired scenario versions are immutable; clone a draft."},
                 status=status.HTTP_409_CONFLICT,
             )
-        return super().update(request, *args, **kwargs)
+        if not _may_edit_draft(
+            request.user, scenario.authored_by_id, scenario.lesson.course.school
+        ):
+            return _not_your_draft()
+        response = super().update(request, *args, **kwargs)
+        record_audit_event(
+            event_type="content.scenario_updated",
+            actor=request.user,
+            school=scenario.lesson.course.school,
+            target=scenario,
+            payload={"version": scenario.version, "fields": sorted(request.data.keys())},
+        )
+        return response
 
     def destroy(self, request, *args, **kwargs):
-        if self.get_object().status != SimulationScenario.Status.DRAFT:
+        scenario = self.get_object()
+        if scenario.status != SimulationScenario.Status.DRAFT:
             return Response(
                 {"detail": "Published or retired scenario versions cannot be deleted."},
                 status=status.HTTP_409_CONFLICT,
             )
+        if not _may_edit_draft(
+            request.user, scenario.authored_by_id, scenario.lesson.course.school
+        ):
+            return _not_your_draft()
+        record_audit_event(
+            event_type="content.scenario_deleted",
+            actor=request.user,
+            school=scenario.lesson.course.school,
+            target=scenario.lesson,
+            payload={"scenarioId": scenario.pk, "version": scenario.version},
+        )
         return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=["post"])
@@ -277,6 +382,10 @@ class ScenarioAuthoringViewSet(viewsets.ModelViewSet):
                         },
                         status=status.HTTP_403_FORBIDDEN,
                     )
+                try:
+                    validate_scenario_for_publication(scenario, for_publish=False)
+                except DjangoValidationError as error:
+                    return Response(error.message_dict, status=status.HTTP_400_BAD_REQUEST)
                 scenario.status = SimulationScenario.Status.REVIEW
                 scenario.authored_by = scenario.authored_by or request.user
                 scenario.submitted_at = now
@@ -288,8 +397,10 @@ class ScenarioAuthoringViewSet(viewsets.ModelViewSet):
                     return self._forbidden_reviewer()
                 if scenario.status != SimulationScenario.Status.REVIEW:
                     return self._conflict("Only a scenario in review can be approved.")
+                if _approving_own_work(request.user, scenario.authored_by_id, school):
+                    return _own_work_response("practical")
                 try:
-                    validate_scenario_for_publication(scenario)
+                    validate_scenario_for_publication(scenario, for_publish=False)
                 except DjangoValidationError as error:
                     return Response(error.message_dict, status=status.HTTP_400_BAD_REQUEST)
                 scenario.status = SimulationScenario.Status.APPROVED
@@ -330,6 +441,7 @@ class ScenarioAuthoringViewSet(viewsets.ModelViewSet):
                     "fromStatus": previous_status,
                     "toStatus": scenario.status,
                     "version": scenario.version,
+                    "reviewNotes": review_notes,
                 },
             )
         return Response(ScenarioAuthoringSerializer(scenario).data)
@@ -403,14 +515,30 @@ class AssetPackageAuthoringViewSet(viewsets.ModelViewSet):
         )
 
     def update(self, request, *args, **kwargs):
-        if self.get_object().status != AssetPackage.Status.DRAFT:
+        package = self.get_object()
+        if package.status != AssetPackage.Status.DRAFT:
             return self._conflict("Published asset packages are immutable.")
-        return super().update(request, *args, **kwargs)
+        response = super().update(request, *args, **kwargs)
+        record_audit_event(
+            event_type="content.asset_package_updated",
+            actor=request.user,
+            school=package.course.school,
+            target=package,
+            payload={"version": package.version, "fields": sorted(request.data.keys())},
+        )
+        return response
 
     def destroy(self, request, *args, **kwargs):
         package = self.get_object()
         if package.status != AssetPackage.Status.DRAFT:
             return self._conflict("Published asset packages cannot be deleted.")
+        record_audit_event(
+            event_type="content.asset_package_deleted",
+            actor=request.user,
+            school=package.course.school,
+            target=package.course,
+            payload={"packageId": package.pk, "code": package.code, "version": package.version},
+        )
         for asset in package.files.all():
             if not asset.path.startswith(("/", "http://", "https://")):
                 default_storage.delete(asset.path)
@@ -495,10 +623,18 @@ class AssetPackageAuthoringViewSet(viewsets.ModelViewSet):
         if asset is None:
             return Response({"detail": "Asset file not found."}, status=status.HTTP_404_NOT_FOUND)
         path = asset.path
+        sha256 = asset.sha256
         asset.delete()
         if not path.startswith(("/", "http://", "https://")):
             default_storage.delete(path)
         self._refresh_digest(package)
+        record_audit_event(
+            event_type="content.asset_removed",
+            actor=request.user,
+            school=package.course.school,
+            target=package,
+            payload={"path": path, "sha256": sha256},
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"])
@@ -529,8 +665,21 @@ class AssetPackageAuthoringViewSet(viewsets.ModelViewSet):
             return self._forbidden_reviewer()
         if package.status != AssetPackage.Status.PUBLISHED:
             return self._conflict("Only a published asset package can be retired.")
+        in_use = package.scenarios.filter(status=SimulationScenario.Status.PUBLISHED).count()
+        if in_use:
+            return self._conflict(
+                f"{in_use} published practical version(s) still use this package. "
+                "Retire or replace them first."
+            )
         package.status = AssetPackage.Status.RETIRED
         package.save()
+        record_audit_event(
+            event_type="content.asset_package_retired",
+            actor=request.user,
+            school=package.course.school,
+            target=package,
+            payload={"version": package.version},
+        )
         return Response(AssetPackageAuthoringSerializer(package).data)
 
     @staticmethod
@@ -562,3 +711,341 @@ class AssetPackageAuthoringViewSet(viewsets.ModelViewSet):
             {"detail": "A school administrator must approve this asset transition."},
             status=status.HTTP_403_FORBIDDEN,
         )
+
+
+def _unique_slug(queryset, text, *, field="slug", max_length=60):
+    base = slugify(text)[: max_length - 4] or "item"
+    candidate = base
+    suffix = 2
+    while queryset.filter(**{field: candidate}).exists():
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+    return candidate
+
+
+HISTORY_SUMMARIES = {
+    "content.lesson_created": "Lesson created",
+    "content.lesson_updated": "Lesson edited",
+    "content.lesson_revised": "Started as a revision",
+    "content.lesson_submit": "Submitted for review",
+    "content.lesson_approve": "Approved",
+    "content.lesson_publish": "Published",
+    "content.lesson_return_to_draft": "Returned to the author",
+    "content.lesson_retire": "Retired",
+    "content.scenario_created": "Practical created",
+    "content.scenario_updated": "Practical edited",
+    "content.scenario_cloned": "New practical version started",
+    "content.scenario_submit": "Submitted for review",
+    "content.scenario_approve": "Approved",
+    "content.scenario_published": "Published",
+    "content.scenario_return_to_draft": "Returned to the author",
+    "content.scenario_retire": "Retired",
+}
+
+
+class GradingPolicyOptionsView(APIView):
+    """Published grading policies an author may attach to a practical scenario."""
+
+    permission_classes = [IsContentAuthorOrSchoolAdmin]
+
+    @extend_schema(responses=GradingPolicyOptionSerializer(many=True))
+    def get(self, request):
+        policies = GradingPolicy.objects.filter(status=GradingPolicy.Status.PUBLISHED)
+        return Response(GradingPolicyOptionSerializer(policies, many=True).data)
+
+
+class AuthoringCourseViewSet(viewsets.ModelViewSet):
+    """Courses, with their modules and competencies, that an author can build lessons in."""
+
+    queryset = Course.objects.none()
+    serializer_class = AuthoringCourseSerializer
+    permission_classes = [IsContentAuthorOrSchoolAdmin]
+    http_method_names = ["get", "post", "patch", "head", "options"]
+    pagination_class = None
+    ordering = ["title"]
+
+    def get_queryset(self):
+        return (
+            Course.objects.filter(school_id__in=_content_school_ids(self.request.user))
+            .select_related("school")
+            .prefetch_related("modules", "competencies", "lessons")
+        )
+
+    def perform_create(self, serializer):
+        school_ids = _content_school_ids(self.request.user)
+        school = serializer.validated_data.get("school")
+        if school is None and len(school_ids) == 1:
+            school = School.objects.get(pk=school_ids[0])
+        if school is None or school.pk not in school_ids:
+            raise PermissionDenied("Choose one of your schools for this course.")
+        title = serializer.validated_data["title"]
+        course = serializer.save(
+            school=school,
+            slug=_unique_slug(Course.objects.all(), f"{school.code}-{title}", max_length=180),
+        )
+        record_audit_event(
+            event_type="content.course_created",
+            actor=self.request.user,
+            school=school,
+            target=course,
+            payload={"title": course.title},
+        )
+
+    def perform_update(self, serializer):
+        if "school" in serializer.validated_data and (
+            serializer.validated_data["school"] != serializer.instance.school
+        ):
+            raise PermissionDenied("A course cannot move to another school.")
+        serializer.save()
+
+    @extend_schema(request=CompetencyOptionSerializer, responses=CompetencyOptionSerializer)
+    @action(detail=True, methods=["post"])
+    def competencies(self, request, pk=None):
+        course = self.get_object()
+        serializer = CompetencyOptionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        code = serializer.validated_data["code"].strip().upper()
+        if Competency.objects.filter(course=course, code=code).exists():
+            return Response(
+                {"detail": f"This course already has a competency coded {code}."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        competency = serializer.save(course=course, code=code)
+        record_audit_event(
+            event_type="content.competency_created",
+            actor=request.user,
+            school=course.school,
+            target=competency,
+            payload={"code": competency.code},
+        )
+        return Response(CompetencyOptionSerializer(competency).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(request=ModuleOptionSerializer, responses=ModuleOptionSerializer)
+    @action(detail=True, methods=["post"])
+    def modules(self, request, pk=None):
+        course = self.get_object()
+        serializer = ModuleOptionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        order = (course.modules.aggregate(latest=Max("order"))["latest"] or 0) + 1
+        module = serializer.save(
+            course=course,
+            order=order,
+            code=_unique_slug(
+                course.modules.all(), serializer.validated_data["title"], field="code"
+            ),
+        )
+        record_audit_event(
+            event_type="content.module_created",
+            actor=request.user,
+            school=course.school,
+            target=module,
+            payload={"title": module.title},
+        )
+        return Response(ModuleOptionSerializer(module).data, status=status.HTTP_201_CREATED)
+
+
+class AuthoringLessonViewSet(viewsets.ModelViewSet):
+    """Draft lessons an author writes before building the practical scenario."""
+
+    queryset = Lesson.objects.none()
+    serializer_class = AuthoringLessonSerializer
+    permission_classes = [IsContentAuthorOrSchoolAdmin]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+    search_fields = ["title", "course__title"]
+    ordering_fields = ["updated_at", "title"]
+    ordering = ["-updated_at"]
+
+    def get_queryset(self):
+        lessons = (
+            Lesson.objects.filter(course__school_id__in=_content_school_ids(self.request.user))
+            .select_related("course", "course__school", "module", "authored_by")
+            .prefetch_related("competencies", "scenarios")
+        )
+        course_id = self.request.query_params.get("course")
+        if course_id and course_id.isdigit():
+            lessons = lessons.filter(course_id=int(course_id))
+        return lessons
+
+    def perform_create(self, serializer):
+        course = serializer.validated_data["course"]
+        if course.school_id not in _content_school_ids(self.request.user):
+            raise PermissionDenied("The course must belong to one of your schools.")
+        lesson = serializer.save(
+            authored_by=self.request.user,
+            status=Lesson.Status.DRAFT,
+            slug=_unique_slug(course.lessons.all(), serializer.validated_data["title"]),
+        )
+        record_audit_event(
+            event_type="content.lesson_created",
+            actor=self.request.user,
+            school=course.school,
+            target=lesson,
+            payload={"title": lesson.title},
+        )
+
+    def update(self, request, *args, **kwargs):
+        lesson = self.get_object()
+        if lesson.status != Lesson.Status.DRAFT:
+            return Response(
+                {"detail": "Only a draft lesson can be edited. Ask a reviewer to return it."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if not _may_edit_draft(request.user, lesson.authored_by_id, lesson.course.school):
+            return _not_your_draft()
+        response = super().update(request, *args, **kwargs)
+        record_audit_event(
+            event_type="content.lesson_updated",
+            actor=request.user,
+            school=lesson.course.school,
+            target=lesson,
+            payload={"fields": sorted(request.data.keys())},
+        )
+        return response
+
+    def destroy(self, request, *args, **kwargs):
+        lesson = self.get_object()
+        if lesson.status != Lesson.Status.DRAFT or lesson.scenarios.exists():
+            return Response(
+                {"detail": "Only a draft lesson without scenarios can be deleted."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if not _may_edit_draft(request.user, lesson.authored_by_id, lesson.course.school):
+            return _not_your_draft()
+        record_audit_event(
+            event_type="content.lesson_deleted",
+            actor=request.user,
+            school=lesson.course.school,
+            target=lesson.course,
+            payload={"lessonId": lesson.pk, "title": lesson.title},
+        )
+        return super().destroy(request, *args, **kwargs)
+
+    @extend_schema(request=None, responses={status.HTTP_201_CREATED: AuthoringLessonSerializer})
+    @action(detail=True, methods=["post"])
+    def revise(self, request, pk=None):
+        """Copy a published lesson, and its latest practical, into a new draft revision."""
+
+        lesson = self.get_object()
+        if lesson.status not in {Lesson.Status.PUBLISHED, Lesson.Status.RETIRED}:
+            return Response(
+                {"detail": "Only a published lesson needs a revision. Edit the draft directly."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        next_version = lesson.content_version + 1
+        with transaction.atomic():
+            revision = Lesson.objects.create(
+                course=lesson.course,
+                module=lesson.module,
+                title=lesson.title,
+                slug=_unique_slug(lesson.course.lessons.all(), f"{lesson.slug}-v{next_version}"),
+                summary=lesson.summary,
+                objectives=list(lesson.objectives),
+                safety_notes=list(lesson.safety_notes),
+                estimated_minutes=lesson.estimated_minutes,
+                language=lesson.language,
+                content_version=next_version,
+                status=Lesson.Status.DRAFT,
+                authored_by=request.user,
+            )
+            revision.competencies.set(lesson.competencies.all())
+            revision.prerequisites.set(lesson.prerequisites.all())
+            source = lesson.scenarios.order_by("-version").first()
+            if source is not None:
+                SimulationScenario.objects.create(
+                    lesson=revision,
+                    version=1,
+                    title=f"{revision.title} practical v1",
+                    definition=source.definition,
+                    grading_policy=source.grading_policy,
+                    asset_package=source.asset_package,
+                    status=SimulationScenario.Status.DRAFT,
+                    authored_by=request.user,
+                )
+            record_audit_event(
+                event_type="content.lesson_revised",
+                actor=request.user,
+                school=lesson.course.school,
+                target=revision,
+                payload={"sourceLessonId": lesson.pk, "contentVersion": next_version},
+            )
+        return Response(AuthoringLessonSerializer(revision).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(responses=ContentHistoryEntrySerializer(many=True))
+    @action(detail=True, methods=["get"])
+    def history(self, request, pk=None):
+        """Every authoring and review decision on the lesson and its practicals, newest first."""
+
+        lesson = self.get_object()
+        versions = {
+            str(pk): version for pk, version in lesson.scenarios.values_list("pk", "version")
+        }
+        events = (
+            AuditEvent.objects.filter(
+                Q(target_type="lab.lesson", target_id=str(lesson.pk))
+                | Q(target_type="lab.simulationscenario", target_id__in=list(versions)),
+                event_type__in=list(HISTORY_SUMMARIES),
+            )
+            .select_related("actor")
+            .order_by("-occurred_at", "-pk")[:100]
+        )
+        return Response(
+            [
+                {
+                    "id": event.pk,
+                    "eventType": event.event_type,
+                    "summary": HISTORY_SUMMARIES[event.event_type],
+                    "subject": (
+                        "Lesson"
+                        if event.target_type == "lab.lesson"
+                        else f"Practical v{versions.get(event.target_id, '?')}"
+                    ),
+                    "actorName": (
+                        (event.actor.get_full_name() or event.actor.get_username())
+                        if event.actor
+                        else "System"
+                    ),
+                    "reviewNotes": str(event.payload.get("reviewNotes") or ""),
+                    "occurredAt": event.occurred_at,
+                }
+                for event in events
+            ]
+        )
+
+    @extend_schema(request=None, responses={status.HTTP_201_CREATED: ScenarioAuthoringSerializer})
+    @action(detail=True, methods=["post"])
+    def scenarios(self, request, pk=None):
+        """Start a new draft practical scenario for this lesson."""
+
+        lesson = self.get_object()
+        policy_id = request.data.get("gradingPolicy") if isinstance(request.data, dict) else None
+        policies = GradingPolicy.objects.filter(status=GradingPolicy.Status.PUBLISHED)
+        policy = (
+            policies.filter(pk=policy_id).first()
+            if policy_id
+            else policies.order_by("-published_at", "-pk").first()
+        )
+        if policy is None:
+            return Response(
+                {
+                    "detail": "No published grading policy is available. Ask a platform administrator."
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        version = (lesson.scenarios.aggregate(latest=Max("version"))["latest"] or 0) + 1
+        scenario = SimulationScenario.objects.create(
+            lesson=lesson,
+            version=version,
+            title=f"{lesson.title} practical v{version}",
+            definition=starter_definition(lesson),
+            grading_policy=policy,
+            status=SimulationScenario.Status.DRAFT,
+            authored_by=request.user,
+        )
+        record_audit_event(
+            event_type="content.scenario_created",
+            actor=request.user,
+            school=lesson.course.school,
+            target=scenario,
+            payload={"version": scenario.version, "fromLesson": lesson.pk},
+        )
+        return Response(ScenarioAuthoringSerializer(scenario).data, status=status.HTTP_201_CREATED)

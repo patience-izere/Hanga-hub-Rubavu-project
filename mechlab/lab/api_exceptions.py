@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import APIException, ErrorDetail, ValidationError
 from rest_framework.views import exception_handler
 
@@ -13,6 +14,11 @@ def _plain(value):
 
 
 def opedu_exception_handler(exc, context):
+    if isinstance(exc, DjangoValidationError):
+        # Model clean() errors are client mistakes, not server faults.
+        exc = ValidationError(
+            exc.message_dict if hasattr(exc, "error_dict") else {"detail": exc.messages}
+        )
     response = exception_handler(exc, context)
     if response is None:
         return None

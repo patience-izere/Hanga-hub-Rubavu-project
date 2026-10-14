@@ -63,6 +63,14 @@ class PilotStudySerializer(serializers.ModelSerializer):
         return pilot_collection_errors(obj) if obj.status == PilotStudy.Status.FROZEN else []
 
     def validate(self, attrs):
+        if (
+            self.instance is not None
+            and "school" in attrs
+            and attrs["school"] != self.instance.school
+        ):
+            raise serializers.ValidationError(
+                {"school": "A pilot cannot move to another school. Create a new pilot instead."}
+            )
         school = attrs.get("school", self.instance.school if self.instance else None)
         scenario = attrs.get("scenario", self.instance.scenario if self.instance else None)
         cohort = attrs.get("cohort", self.instance.cohort if self.instance else None)
@@ -206,3 +214,17 @@ class PilotOptionsSerializer(serializers.Serializer):
     schools = serializers.ListField(child=serializers.DictField())
     cohorts = serializers.ListField(child=serializers.DictField())
     scenarios = serializers.ListField(child=serializers.DictField())
+
+
+class PilotConsentSerializer(serializers.Serializer):
+    consentAccepted = serializers.BooleanField(write_only=True, required=False)
+    consented = serializers.BooleanField(read_only=True)
+    consentVersion = serializers.CharField(read_only=True)
+    expiresAt = serializers.DateTimeField(read_only=True, allow_null=True)
+
+
+class PilotParticipantSerializer(serializers.Serializer):
+    learnerId = serializers.IntegerField()
+    name = serializers.CharField()
+    consented = serializers.BooleanField()
+    recordedInstruments = serializers.ListField(child=serializers.CharField())

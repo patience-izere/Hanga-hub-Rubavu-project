@@ -7,7 +7,12 @@ import { useSchoolAudit } from "@/school/useSchoolAdmin";
 function payloadSummary(payload: Record<string, unknown>): string {
   const entries = Object.entries(payload).filter(([, value]) => value !== null && value !== "");
   if (entries.length === 0) return "";
-  return entries.map(([key, value]) => `${key}: ${String(value)}`).join(" · ");
+  return entries
+    .map(
+      ([key, value]) =>
+        `${key}: ${typeof value === "object" ? JSON.stringify(value) : String(value)}`,
+    )
+    .join(" · ");
 }
 
 /**
@@ -38,53 +43,70 @@ export function SchoolAuditPage() {
         loading="Loading the audit trail…"
         error="The audit trail could not be loaded."
       >
-        {(data) => (
-          <>
-            <div className="audit-controls">
-              <label>
-                Event type
-                <select value={eventType} onChange={(event) => setEventType(event.target.value)}>
-                  <option value="">All events</option>
-                  {data.eventTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {auditLabel(type)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <span className="audit-count">{data.events.length} entries</span>
-            </div>
+        {(data) => {
+          const events = data.pages.flatMap((page) => page.events);
+          const eventTypes = data.pages[0]?.eventTypes ?? [];
+          return (
+            <>
+              <div className="audit-controls">
+                <label>
+                  Event type
+                  <select value={eventType} onChange={(event) => setEventType(event.target.value)}>
+                    <option value="">All events</option>
+                    {eventTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {auditLabel(type)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <span className="audit-count">
+                  {events.length} {events.length === 1 ? "entry" : "entries"}
+                  {audit.hasNextPage ? " shown" : ""}
+                </span>
+              </div>
 
-            {data.events.length === 0 ? (
-              <p className="field-note">
-                {eventType
-                  ? "No entries of that type yet."
-                  : "Nothing has been recorded for this school yet."}
-              </p>
-            ) : (
-              <ul className="audit-list">
-                {data.events.map((event) => {
-                  const summary = payloadSummary(event.payload);
-                  return (
-                    <li key={event.id}>
-                      <div className="audit-main">
-                        <strong>{auditLabel(event.eventType)}</strong>
-                        <small>
-                          {event.actorName}
-                          {event.targetType ? ` · ${event.targetType} ${event.targetId}` : ""}
-                        </small>
-                        {summary ? <p className="audit-payload">{summary}</p> : null}
-                      </div>
-                      <time dateTime={event.occurredAt}>
-                        {new Date(event.occurredAt).toLocaleString()}
-                      </time>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </>
-        )}
+              {events.length === 0 ? (
+                <p className="field-note">
+                  {eventType
+                    ? "No entries of that type yet."
+                    : "Nothing has been recorded for this school yet."}
+                </p>
+              ) : (
+                <ul className="audit-list">
+                  {events.map((event) => {
+                    const summary = payloadSummary(event.payload);
+                    return (
+                      <li key={event.id}>
+                        <div className="audit-main">
+                          <strong>{auditLabel(event.eventType)}</strong>
+                          <small>
+                            {event.actorName}
+                            {event.targetType ? ` · ${event.targetType} ${event.targetId}` : ""}
+                          </small>
+                          {summary ? <p className="audit-payload">{summary}</p> : null}
+                        </div>
+                        <time dateTime={event.occurredAt}>
+                          {new Date(event.occurredAt).toLocaleString()}
+                        </time>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {audit.hasNextPage ? (
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  disabled={audit.isFetchingNextPage}
+                  onClick={() => void audit.fetchNextPage()}
+                >
+                  {audit.isFetchingNextPage ? "Loading…" : "Show older entries"}
+                </button>
+              ) : null}
+            </>
+          );
+        }}
       </QueryBoundary>
     </section>
   );

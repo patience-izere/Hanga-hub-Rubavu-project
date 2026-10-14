@@ -33,10 +33,12 @@ from .pilot_analysis import build_pilot_report
 from .pilot_instruments import validate_pilot_observation
 from .pilot_serializers import (
     PilotApprovalSerializer,
+    PilotConsentSerializer,
     PilotIncidentSerializer,
     PilotObservationInputSerializer,
     PilotObservationSerializer,
     PilotOptionsSerializer,
+    PilotParticipantSerializer,
     PilotRehearsalSerializer,
     PilotReportSerializer,
     PilotReviewSerializer,
@@ -82,7 +84,7 @@ class PilotStudyViewSet(viewsets.ModelViewSet):
     ordering = ["-created_at"]
 
     def get_permissions(self):
-        if self.action in {"list", "retrieve", "observations"}:
+        if self.action in {"list", "retrieve", "observations", "consent"}:
             return [IsAuthenticated()]
         return [IsInstructorOrSchoolAdmin()]
 
@@ -147,8 +149,9 @@ class PilotStudyViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
     @extend_schema(responses=PilotOptionsSerializer)
-    @action(detail=False, methods=["get"], url_path="options")
-    def options(self, request):
+    @action(detail=False, methods=["get"], url_path="options", url_name="options")
+    def configuration_options(self, request):
+        # Named so it does not shadow APIView.options, the HTTP OPTIONS handler.
         school_ids = _pilot_school_ids(request.user)
         if not school_ids:
             raise PermissionDenied("Pilot configuration is restricted to school staff.")
@@ -315,6 +318,121 @@ class PilotStudyViewSet(viewsets.ModelViewSet):
             payload={"kind": rehearsal.kind, "outcome": rehearsal.outcome},
         )
         return Response(PilotRehearsalSerializer(rehearsal).data, status=status.HTTP_201_CREATED)
+
+    def _consent_receipt(self, study, user):
+        return ResearchConsentReceipt.objects.filter(
+            school=study.school,
+            participant_code=research_participant_code(study.school_id, user.pk),
+            consent_version=study.consent_version,
+            scenario_version=str(study.scenario.version),
+            status=ResearchConsentReceipt.Status.ACTIVE,
+            expires_at__gt=timezone.now(),
+        ).first()
+
+    @extend_schema(request=PilotConsentSerializer, responses=PilotConsentSerializer)
+    @action(detail=True, methods=["get", "post"], url_path="consent")
+    def consent(self, request, pk=None):
+        """A learner's own decision to take part, recorded before any scored instrument."""
+
+        study = self.get_object()
+        enrolled = Enrollment.objects.filter(
+            cohort=study.cohort, learner=request.user, status=Enrollment.Status.ACTIVE
+        ).exists()
+        if not enrolled:
+            raise PermissionDenied("Only learners in this pilot's cohort can join it.")
+        if request.method == "GET":
+            receipt = self._consent_receipt(study, request.user)
+            return Response(
+                {
+                    "consented": receipt is not None,
+                    "consentVersion": study.consent_version,
+                    "expiresAt": receipt.expires_at if receipt else None,
+                }
+            )
+        if study.status != PilotStudy.Status.COLLECTING:
+            return self._conflict("This pilot is not collecting responses.")
+        if (
+            settings.RESEARCH_CONSENT_STATUS != "approved"
+            or study.consent_version != settings.RESEARCH_CONSENT_VERSION
+        ):
+            return Response(
+                {"detail": "The pilot consent text is not approved; nothing was recorded."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        serializer = PilotConsentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if serializer.validated_data.get("consentAccepted") is not True:
+            return Response(
+                {"detail": "Tick the consent statement to take part."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        now = timezone.now()
+        participant_code = research_participant_code(study.school_id, request.user.pk)
+        receipt, _ = ResearchConsentReceipt.objects.update_or_create(
+            school=study.school,
+            participant_code=participant_code,
+            consent_version=study.consent_version,
+            scenario_version=str(study.scenario.version),
+            defaults={
+                "status": ResearchConsentReceipt.Status.ACTIVE,
+                "consented_at": now,
+                "withdrawn_at": None,
+                "expires_at": now + timedelta(days=settings.RESEARCH_RETENTION_DAYS),
+            },
+        )
+        record_audit_event(
+            event_type="research.consent_recorded",
+            actor=request.user,
+            school=study.school,
+            target=receipt,
+            payload={"pilotId": study.pk, "consentVersion": receipt.consent_version},
+        )
+        return Response(
+            {
+                "consented": True,
+                "consentVersion": receipt.consent_version,
+                "expiresAt": receipt.expires_at,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @extend_schema(responses=PilotParticipantSerializer(many=True))
+    @action(detail=True, methods=["get"], url_path="participants")
+    def participants(self, request, pk=None):
+        """Enrolled learners with their consent state, for recording learner-scored instruments."""
+
+        study = self.get_object()
+        if study.school_id not in _pilot_school_ids(request.user):
+            raise PermissionDenied("Pilot participants are restricted to school staff.")
+        consented = {
+            code
+            for _, code in ResearchConsentReceipt.objects.filter(
+                school=study.school,
+                consent_version=study.consent_version,
+                scenario_version=str(study.scenario.version),
+                status=ResearchConsentReceipt.Status.ACTIVE,
+                expires_at__gt=timezone.now(),
+            ).values_list("school_id", "participant_code")
+        }
+        recorded = {}
+        for code, instrument in study.observations.values_list("participant_code", "instrument"):
+            recorded.setdefault(code, []).append(instrument)
+        rows = []
+        for enrollment in (
+            Enrollment.objects.filter(cohort=study.cohort, status=Enrollment.Status.ACTIVE)
+            .select_related("learner")
+            .order_by("learner__first_name", "learner__last_name", "learner__username")
+        ):
+            code = research_participant_code(study.school_id, enrollment.learner_id)
+            rows.append(
+                {
+                    "learnerId": enrollment.learner_id,
+                    "name": enrollment.learner.get_full_name() or enrollment.learner.get_username(),
+                    "consented": code in consented,
+                    "recordedInstruments": sorted(recorded.get(code, [])),
+                }
+            )
+        return Response(rows)
 
     @extend_schema(
         request=PilotObservationInputSerializer,
