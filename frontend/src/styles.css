@@ -1,12 +1,10 @@
 :root {
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  /* Inter ships with the app (@fontsource-variable/inter), so every device shows the intended type
+     instead of whatever sans-serif it has installed. */
+  --font-sans:
+    "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   color: #16332e;
   background: #f4f1e8;
   font-synthesis: none;
@@ -77,7 +75,7 @@ a {
   place-items: center;
   background: var(--brand-surface, var(--green-950));
   color: var(--lime);
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-size: 24px;
   font-weight: 800;
   transform: rotate(-3deg);
@@ -87,10 +85,7 @@ a {
   display: block;
 }
 .brand strong {
-  font:
-    800 18px/1.1 ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 18px/1.1 var(--font-sans);
 }
 .brand small {
   color: var(--muted);
@@ -150,10 +145,7 @@ main {
 .dashboard h1 {
   max-width: 850px;
   margin: 18px 0;
-  font:
-    800 clamp(43px, 7vw, 82px)/1.02 ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 clamp(43px, 7vw, 82px)/1.02 var(--font-sans);
   letter-spacing: -0.055em;
   color: var(--green-950);
 }
@@ -240,17 +232,11 @@ main {
   border-left: 1px solid var(--line);
 }
 .feature-grid span {
-  font:
-    800 13px ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 13px var(--font-sans);
   color: var(--green-650);
 }
 .feature-grid h2 {
-  font:
-    800 26px ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 26px var(--font-sans);
   margin: 20px 0 10px;
 }
 .feature-grid p {
@@ -294,10 +280,7 @@ main {
 }
 .auth-card h2 {
   margin: 0 0 28px;
-  font:
-    800 30px ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 30px var(--font-sans);
 }
 .auth-card label {
   display: block;
@@ -351,10 +334,7 @@ main {
 }
 .account-card h1 {
   margin: 12px 0;
-  font:
-    800 clamp(32px, 5vw, 47px)/1.05 ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 clamp(32px, 5vw, 47px)/1.05 var(--font-sans);
   color: var(--green-950);
 }
 .account-card > p {
@@ -543,10 +523,7 @@ main {
   color: var(--green-650);
 }
 .empty-learning-state h2 {
-  font:
-    800 27px ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 27px var(--font-sans);
   margin: 16px 0 8px;
 }
 .empty-learning-state p {
@@ -597,10 +574,7 @@ main {
   background: var(--surface-success, #d9efc5);
 }
 .assignment-card h2 {
-  font:
-    800 25px ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 25px var(--font-sans);
   margin: 25px 0 10px;
 }
 .assignment-card > p {
@@ -648,10 +622,7 @@ main {
 .lesson-header h1 {
   max-width: 850px;
   margin: 14px 0;
-  font:
-    800 clamp(40px, 6vw, 68px)/1.03 ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 clamp(40px, 6vw, 68px)/1.03 var(--font-sans);
   letter-spacing: -0.045em;
   color: var(--green-950);
 }
@@ -700,10 +671,7 @@ main {
 .competency-panel h2,
 .lesson-launch h2 {
   margin-top: 0;
-  font:
-    800 23px ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 23px var(--font-sans);
 }
 .lesson-panel li {
   margin: 12px 0;
@@ -886,10 +854,7 @@ main {
 }
 .simulation-header h1 {
   margin: 8px 0 0;
-  font:
-    800 clamp(30px, 4vw, 50px)/1.05 ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 clamp(30px, 4vw, 50px)/1.05 var(--font-sans);
   color: var(--green-950);
   letter-spacing: -0.035em;
 }
@@ -1345,10 +1310,7 @@ main {
 }
 .procedure-panel h2 {
   margin: 10px 0 8px;
-  font:
-    800 27px ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 27px var(--font-sans);
   color: var(--green-950);
 }
 .procedure-panel > p {
@@ -1508,10 +1470,7 @@ main {
   font-weight: 800;
 }
 .result-card h1 {
-  font:
-    800 clamp(30px, 5vw, 48px)/1.05 ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 clamp(30px, 5vw, 48px)/1.05 var(--font-sans);
   color: var(--green-950);
 }
 .result-card > p {
@@ -1604,10 +1563,7 @@ main {
 }
 .evidence-heading h2 {
   margin: 0;
-  font:
-    800 27px ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 27px var(--font-sans);
   color: var(--green-950);
 }
 .evidence-heading p {
@@ -1676,10 +1632,7 @@ main {
 }
 .review-header h1 {
   margin: 11px 0;
-  font:
-    800 clamp(40px, 6vw, 66px)/1 ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 clamp(40px, 6vw, 66px)/1 var(--font-sans);
   color: var(--green-950);
   letter-spacing: -0.04em;
 }
@@ -5247,10 +5200,7 @@ textarea {
 
 /* ── Module Development Studio ─────────────────────────────────────────────── */
 .studio-page h2 {
-  font:
-    800 1.25rem ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font: 800 1.25rem var(--font-sans);
   margin: 0;
 }
 .studio-heading-actions {
