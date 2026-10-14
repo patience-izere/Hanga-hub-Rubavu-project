@@ -2651,7 +2651,7 @@ paths:
           description: No response body
   /api/v1/school/audit/:
     get:
-      operationId: api_v1_school_audit_list
+      operationId: api_v1_school_audit_retrieve
       description: |-
         Read-only governance trail for the administered schools.
 
@@ -2667,9 +2667,85 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AuditEvent'
+                $ref: '#/components/schemas/AuditPage'
+          description: ''
+  /api/v1/school/cohorts/:
+    get:
+      operationId: api_v1_school_cohorts_retrieve
+      description: |-
+        Cohorts (classes) and who is in them, so instructors can assign a lesson to a class.
+
+        Cohorts used to exist only in Django admin, which school administrators usually cannot open.
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolCohortList'
+          description: ''
+    post:
+      operationId: api_v1_school_cohorts_create
+      description: |-
+        Cohorts (classes) and who is in them, so instructors can assign a lesson to a class.
+
+        Cohorts used to exist only in Django admin, which school administrators usually cannot open.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchoolCohortCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SchoolCohortCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SchoolCohortCreateRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolCohort'
+          description: ''
+  /api/v1/school/cohorts/{id}/:
+    patch:
+      operationId: api_v1_school_cohorts_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSchoolCohortUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSchoolCohortUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSchoolCohortUpdateRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolCohort'
           description: ''
   /api/v1/school/invitations/:
     get:
@@ -2771,7 +2847,6 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/SchoolInvitationAcceptRequest'
-        required: true
       security:
       - cookieAuth: []
       - {}
@@ -3656,6 +3731,25 @@ components:
       - schoolName
       - targetId
       - targetType
+    AuditPage:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        eventTypes:
+          type: array
+          items:
+            type: string
+        nextBefore:
+          type: integer
+          nullable: true
+      required:
+      - eventTypes
+      - events
+      - nextBefore
     AuthoringCourse:
       type: object
       properties:
@@ -3867,6 +3961,19 @@ components:
     BlankEnum:
       enum:
       - ''
+    CohortLearner:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+      required:
+      - email
+      - id
+      - name
     Competency:
       type: object
       properties:
@@ -5604,11 +5711,31 @@ components:
         asset_package:
           type: integer
           nullable: true
+    PatchedSchoolCohortUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 180
+        academicYear:
+          type: string
+          maxLength: 20
+        isActive:
+          type: boolean
+        learnerIds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          maxItems: 500
     PatchedSchoolMemberUpdateRequest:
       type: object
       properties:
         isActive:
           type: boolean
+        role:
+          $ref: '#/components/schemas/RoleEnum'
     PilotApproval:
       type: object
       properties:
@@ -6683,6 +6810,76 @@ components:
       - lesson
       - title
       - version
+    SchoolCohort:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        academicYear:
+          type: string
+        isActive:
+          type: boolean
+        school:
+          $ref: '#/components/schemas/SchoolSummary'
+        programName:
+          type: string
+        learners:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortLearner'
+      required:
+      - academicYear
+      - code
+      - id
+      - isActive
+      - learners
+      - name
+      - programName
+      - school
+    SchoolCohortCreateRequest:
+      type: object
+      properties:
+        schoolId:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+          maxLength: 180
+        programName:
+          type: string
+          minLength: 1
+          maxLength: 180
+        academicYear:
+          type: string
+          maxLength: 20
+      required:
+      - name
+      - programName
+    SchoolCohortList:
+      type: object
+      properties:
+        cohorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchoolCohort'
+        programs:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        learners:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - cohorts
+      - learners
+      - programs
     SchoolInvitation:
       type: object
       properties:
@@ -6721,6 +6918,9 @@ components:
       - school
     SchoolInvitationAcceptRequest:
       type: object
+      description: |-
+        New people choose a name and password; people who already have an account sign in first
+        and send nothing.
       properties:
         firstName:
           type: string
@@ -6734,10 +6934,6 @@ components:
           type: string
           writeOnly: true
           minLength: 1
-      required:
-      - firstName
-      - lastName
-      - password
     SchoolInvitationCreateRequest:
       type: object
       properties:
@@ -6779,7 +6975,10 @@ components:
         expiresAt:
           type: string
           format: date-time
+        accountExists:
+          type: boolean
       required:
+      - accountExists
       - email
       - expiresAt
       - role

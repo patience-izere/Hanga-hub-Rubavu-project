@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from hashlib import sha256
 
 from django.conf import settings
 from django.contrib.auth import (
@@ -24,6 +23,7 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
+from . import throttling
 from .audit import record_audit_event
 from .notifications import send_email_safely
 
@@ -73,12 +73,6 @@ def _user_payload(request: HttpRequest) -> dict:
             getattr(user, "learner_profile", None), "preferred_language", ""
         ),
     }
-
-
-def _login_cache_key(request: HttpRequest, identifier: str) -> str:
-    address = request.META.get("REMOTE_ADDR", "unknown")
-    digest = sha256(f"{address}:{identifier.casefold()}".encode()).hexdigest()
-    return f"opedu:login-failures:{digest}"
 
 
 def _password_errors(password: str, user=None) -> list[str]:
@@ -204,16 +198,17 @@ def login_api(request: HttpRequest) -> JsonResponse:
     if not identifier or not password:
         return JsonResponse({"detail": "Email and password are required."}, status=400)
 
-    cache_key = _login_cache_key(request, identifier)
-    failures = cache.get(cache_key, 0)
-    if failures >= settings.LOGIN_FAILURE_LIMIT:
-        return JsonResponse(
-            {
-                "detail": "Too many unsuccessful sign-in attempts. Try again later.",
-                "code": "login_locked",
-                "retryAfter": settings.LOGIN_LOCKOUT_SECONDS,
-            },
-            status=429,
+    address = throttling.client_ip(request)
+    window = settings.LOGIN_LOCKOUT_SECONDS
+    if (
+        throttling.count("login", address, identifier) >= settings.LOGIN_FAILURE_LIMIT
+        or throttling.count("login-account", identifier) >= settings.LOGIN_ACCOUNT_FAILURE_LIMIT
+        or throttling.count("login-ip", address) >= settings.LOGIN_IP_FAILURE_LIMIT
+    ):
+        return throttling.too_many(
+            "Too many unsuccessful sign-in attempts. Try again later.",
+            code="login_locked",
+            retry_after=window,
         )
 
     user_model = get_user_model()
@@ -231,7 +226,9 @@ def login_api(request: HttpRequest) -> JsonResponse:
                 {"detail": "This account is disabled.", "code": "account_disabled"},
                 status=403,
             )
-        cache.set(cache_key, failures + 1, timeout=settings.LOGIN_LOCKOUT_SECONDS)
+        throttling.record("login", address, identifier, window=window)
+        throttling.record("login-account", identifier, window=window)
+        throttling.record("login-ip", address, window=window)
         return JsonResponse({"detail": "Invalid email or password."}, status=401)
     if not user.is_active:
         return JsonResponse({"detail": "This account is disabled."}, status=403)
@@ -241,7 +238,7 @@ def login_api(request: HttpRequest) -> JsonResponse:
         and memberships.exists()
         and not memberships.filter(is_active=True, school__is_active=True).exists()
     ):
-        cache.delete(cache_key)
+        throttling.clear("login", address, identifier)
         return JsonResponse(
             {
                 "detail": "Your school access is suspended. Contact your school administrator.",
@@ -251,7 +248,7 @@ def login_api(request: HttpRequest) -> JsonResponse:
         )
 
     login(request, user)
-    cache.delete(cache_key)
+    throttling.clear("login", address, identifier)
     return JsonResponse({"user": _user_payload(request)})
 
 
@@ -271,8 +268,19 @@ def password_change(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"detail": str(exc)}, status=400)
     current_password = str(body.get("currentPassword") or "")
     new_password = str(body.get("newPassword") or "")
+    user_key = str(request.user.pk)
+    window = settings.LOGIN_LOCKOUT_SECONDS
+    # Someone at an unlocked workshop computer must not be able to guess the password.
+    if throttling.count("password-change", user_key) >= settings.LOGIN_FAILURE_LIMIT:
+        return throttling.too_many(
+            "Too many incorrect current passwords. Try again later.",
+            code="password_change_locked",
+            retry_after=window,
+        )
     if not request.user.check_password(current_password):
+        throttling.record("password-change", user_key, window=window)
         return JsonResponse({"detail": "The current password is incorrect."}, status=400)
+    throttling.clear("password-change", user_key)
     errors = _password_errors(new_password, user=request.user)
     if errors:
         return JsonResponse({"detail": " ".join(errors), "errors": errors}, status=400)
@@ -295,9 +303,23 @@ def password_reset_request(request: HttpRequest) -> JsonResponse:
     except ValueError as exc:
         return JsonResponse({"detail": str(exc)}, status=400)
     email = str(body.get("email") or "").strip()
+    window = settings.PASSWORD_RESET_WINDOW_SECONDS
+    address = throttling.client_ip(request)
+    if throttling.record("reset-ip", address, window=window) > settings.PASSWORD_RESET_IP_LIMIT:
+        return throttling.too_many(
+            "Too many reset requests from this network. Try again later.",
+            code="reset_throttled",
+            retry_after=window,
+        )
+    # Past a few messages an hour the request is still answered the same way, but nothing is
+    # sent, so the endpoint cannot be used to flood someone's inbox.
+    within_email_limit = (
+        throttling.record("reset-email", email, window=window)
+        <= settings.PASSWORD_RESET_EMAIL_LIMIT
+    )
     user_model = get_user_model()
     user = user_model.objects.filter(email__iexact=email, is_active=True).first()
-    if user:
+    if user and within_email_limit:
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}"

@@ -81,6 +81,7 @@ export function workspaceSections(roles: RoleCapabilities): WorkspaceSection[] {
         { to: "/school", label: "nav.overview", end: true },
         { to: "/school/people", label: "nav.people" },
         { to: "/school/invitations", label: "nav.invitations" },
+        { to: "/school/classes", label: "nav.classes" },
         { to: "/school/audit", label: "nav.audit" },
       ],
     });

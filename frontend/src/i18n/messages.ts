@@ -49,6 +49,7 @@ export const en = {
   "nav.assets": "Asset packages",
   "nav.people": "People",
   "nav.invitations": "Invitations",
+  "nav.classes": "Classes",
   "nav.audit": "Audit log",
   "nav.pilots": "Pilot governance",
   "nav.survey": "Survey",

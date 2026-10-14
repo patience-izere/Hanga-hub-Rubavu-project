@@ -29,6 +29,8 @@ from .learning_views import (
 from .pilot_views import PilotStudyViewSet
 from .school_views import (
     SchoolAuditView,
+    SchoolCohortDetailView,
+    SchoolCohortListView,
     SchoolInvitationAcceptView,
     SchoolInvitationDetailView,
     SchoolInvitationListCreateView,
@@ -106,6 +108,8 @@ urlpatterns = [
     ),
     path("school/overview/", SchoolOverviewView.as_view(), name="school-overview"),
     path("school/audit/", SchoolAuditView.as_view(), name="school-audit"),
+    path("school/cohorts/", SchoolCohortListView.as_view(), name="school-cohort-list"),
+    path("school/cohorts/<int:pk>/", SchoolCohortDetailView.as_view(), name="school-cohort-detail"),
     path("school/members/", SchoolMemberListView.as_view(), name="school-member-list"),
     path("school/members/<int:pk>/", SchoolMemberDetailView.as_view(), name="school-member-detail"),
     path(

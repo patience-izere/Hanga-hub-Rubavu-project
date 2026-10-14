@@ -3830,3 +3830,244 @@ class InstructorWorkflowTests(TestCase):
             overview = self.client.get("/api/v1/instructor/overview/").json()
         self.assertEqual(overview["metrics"]["attempts"], 6)
         self.assertEqual(len(large.captured_queries), len(small.captured_queries))
+
+
+class SchoolAdministrationTests(TestCase):
+    """Roles, invitations for existing accounts, cohorts and the audit trail."""
+
+    def setUp(self):
+        cache.clear()
+        self.school = School.objects.create(name="Rubavu Admin School", code="rubavu-admin")
+        self.admin = User.objects.create_user("admin@school.test", "admin@school.test", "pw-123")
+        self.colleague = User.objects.create_user("staff@school.test", "staff@school.test", "pw-1")
+        self.learner = User.objects.create_user("learner@school.test", "learner@school.test", "pw")
+        self.admin_membership = SchoolMembership.objects.create(
+            school=self.school, user=self.admin, role=SchoolMembership.Role.ADMIN
+        )
+        self.colleague_membership = SchoolMembership.objects.create(
+            school=self.school, user=self.colleague, role=SchoolMembership.Role.INSTRUCTOR
+        )
+        self.learner_membership = SchoolMembership.objects.create(
+            school=self.school, user=self.learner, role=SchoolMembership.Role.LEARNER
+        )
+        self.client.force_login(self.admin)
+
+    def patch_member(self, membership, body):
+        return self.client.patch(
+            f"/api/v1/school/members/{membership.pk}/", body, content_type="application/json"
+        )
+
+    def test_administrator_changes_a_role_with_safeguards(self):
+        promoted = self.patch_member(self.colleague_membership, {"role": "admin"})
+        self.assertEqual(promoted.status_code, 200, promoted.content)
+        self.assertEqual(promoted.json()["role"], "admin")
+        self.assertTrue(AuditEvent.objects.filter(event_type="membership.role_changed").exists())
+
+        self.assertEqual(
+            self.patch_member(self.admin_membership, {"role": "learner"}).status_code, 409
+        )
+        self.assertEqual(self.patch_member(self.colleague_membership, {}).status_code, 400)
+
+        program = Program.objects.create(school=self.school, code="auto", name="Auto")
+        cohort = Cohort.objects.create(school=self.school, program=program, code="c", name="C")
+        Enrollment.objects.create(cohort=cohort, learner=self.learner)
+        changed = self.patch_member(self.learner_membership, {"role": "instructor"})
+        self.assertEqual(changed.status_code, 200)
+        self.assertTrue(InstructorProfile.objects.filter(user=self.learner).exists())
+        self.assertEqual(Enrollment.objects.get().status, Enrollment.Status.WITHDRAWN)
+
+        # The last active administrator cannot be demoted by a colleague either.
+        self.patch_member(self.colleague_membership, {"role": "instructor"})
+        self.client.force_login(self.colleague)
+        self.assertEqual(self.client.get("/api/v1/school/members/").status_code, 403)
+
+    def test_someone_with_an_account_joins_another_school_by_signing_in(self):
+        other = School.objects.create(name="Gisenyi School", code="gisenyi-admin")
+        SchoolMembership.objects.create(
+            school=other, user=self.admin, role=SchoolMembership.Role.ADMIN
+        )
+        created = self.client.post(
+            "/api/v1/school/invitations/",
+            {"schoolId": other.pk, "email": "learner@school.test", "role": "learner"},
+            content_type="application/json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        token = created.json()["acceptUrl"].rsplit("/", 1)[-1]
+        url = f"/api/v1/school/invitations/accept/{token}/"
+
+        self.client.logout()
+        self.assertTrue(self.client.get(url).json()["accountExists"])
+        anonymous = self.client.post(url, {}, content_type="application/json")
+        self.assertEqual(anonymous.json()["code"], "account_exists")
+
+        self.client.force_login(self.colleague)
+        wrong = self.client.post(url, {}, content_type="application/json")
+        self.assertEqual(wrong.json()["code"], "invitation_email_mismatch")
+
+        self.client.force_login(self.learner)
+        accepted = self.client.post(url, {}, content_type="application/json")
+        self.assertEqual(accepted.status_code, 200, accepted.content)
+        self.assertTrue(
+            SchoolMembership.objects.filter(
+                school=other, user=self.learner, is_active=True
+            ).exists()
+        )
+        self.assertEqual(
+            self.client.get("/api/v1/auth/me/").json()["user"]["email"], "learner@school.test"
+        )
+
+    def test_new_people_still_need_a_name_and_password(self):
+        created = self.client.post(
+            "/api/v1/school/invitations/",
+            {"email": "new@school.test", "role": "instructor"},
+            content_type="application/json",
+        )
+        token = created.json()["acceptUrl"].rsplit("/", 1)[-1]
+        self.client.logout()
+        url = f"/api/v1/school/invitations/accept/{token}/"
+        self.assertFalse(self.client.get(url).json()["accountExists"])
+        missing = self.client.post(url, {"firstName": "Ada"}, content_type="application/json")
+        self.assertEqual(missing.status_code, 400)
+        self.assertIn("password", missing.json())
+
+    def test_audit_filters_reject_bad_input_and_page_backwards(self):
+        for index in range(5):
+            AuditEvent.objects.create(
+                event_type="test.event", actor=self.admin, school=self.school, payload={"i": index}
+            )
+        self.assertEqual(self.client.get("/api/v1/school/audit/?actor=abc").status_code, 400)
+        self.assertEqual(self.client.get("/api/v1/school/audit/?limit=-1").status_code, 400)
+        first = self.client.get("/api/v1/school/audit/?limit=3").json()
+        self.assertEqual(len(first["events"]), 3)
+        self.assertIsNotNone(first["nextBefore"])
+        second = self.client.get(
+            f"/api/v1/school/audit/?limit=3&before={first['nextBefore']}"
+        ).json()
+        self.assertEqual(len(second["events"]), 2)
+        self.assertIsNone(second["nextBefore"])
+        self.assertFalse(
+            {event["id"] for event in first["events"]} & {event["id"] for event in second["events"]}
+        )
+
+    def test_administrator_creates_a_cohort_and_sets_its_learners(self):
+        created = self.client.post(
+            "/api/v1/school/cohorts/",
+            {"name": "Auto Year 1", "programName": "Automobile Technology", "academicYear": "2026"},
+            content_type="application/json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        cohort_id = created.json()["id"]
+        self.assertEqual(created.json()["programName"], "Automobile Technology")
+        url = f"/api/v1/school/cohorts/{cohort_id}/"
+        not_learner = self.client.patch(
+            url, {"learnerIds": [self.colleague.pk]}, content_type="application/json"
+        )
+        self.assertEqual(not_learner.status_code, 400)
+        joined = self.client.patch(
+            url, {"learnerIds": [self.learner.pk]}, content_type="application/json"
+        )
+        self.assertEqual([item["id"] for item in joined.json()["learners"]], [self.learner.pk])
+        emptied = self.client.patch(url, {"learnerIds": []}, content_type="application/json")
+        self.assertEqual(emptied.json()["learners"], [])
+        self.assertEqual(Enrollment.objects.get().status, Enrollment.Status.WITHDRAWN)
+        listed = self.client.get("/api/v1/school/cohorts/").json()
+        self.assertEqual(listed["cohorts"][0]["name"], "Auto Year 1")
+        self.assertEqual([item["id"] for item in listed["learners"]], [self.learner.pk])
+
+        outsider = User.objects.create_user("outsider-admin@x.test", password="pw")
+        elsewhere = School.objects.create(name="Elsewhere", code="elsewhere")
+        SchoolMembership.objects.create(school=elsewhere, user=outsider, role="admin")
+        self.client.force_login(outsider)
+        self.assertEqual(
+            self.client.patch(url, {"name": "Taken"}, content_type="application/json").status_code,
+            404,
+        )
+
+
+class SignInProtectionTests(TestCase):
+    """Brute-force limits keyed by the real client address and by account."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user("person@x.test", "person@x.test", "right-password-1")
+        school = School.objects.create(name="Throttle School", code="throttle")
+        SchoolMembership.objects.create(school=school, user=self.user, role="learner")
+
+    def sign_in(self, password, address="10.0.0.1", email="person@x.test", **headers):
+        return self.client.post(
+            "/api/v1/auth/login/",
+            {"email": email, "password": password},
+            content_type="application/json",
+            REMOTE_ADDR=address,
+            **headers,
+        )
+
+    @override_settings(LOGIN_FAILURE_LIMIT=100, LOGIN_ACCOUNT_FAILURE_LIMIT=3)
+    def test_one_account_is_locked_after_failures_from_many_addresses(self):
+        for index in range(3):
+            self.assertEqual(self.sign_in("wrong", address=f"10.0.0.{index}").status_code, 401)
+        locked = self.sign_in("right-password-1", address="10.9.9.9")
+        self.assertEqual(locked.status_code, 429)
+        self.assertEqual(locked["Retry-After"], "300")
+
+    @override_settings(LOGIN_IP_FAILURE_LIMIT=3)
+    def test_one_address_trying_many_accounts_is_slowed_down(self):
+        for index in range(3):
+            self.sign_in("wrong", email=f"guess{index}@x.test")
+        self.assertEqual(self.sign_in("right-password-1").status_code, 429)
+        self.assertEqual(self.sign_in("right-password-1", address="10.0.0.2").status_code, 200)
+
+    @override_settings(OPEDU_TRUSTED_PROXY_COUNT=1, LOGIN_FAILURE_LIMIT=2)
+    def test_clients_behind_the_proxy_are_told_apart(self):
+        proxy = "172.18.0.5"
+        for _ in range(2):
+            self.sign_in("wrong", address=proxy, HTTP_X_FORWARDED_FOR="spoofed, 41.1.1.1")
+        self.assertEqual(
+            self.sign_in("wrong", address=proxy, HTTP_X_FORWARDED_FOR="41.1.1.1").status_code, 429
+        )
+        # Another learner on a different connection, through the same proxy, can still sign in.
+        allowed = self.sign_in("right-password-1", address=proxy, HTTP_X_FORWARDED_FOR="41.2.2.2")
+        self.assertEqual(allowed.status_code, 200)
+
+    @override_settings(PASSWORD_RESET_EMAIL_LIMIT=2, PASSWORD_RESET_IP_LIMIT=4)
+    def test_password_reset_cannot_flood_an_inbox(self):
+        for _ in range(3):
+            response = self.client.post(
+                "/api/v1/auth/password/reset/",
+                {"email": "person@x.test"},
+                content_type="application/json",
+            )
+            self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 2)
+        self.client.post(
+            "/api/v1/auth/password/reset/", {"email": "a@x.test"}, content_type="application/json"
+        )
+        blocked = self.client.post(
+            "/api/v1/auth/password/reset/", {"email": "b@x.test"}, content_type="application/json"
+        )
+        self.assertEqual(blocked.status_code, 429)
+
+    @override_settings(LOGIN_FAILURE_LIMIT=2)
+    def test_password_change_limits_guesses_of_the_current_password(self):
+        self.client.force_login(self.user)
+        for _ in range(2):
+            wrong = self.client.post(
+                "/api/v1/auth/password/change/",
+                {"currentPassword": "guess", "newPassword": "another-strong-pass-9"},
+                content_type="application/json",
+            )
+            self.assertEqual(wrong.status_code, 400)
+        locked = self.client.post(
+            "/api/v1/auth/password/change/",
+            {"currentPassword": "right-password-1", "newPassword": "another-strong-pass-9"},
+            content_type="application/json",
+        )
+        self.assertEqual(locked.status_code, 429)
+
+    @override_settings(LOGIN_IP_FAILURE_LIMIT=2)
+    def test_django_admin_sign_in_is_limited(self):
+        for _ in range(2):
+            self.client.post("/admin/login/", {"username": "x", "password": "y"})
+        self.assertEqual(
+            self.client.post("/admin/login/", {"username": "x", "password": "y"}).status_code, 429
+        )

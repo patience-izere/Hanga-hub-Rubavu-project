@@ -1023,13 +1023,55 @@ export interface paths {
          *     AuditEvent; until now those were reachable only through Django admin, which the person
          *     accountable for governance may not have access to.
          */
-        get: operations["api_v1_school_audit_list"];
+        get: operations["api_v1_school_audit_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/school/cohorts/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Cohorts (classes) and who is in them, so instructors can assign a lesson to a class.
+         *
+         *     Cohorts used to exist only in Django admin, which school administrators usually cannot open.
+         */
+        get: operations["api_v1_school_cohorts_retrieve"];
+        put?: never;
+        /**
+         * @description Cohorts (classes) and who is in them, so instructors can assign a lesson to a class.
+         *
+         *     Cohorts used to exist only in Django admin, which school administrators usually cannot open.
+         */
+        post: operations["api_v1_school_cohorts_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/school/cohorts/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["api_v1_school_cohorts_partial_update"];
         trace?: never;
     };
     "/api/v1/school/invitations/": {
@@ -1435,6 +1477,13 @@ export interface components {
             /** Format: date-time */
             occurredAt: string;
         };
+        AuditPage: {
+            events: {
+                [key: string]: unknown;
+            }[];
+            eventTypes: string[];
+            nextBefore: number | null;
+        };
         AuthoringCourse: {
             readonly id: number;
             /** @description Leave empty for platform-wide content. */
@@ -1495,6 +1544,11 @@ export interface components {
         };
         /** @enum {unknown} */
         BlankEnum: "";
+        CohortLearner: {
+            id: number;
+            name: string;
+            email: string;
+        };
         Competency: {
             readonly id: number;
             code: string;
@@ -2199,8 +2253,15 @@ export interface components {
             grading_policy?: number;
             asset_package?: number | null;
         };
+        PatchedSchoolCohortUpdateRequest: {
+            name?: string;
+            academicYear?: string;
+            isActive?: boolean;
+            learnerIds?: number[];
+        };
         PatchedSchoolMemberUpdateRequest: {
             isActive?: boolean;
+            role?: components["schemas"]["RoleEnum"];
         };
         PilotApproval: {
             readonly id: number;
@@ -2655,6 +2716,31 @@ export interface components {
             grading_policy: number;
             asset_package?: number | null;
         };
+        SchoolCohort: {
+            id: number;
+            name: string;
+            code: string;
+            academicYear: string;
+            isActive: boolean;
+            school: components["schemas"]["SchoolSummary"];
+            programName: string;
+            learners: components["schemas"]["CohortLearner"][];
+        };
+        SchoolCohortCreateRequest: {
+            schoolId?: number;
+            name: string;
+            programName: string;
+            academicYear?: string;
+        };
+        SchoolCohortList: {
+            cohorts: components["schemas"]["SchoolCohort"][];
+            programs: {
+                [key: string]: unknown;
+            }[];
+            learners: {
+                [key: string]: unknown;
+            }[];
+        };
         SchoolInvitation: {
             readonly id: number;
             readonly school: components["schemas"]["SchoolSummary"];
@@ -2669,10 +2755,14 @@ export interface components {
             /** Format: date-time */
             readonly created_at: string;
         };
+        /**
+         * @description New people choose a name and password; people who already have an account sign in first
+         *     and send nothing.
+         */
         SchoolInvitationAcceptRequest: {
-            firstName: string;
-            lastName: string;
-            password: string;
+            firstName?: string;
+            lastName?: string;
+            password?: string;
         };
         SchoolInvitationCreateRequest: {
             schoolId?: number;
@@ -2693,6 +2783,7 @@ export interface components {
             role: string;
             /** Format: date-time */
             expiresAt: string;
+            accountExists: boolean;
         };
         SchoolMember: {
             readonly id: number;
@@ -5106,7 +5197,7 @@ export interface operations {
             };
         };
     };
-    api_v1_school_audit_list: {
+    api_v1_school_audit_retrieve: {
         parameters: {
             query?: never;
             header?: never;
@@ -5120,7 +5211,78 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuditEvent"][];
+                    "application/json": components["schemas"]["AuditPage"];
+                };
+            };
+        };
+    };
+    api_v1_school_cohorts_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolCohortList"];
+                };
+            };
+        };
+    };
+    api_v1_school_cohorts_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchoolCohortCreateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["SchoolCohortCreateRequest"];
+                "multipart/form-data": components["schemas"]["SchoolCohortCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolCohort"];
+                };
+            };
+        };
+    };
+    api_v1_school_cohorts_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedSchoolCohortUpdateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedSchoolCohortUpdateRequest"];
+                "multipart/form-data": components["schemas"]["PatchedSchoolCohortUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolCohort"];
                 };
             };
         };
@@ -5219,7 +5381,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
                 "application/json": components["schemas"]["SchoolInvitationAcceptRequest"];
                 "application/x-www-form-urlencoded": components["schemas"]["SchoolInvitationAcceptRequest"];

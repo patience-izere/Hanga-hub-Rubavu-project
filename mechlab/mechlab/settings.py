@@ -71,6 +71,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "lab.middleware.RequestObservabilityMiddleware",
     "lab.middleware.SecurityHeadersMiddleware",
+    "lab.throttling.AdminLoginThrottleMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -277,6 +278,17 @@ if RESEARCH_RETENTION_DAYS < 1:
     raise ImproperlyConfigured("OPEDU_RESEARCH_RETENTION_DAYS must be at least 1.")
 LOGIN_FAILURE_LIMIT = int(os.environ.get("DJANGO_LOGIN_FAILURE_LIMIT", "5"))
 LOGIN_LOCKOUT_SECONDS = int(os.environ.get("DJANGO_LOGIN_LOCKOUT_SECONDS", "300"))
+# Failures for one account from any address, and from one address across accounts (password
+# spraying). Both are higher than the per-address-and-account limit so a shared school network
+# is not locked out by a few typing mistakes.
+LOGIN_ACCOUNT_FAILURE_LIMIT = int(os.environ.get("DJANGO_LOGIN_ACCOUNT_FAILURE_LIMIT", "20"))
+LOGIN_IP_FAILURE_LIMIT = int(os.environ.get("DJANGO_LOGIN_IP_FAILURE_LIMIT", "50"))
+PASSWORD_RESET_EMAIL_LIMIT = int(os.environ.get("DJANGO_PASSWORD_RESET_EMAIL_LIMIT", "3"))
+PASSWORD_RESET_IP_LIMIT = int(os.environ.get("DJANGO_PASSWORD_RESET_IP_LIMIT", "10"))
+PASSWORD_RESET_WINDOW_SECONDS = 3600
+# How many reverse proxies (nginx, a load balancer) sit in front of Django. Client addresses for
+# rate limits are read from X-Forwarded-For only when this is set; 0 trusts REMOTE_ADDR.
+OPEDU_TRUSTED_PROXY_COUNT = int(os.environ.get("OPEDU_TRUSTED_PROXY_COUNT", "0"))
 
 LOGGING = {
     "version": 1,
@@ -330,6 +342,8 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
+    # DRF throttles identify anonymous clients the same way as the sign-in limits.
+    "NUM_PROXIES": OPEDU_TRUSTED_PROXY_COUNT or None,
     "DEFAULT_THROTTLE_RATES": {
         "anon": os.environ.get("DJANGO_ANON_THROTTLE_RATE", "120/hour"),
         "user": os.environ.get("DJANGO_USER_THROTTLE_RATE", "1200/hour"),

@@ -38,7 +38,13 @@ class SchoolMemberSerializer(serializers.ModelSerializer):
 
 
 class SchoolMemberUpdateSerializer(serializers.Serializer):
-    isActive = serializers.BooleanField()
+    isActive = serializers.BooleanField(required=False)
+    role = serializers.ChoiceField(choices=SchoolMembership.Role.choices, required=False)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError("Change the role or the access status.")
+        return attrs
 
 
 class SchoolInvitationSerializer(serializers.ModelSerializer):
@@ -79,12 +85,22 @@ class SchoolInvitationPreviewSerializer(serializers.Serializer):
     email = serializers.EmailField()
     role = serializers.CharField()
     expiresAt = serializers.DateTimeField()
+    accountExists = serializers.BooleanField()
 
 
 class SchoolInvitationAcceptSerializer(serializers.Serializer):
-    firstName = serializers.CharField(max_length=150)
-    lastName = serializers.CharField(max_length=150)
-    password = serializers.CharField(write_only=True)
+    """New people choose a name and password; people who already have an account sign in first
+    and send nothing."""
+
+    firstName = serializers.CharField(max_length=150, required=False)
+    lastName = serializers.CharField(max_length=150, required=False)
+    password = serializers.CharField(write_only=True, required=False)
+
+
+class AuditPageSerializer(serializers.Serializer):
+    events = serializers.ListField(child=serializers.DictField())
+    eventTypes = serializers.ListField(child=serializers.CharField())
+    nextBefore = serializers.IntegerField(allow_null=True)
 
 
 class DetailSerializer(serializers.Serializer):
@@ -120,3 +136,42 @@ class SchoolOverviewSerializer(serializers.Serializer):
     suspendedMembers = serializers.IntegerField()
     cohorts = serializers.ListField(child=serializers.DictField())
     recentAudit = AuditEventSerializer(many=True)
+
+
+class CohortLearnerSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    email = serializers.CharField(allow_blank=True)
+
+
+class SchoolCohortSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    code = serializers.CharField()
+    academicYear = serializers.CharField(allow_blank=True)
+    isActive = serializers.BooleanField()
+    school = SchoolSummarySerializer()
+    programName = serializers.CharField()
+    learners = CohortLearnerSerializer(many=True)
+
+
+class SchoolCohortListSerializer(serializers.Serializer):
+    cohorts = SchoolCohortSerializer(many=True)
+    programs = serializers.ListField(child=serializers.DictField())
+    learners = serializers.ListField(child=serializers.DictField())
+
+
+class SchoolCohortCreateSerializer(serializers.Serializer):
+    schoolId = serializers.IntegerField(required=False)
+    name = serializers.CharField(max_length=180)
+    programName = serializers.CharField(max_length=180)
+    academicYear = serializers.CharField(max_length=20, required=False, allow_blank=True)
+
+
+class SchoolCohortUpdateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=180, required=False)
+    academicYear = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    isActive = serializers.BooleanField(required=False)
+    learnerIds = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False, max_length=500
+    )

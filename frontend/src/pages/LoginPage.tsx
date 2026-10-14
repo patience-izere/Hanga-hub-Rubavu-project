@@ -12,8 +12,11 @@ export function LoginPage({ user }: { user: User | null }) {
   const location = useLocation();
   const sessionExpired = sessionStorage.getItem("opedu:session-expired") === "true";
 
+  // Once signed in, go where the person was heading (a protected page, or an invitation link).
+  const destination = (location.state as { from?: string } | null)?.from || "/dashboard";
+
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={destination} replace />;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -24,7 +27,6 @@ export function LoginPage({ user }: { user: User | null }) {
       return; // The error is shown below from the mutation state.
     }
     sessionStorage.removeItem("opedu:session-expired");
-    const destination = (location.state as { from?: string } | null)?.from || "/dashboard";
     navigate(destination, { replace: true });
   }
 

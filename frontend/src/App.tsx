@@ -88,6 +88,7 @@ const SchoolInvitationsPage = lazyPage(
   () => import("./pages/SchoolInvitationsPage"),
   "SchoolInvitationsPage",
 );
+const SchoolClassesPage = lazyPage(() => import("./pages/SchoolClassesPage"), "SchoolClassesPage");
 const SchoolAuditPage = lazyPage(() => import("./pages/SchoolAuditPage"), "SchoolAuditPage");
 const ResearchSurveyPage = lazyPage(
   () => import("./pages/ResearchSurveyPage"),
@@ -351,6 +352,14 @@ export function App() {
           element={
             <RequireRole user={user} capability="canAdministerSchool">
               <SchoolInvitationsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/school/classes"
+          element={
+            <RequireRole user={user} capability="canAdministerSchool">
+              <SchoolClassesPage />
             </RequireRole>
           }
         />
