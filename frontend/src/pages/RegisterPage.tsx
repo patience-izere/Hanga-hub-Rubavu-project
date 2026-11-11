@@ -54,8 +54,8 @@ export function RegisterPage({ user }: { user: User | null }) {
         <div className="eyebrow">Learn on your own</div>
         <h1>Practise workshop skills for free.</h1>
         <p>
-          No school needed. Choose lessons, practise as often as you like, and earn a practice
-          certificate. If you join a class later, you can use the same account.
+          No school needed. Choose lessons, practise as often as you like, and keep a practice
+          record of your results. If you join a class later, you can use the same account.
         </p>
         <Link className="hero-text-link" to="/demo">
           Not sure yet? Try a lesson first without an account.

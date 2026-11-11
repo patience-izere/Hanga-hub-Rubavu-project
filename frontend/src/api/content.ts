@@ -170,6 +170,7 @@ export type ModuleOption = {
   title: string;
   description: string;
   order: number;
+  lessonCount?: number;
 };
 
 export type AuthoringCourse = {
@@ -183,6 +184,29 @@ export type AuthoringCourse = {
   modules: ModuleOption[];
   competencies: CompetencyOption[];
   lessonCount: number;
+} & CourseDetails;
+
+/** The catalogue details of a course, shown on the public Courses page. */
+export type CourseDetails = {
+  summary: string;
+  access: "public" | "account" | "members";
+  accessLabel?: string;
+  level: "beginner" | "intermediate" | "advanced";
+  ageGroup: string;
+  durationHours: number | null;
+  language: string;
+  delivery: "virtual" | "blended";
+  outcomes: string[];
+  requirements: string[];
+  prerequisites: string[];
+  recognition: string;
+  isPublished: boolean;
+};
+
+export type CourseInput = Partial<CourseDetails> & {
+  title: string;
+  trade: string;
+  description: string;
 };
 
 export type LessonStatus = "draft" | "review" | "approved" | "published" | "retired";
@@ -253,12 +277,74 @@ export async function listAuthoringCourses(): Promise<AuthoringCourse[]> {
   return rows(await apiFetch<Paged<AuthoringCourse>>("/api/v1/content/courses/"));
 }
 
-export function createAuthoringCourse(input: {
-  title: string;
-  trade: string;
-  description: string;
-}) {
+export function createAuthoringCourse(input: CourseInput) {
   return send<AuthoringCourse>("/api/v1/content/courses/", "POST", input);
+}
+
+export function updateAuthoringCourse(id: number, input: Partial<CourseInput>) {
+  return send<AuthoringCourse>(`/api/v1/content/courses/${id}/`, "PATCH", input);
+}
+
+export async function deleteAuthoringCourse(id: number) {
+  await ensureCsrf();
+  await apiFetch(`/api/v1/content/courses/${id}/`, { method: "DELETE" });
+}
+
+export function updateCourseModule(
+  courseId: number,
+  moduleId: number,
+  input: { title?: string; description?: string; move?: "up" | "down" },
+) {
+  return send<ModuleOption>(
+    `/api/v1/content/courses/${courseId}/modules/${moduleId}/`,
+    "PATCH",
+    input,
+  );
+}
+
+export async function deleteCourseModule(courseId: number, moduleId: number) {
+  await ensureCsrf();
+  await apiFetch(`/api/v1/content/courses/${courseId}/modules/${moduleId}/`, { method: "DELETE" });
+}
+
+export function updateCourseCompetency(
+  courseId: number,
+  competencyId: number,
+  input: { code?: string; title?: string; description?: string },
+) {
+  return send<CompetencyOption>(
+    `/api/v1/content/courses/${courseId}/competencies/${competencyId}/`,
+    "PATCH",
+    input,
+  );
+}
+
+export async function deleteCourseCompetency(courseId: number, competencyId: number) {
+  await ensureCsrf();
+  await apiFetch(`/api/v1/content/courses/${courseId}/competencies/${competencyId}/`, {
+    method: "DELETE",
+  });
+}
+
+export async function deleteAuthoringLesson(id: number) {
+  await ensureCsrf();
+  await apiFetch(`/api/v1/content/lessons/${id}/`, { method: "DELETE" });
+}
+
+export function updateAuthoredAssetPackage(id: number, input: { name: string }) {
+  return send<AuthoredAssetPackage>(`/api/v1/content/asset-packages/${id}/`, "PATCH", input);
+}
+
+export async function removeAuthoredAssetFile(packageId: number, fileId: number) {
+  await ensureCsrf();
+  await apiFetch(`/api/v1/content/asset-packages/${packageId}/files/${fileId}/`, {
+    method: "DELETE",
+  });
+}
+
+export async function deleteAuthoredAssetPackage(id: number) {
+  await ensureCsrf();
+  await apiFetch(`/api/v1/content/asset-packages/${id}/`, { method: "DELETE" });
 }
 
 export function addCourseCompetency(

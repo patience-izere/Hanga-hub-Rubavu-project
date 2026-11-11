@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 
+import { CONTACT } from "../config/site";
+
 export function PrivacyPage() {
   return (
     <LegalPage title="Privacy overview" eyebrow="Privacy" updated="Working draft · August 2026">
@@ -40,6 +42,14 @@ export function PrivacyPage() {
         page; the responses are deleted while a non-identifying withdrawal receipt is retained.
         Withdrawal does not change marks or access to required learning.
       </p>
+      <h2>Website analytics</h2>
+      <p>
+        On opedu.izere.work we use Google Analytics, through Google Tag Manager, to count visits and
+        see which pages help people, so we can improve them. It records things such as pages viewed,
+        device type, approximate region and how people arrived, using cookies. It does not receive
+        your lesson results, answers or account details. You can block it with your browser&apos;s
+        privacy settings or an ad blocker without affecting how OPedu works.
+      </p>
       <h2>Retention and incidents</h2>
       <p>
         Research responses are removed when their configured retention period expires. The final
@@ -56,8 +66,9 @@ export function TermsPage() {
       <h2>Educational purpose</h2>
       <p>
         OPedu supports technical-learning preparation, guided practice, and review. It is not a
-        professional certification, equipment manual, or replacement for supervised physical
-        instruction.
+        college, does not issue certificates or qualifications, and is not an equipment manual or a
+        replacement for supervised physical instruction. See the{" "}
+        <Link to="/disclaimer">disclaimer</Link>.
       </p>
       <h2>Authorized access</h2>
       <p>
@@ -81,6 +92,51 @@ export function TermsPage() {
         The current platform is under development. Curriculum references, technical procedures,
         tolerances, scoring, device readiness, and support processes require validation before
         operational school use.
+      </p>
+    </LegalPage>
+  );
+}
+
+export function DisclaimerPage() {
+  return (
+    <LegalPage title="Disclaimer" eyebrow="Disclaimer" updated="Last updated · November 2026">
+      <h2>OPedu is not a college</h2>
+      <p>
+        OPedu is a practice platform for technical skills. It is not a college, university,
+        technical school or training institution, and it is not affiliated with, accredited by or
+        acting on behalf of any of them.
+      </p>
+      <h2>No certificates or qualifications</h2>
+      <p>
+        OPedu does not issue certificates, diplomas or qualifications of any kind. The practice
+        records, scores and badges you see on OPedu show what you did in the virtual workshop. They
+        are not certificates and do not prove that you are qualified or competent to do the work.
+      </p>
+      <h2>Partner institutions</h2>
+      <p>
+        OPedu may partner with schools and training institutions. A partner institution may choose
+        to award its own certificate to learners who complete both the virtual practice on OPedu and
+        a supervised physical workshop training with that institution. In that case the certificate
+        comes from the institution, under its own rules and accreditation, not from OPedu. A
+        course&apos;s page says when a partner offers recognition.
+      </p>
+      <h2>Virtual practice is not physical training</h2>
+      <p>
+        Practising a procedure on OPedu helps you prepare, but it does not replace hands-on training
+        under a qualified instructor. Never work on real vehicles, electrical installations or
+        machinery on the strength of OPedu practice alone. Always follow your workplace&apos;s or
+        school&apos;s safety rules and the instructions of the responsible person.
+      </p>
+      <h2>Content accuracy</h2>
+      <p>
+        We work to keep lessons accurate and safe, but procedures, tolerances and equipment vary.
+        Check the manufacturer&apos;s instructions and your instructor&apos;s guidance before
+        applying anything you practised here.
+      </p>
+      <h2>Questions</h2>
+      <p>
+        Contact us at <a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>, by telephone or
+        WhatsApp on {CONTACT.phoneDisplay}.
       </p>
     </LegalPage>
   );

@@ -6,7 +6,11 @@ import type { InstructorLearnerAssignment } from "../api/instructor";
 import { MetricGrid, MetricTile } from "../components/ui/MetricTile";
 import { QueryBoundary } from "../components/ui/QueryBoundary";
 import { attemptStatusLabel, attemptOutcomeLabel } from "../learning/labels";
-import { useInstructorLearner, useUpdateInstructorAssignment } from "../learning/useInstructor";
+import {
+  useCancelInstructorAssignment,
+  useInstructorLearner,
+  useUpdateInstructorAssignment,
+} from "../learning/useInstructor";
 import { Breadcrumbs } from "../components/ui/Breadcrumbs";
 
 const MASTERY_LABELS: Record<string, string> = {
@@ -98,6 +102,7 @@ export function InstructorLearnerDetailPage() {
   const learnerId = Number(useParams().learnerId);
   const detail = useInstructorLearner(learnerId);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const cancel = useCancelInstructorAssignment(learnerId);
 
   return (
     <section className="dashboard learner-detail-page">
@@ -243,6 +248,25 @@ export function InstructorLearnerDetailPage() {
                             >
                               Change
                             </button>
+                            {assignment.attemptsUsed === 0 && !assignment.latestStatus ? (
+                              <button
+                                type="button"
+                                className="button-link danger-link"
+                                disabled={cancel.isPending}
+                                aria-label={`Cancel the assignment ${assignment.lessonTitle}`}
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      `Cancel "${assignment.lessonTitle}" for this learner? They have not started it.`,
+                                    )
+                                  ) {
+                                    cancel.mutate(assignment.id);
+                                  }
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            ) : null}
                           </td>
                         </tr>
                       ),
@@ -252,6 +276,11 @@ export function InstructorLearnerDetailPage() {
               </div>
             )}
 
+            {cancel.isError ? (
+              <p className="form-error" role="alert">
+                {describeApiError(cancel.error, "The assignment could not be cancelled.")}
+              </p>
+            ) : null}
             <h2 className="section-title">Attempt history</h2>
             {data.attempts.length === 0 ? (
               <p className="field-note">This learner has not started an attempt yet.</p>

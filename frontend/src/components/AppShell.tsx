@@ -9,8 +9,13 @@ import { OfflineBanner } from "./OfflineBanner";
 import { InstallAppButton } from "./InstallAppButton";
 import { useLocale } from "../i18n/LocaleProvider";
 import { LanguageSelect, ThemeSelect } from "./ShellControls";
+import { BrandLogo } from "./BrandLogo";
+import { SocialGlyph, SocialLinks } from "./SocialIcons";
+import { CONTACT } from "../config/site";
 
 const PUBLIC_LINKS = [
+  { to: "/", label: "home", end: true },
+  { to: "/courses", label: "courses" },
   { to: "/about", label: "about" },
   { to: "/features", label: "features" },
   { to: "/updates", label: "updates" },
@@ -52,13 +57,12 @@ export function AppShell({ user }: AppShellProps) {
       </a>
       <header className="site-header">
         <Link className="brand" to="/" aria-label="OPedu home">
-          <span className="brand-mark" aria-hidden="true">
-            O
-          </span>
-          <span>
-            <strong>OPedu</strong>
-            {user?.organization ? <small>{user.organization}</small> : null}
-          </span>
+          <BrandLogo height={52} />
+          {user?.organization ? (
+            <span>
+              <small>{user.organization}</small>
+            </span>
+          ) : null}
         </Link>
         <button
           type="button"
@@ -75,7 +79,12 @@ export function AppShell({ user }: AppShellProps) {
           aria-label="Primary navigation"
         >
           {PUBLIC_LINKS.map((link) => (
-            <NavLink key={link.to} className="public-nav-link" to={link.to}>
+            <NavLink
+              key={link.to}
+              className="public-nav-link"
+              to={link.to}
+              end={"end" in link ? link.end : undefined}
+            >
               {t(link.label)}
             </NavLink>
           ))}
@@ -106,17 +115,30 @@ export function AppShell({ user }: AppShellProps) {
       </main>
       <footer className="site-footer">
         <div className="footer-brand">
-          <span className="brand-mark" aria-hidden="true">
-            O
-          </span>
           <div>
-            <strong>OPedu</strong>
+            <BrandLogo height={56} />
             <p>Practical skills, safely learned.</p>
+            <SocialLinks />
+            <a
+              className="footer-whatsapp"
+              href={CONTACT.whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <SocialGlyph network="whatsapp" />
+              Talk to us on WhatsApp
+            </a>
+            <address className="footer-contact">
+              <a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>
+              <a href={CONTACT.phoneHref}>Tel. {CONTACT.phoneDisplay}</a>
+              <span>{CONTACT.address}</span>
+            </address>
           </div>
         </div>
         <div className="footer-links">
           <div>
             <strong>Explore</strong>
+            <Link to="/courses">Courses</Link>
             <Link to="/about">About OPedu</Link>
             <Link to="/features">Platform features</Link>
             <Link to="/updates">Updates</Link>
@@ -132,6 +154,7 @@ export function AppShell({ user }: AppShellProps) {
             <Link to="/contact">Contact</Link>
             <Link to="/privacy">Privacy</Link>
             <Link to="/terms">Terms</Link>
+            <Link to="/disclaimer">Disclaimer</Link>
           </div>
         </div>
         <div className="footer-bottom">

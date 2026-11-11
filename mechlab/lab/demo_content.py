@@ -2108,3 +2108,69 @@ ELECTRICAL_COURSE = {
     },
     "lessons": [SAFE_ISOLATION_LESSON, CONTINUITY_LESSON],
 }
+
+
+# Catalogue details for the built-in courses, shown on the public Courses page. Applied when a
+# course is first loaded, and to a built-in course that has no summary yet; later edits made in the
+# Studio are kept.
+BUILTIN_COURSE_DETAILS = {
+    "automotive-electrical-foundations": {
+        "summary": (
+            "Inspect and test a vehicle battery safely, then read the measurements to decide what "
+            "is wrong."
+        ),
+        "access": "public",
+        "level": "beginner",
+        "age_group": "15 and over",
+        "duration_hours": 3,
+        "language": "English",
+        "delivery": "blended",
+        "outcomes": [
+            "Prepare a vehicle and yourself before electrical work.",
+            "Set up a multimeter and measure battery voltage correctly.",
+            "Interpret readings and choose the next diagnostic step.",
+        ],
+        "requirements": [
+            "A phone, tablet or computer with a recent web browser.",
+            "About 20 minutes per lesson.",
+        ],
+        "prerequisites": ["None. Basic reading in English helps."],
+    },
+    "workshop-safety-essentials": {
+        "summary": "Spot the hazards in a workshop before work starts, and know what to do about each.",
+        "access": "public",
+        "level": "beginner",
+        "age_group": "15 and over",
+        "duration_hours": 1,
+        "language": "English",
+        "delivery": "virtual",
+        "outcomes": [
+            "Recognise common workshop hazards.",
+            "Choose the right control or protective equipment for each hazard.",
+        ],
+        "requirements": ["A phone, tablet or computer with a recent web browser."],
+        "prerequisites": ["None."],
+    },
+    "electrical-installation-foundations": {
+        "summary": (
+            "Isolate a circuit safely, prove it dead and test continuity, the first habits of an "
+            "electrician."
+        ),
+        "access": "account",
+        "level": "beginner",
+        "age_group": "16 and over",
+        "duration_hours": 4,
+        "language": "English",
+        "delivery": "blended",
+        "outcomes": [
+            "Follow a safe isolation procedure and prove a circuit dead.",
+            "Test the continuity of a lighting circuit conductor.",
+            "Record results an instructor can review.",
+        ],
+        "requirements": [
+            "A free OPedu account, so your progress is saved.",
+            "A phone, tablet or computer with a recent web browser.",
+        ],
+        "prerequisites": ["Workshop Safety Essentials, or equivalent safety training."],
+    },
+}

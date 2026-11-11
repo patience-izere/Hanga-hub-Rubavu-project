@@ -6,6 +6,7 @@ import { Pagination, usePage } from "@/components/ui/Pagination";
 import { QueryBoundary } from "@/components/ui/QueryBoundary";
 import {
   useCreateSchoolCohort,
+  useDeleteSchoolCohort,
   useSchoolCohorts,
   useSchoolOverview,
   useUpdateSchoolCohort,
@@ -223,6 +224,7 @@ function CreateClassForm({ data }: { data: SchoolCohortList }) {
 export function SchoolClassesPage() {
   const cohorts = useSchoolCohorts();
   const update = useUpdateSchoolCohort();
+  const remove = useDeleteSchoolCohort();
   const [editingId, setEditingId] = useState<number | null>(null);
 
   return (
@@ -250,6 +252,11 @@ export function SchoolClassesPage() {
             {update.isError ? (
               <p className="form-error" role="alert">
                 {describeApiError(update.error, "The class could not be changed.")}
+              </p>
+            ) : null}
+            {update.isError || remove.isError ? (
+              <p className="form-error" role="alert">
+                {describeApiError(update.error ?? remove.error, "The class could not be changed.")}
               </p>
             ) : null}
             {data.cohorts.length === 0 ? (
@@ -287,12 +294,39 @@ export function SchoolClassesPage() {
                           type="button"
                           className="button-link"
                           disabled={update.isPending}
+                          onClick={() => {
+                            const name = window.prompt("New name for this class", cohort.name);
+                            if (name && name.trim() && name.trim() !== cohort.name) {
+                              update.mutate({ id: cohort.id, name: name.trim() });
+                            }
+                          }}
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          className="button-link"
+                          disabled={update.isPending}
                           onClick={() =>
                             update.mutate({ id: cohort.id, isActive: !cohort.isActive })
                           }
                         >
                           {cohort.isActive ? "Archive" : "Restore"}
                         </button>
+                        {cohort.learners.length === 0 ? (
+                          <button
+                            type="button"
+                            className="button-link danger-link"
+                            disabled={remove.isPending}
+                            onClick={() => {
+                              if (window.confirm(`Delete the class "${cohort.name}"?`)) {
+                                remove.mutate(cohort.id);
+                              }
+                            }}
+                          >
+                            Delete
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                     {editingId === cohort.id ? (

@@ -7,8 +7,11 @@ import {
   createPlatformSchool,
   decideRegistration,
   getPlatformOverview,
+  deleteContactMessage,
+  deletePlatformSchool,
   listContactMessages,
   setContactHandled,
+  updatePlatformSchool,
   type PlatformSchool,
   type RegistrationDecision,
 } from "@/api/platform";
@@ -208,6 +211,10 @@ function ContactInbox() {
       setContactHandled(id, handled),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["platform", "contact"] }),
   });
+  const remove = useMutation({
+    mutationFn: deleteContactMessage,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["platform", "contact"] }),
+  });
   return (
     <section className="admin-panel">
       <h2>Messages from the contact form</h2>
@@ -243,6 +250,18 @@ function ContactInbox() {
                   >
                     {item.handled ? "Mark as not answered" : "Mark as answered"}
                   </button>
+                  <button
+                    type="button"
+                    className="button-link danger-link"
+                    disabled={remove.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Delete the message from ${item.name}?`)) {
+                        remove.mutate(item.id);
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
                 </div>
               </li>
             ))}
@@ -250,6 +269,93 @@ function ContactInbox() {
         )}
       </QueryBoundary>
     </section>
+  );
+}
+
+function SchoolActions({ school }: { school: PlatformSchool }) {
+  const queryClient = useQueryClient();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: overviewKey });
+  const update = useMutation({
+    mutationFn: (changes: Parameters<typeof updatePlatformSchool>[1]) =>
+      updatePlatformSchool(school.id, changes),
+    onSuccess: refresh,
+  });
+  const remove = useMutation({
+    mutationFn: () => deletePlatformSchool(school.id),
+    onSuccess: refresh,
+  });
+  const error = update.error ?? remove.error;
+  return (
+    <div className="crud-actions">
+      <button
+        type="button"
+        className="button-link"
+        disabled={update.isPending}
+        onClick={() => {
+          const name = window.prompt("New name for this organisation", school.name);
+          if (name && name.trim() && name.trim() !== school.name)
+            update.mutate({ name: name.trim() });
+        }}
+      >
+        Rename
+      </button>
+      <label>
+        <span className="sr-only">Type of {school.name}</span>
+        <select
+          value={school.kind}
+          disabled={update.isPending}
+          onChange={(event) =>
+            update.mutate({ kind: event.target.value as PlatformSchool["kind"] })
+          }
+        >
+          {KIND_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {school.isOpen ? null : (
+        <button
+          type="button"
+          className="button-link"
+          disabled={update.isPending}
+          onClick={() => update.mutate({ isActive: !school.isActive })}
+        >
+          {school.isActive ? "Switch off" : "Switch on"}
+        </button>
+      )}
+      <button
+        type="button"
+        className="button-link"
+        disabled={update.isPending}
+        title="Shows pilot study and survey tools to this organisation"
+        onClick={() => update.mutate({ researchEnabled: !school.researchEnabled })}
+      >
+        {school.researchEnabled ? "End research study" : "Start research study"}
+      </button>
+      {school.isOpen ? null : (
+        <button
+          type="button"
+          className="button-link danger-link"
+          disabled={remove.isPending}
+          onClick={() => {
+            if (
+              window.confirm(`Delete ${school.name}? Only an empty organisation can be deleted.`)
+            ) {
+              remove.mutate();
+            }
+          }}
+        >
+          Delete
+        </button>
+      )}
+      {error ? (
+        <p className="form-error" role="alert">
+          {describeApiError(error, "The change could not be saved.")}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -297,6 +403,9 @@ export function PlatformSchoolsPage() {
                         <th scope="col">Members</th>
                         <th scope="col">Administrators</th>
                         <th scope="col">Status</th>
+                        <th scope="col">
+                          <span className="sr-only">Actions</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -309,7 +418,10 @@ export function PlatformSchoolsPage() {
                           <td>{school.kindLabel}</td>
                           <td>{school.memberCount}</td>
                           <td>{school.adminCount}</td>
-                          <td>{school.isActive ? "Active" : "Inactive"}</td>
+                          <td>{school.isActive ? "Active" : "Switched off"}</td>
+                          <td>
+                            <SchoolActions school={school} />
+                          </td>
                         </tr>
                       ))}
                     </tbody>

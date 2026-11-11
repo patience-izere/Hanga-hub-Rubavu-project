@@ -3,7 +3,10 @@ import { join, relative } from "node:path";
 
 const root = new URL("../dist", import.meta.url).pathname.replace(/^\/(.:)/, "$1");
 const limits = { ".js": 900_000, ".css": 100_000 };
-const totalLimit = 2_000_000;
+// Everything the app can download, including pages loaded on demand. Raised from 2.0 MB in
+// November 2026 for the public Courses pages, the course editor and the management screens,
+// which load only when opened; the initial-load limit below is unchanged.
+const totalLimit = 2_100_000;
 const files = [];
 
 async function collect(directory) {

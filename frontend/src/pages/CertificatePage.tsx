@@ -36,6 +36,10 @@ function CertificateSheet({
         {certificate.courseTitle} · {certificate.trade}
       </p>
       <p className="certificate-statement">{certificate.statement}</p>
+      <p className="certificate-disclaimer">
+        Practice record of virtual training on OPedu. It is not a certificate or qualification;
+        OPedu is not a college.
+      </p>
       <dl>
         <div>
           <dt>Date</dt>
@@ -56,8 +60,8 @@ function CertificateSheet({
       </dl>
       {verifyUrl ? (
         <div className="certificate-verify">
-          <canvas ref={canvas} aria-label="QR code to check this certificate" />
-          <small>Scan or visit the link to check this certificate is genuine.</small>
+          <canvas ref={canvas} aria-label="QR code to check this practice record" />
+          <small>Scan or visit the link to check this practice record is genuine.</small>
         </div>
       ) : null}
     </article>
@@ -73,14 +77,17 @@ export function CertificatePage() {
   });
   const [copied, setCopied] = useState(false);
 
-  if (certificate.isPending) return <p className="panel-status">Preparing your certificate…</p>;
+  if (certificate.isPending) return <p className="panel-status">Preparing your practice record…</p>;
   if (certificate.isError || !certificate.data) {
     return (
       <section className="result-page">
         <div className="result-card">
-          <h1>No certificate for this attempt</h1>
+          <h1>No practice record for this attempt</h1>
           <p>
-            {describeApiError(certificate.error, "Certificates are given for passed attempts.")}
+            {describeApiError(
+              certificate.error,
+              "Practice records are given for completed attempts.",
+            )}
           </p>
           <Link to={`/learn/attempts/${attemptId}`}>Back to the result</Link>
         </div>
@@ -119,7 +126,7 @@ export function CertificatePage() {
   );
 }
 
-/** Public: an employer or a school checks a certificate someone shows them. */
+/** Public: an employer or a school checks a practice record someone shows them. */
 export function VerifyCertificatePage() {
   const code = useParams().code ?? "";
   const check = useQuery({
@@ -133,14 +140,15 @@ export function VerifyCertificatePage() {
       {check.data?.valid ? (
         <>
           <p className="verify-banner is-valid" role="status">
-            ✓ Genuine. This certificate was issued by OPedu and still stands.
+            ✓ Genuine. This practice record was produced by OPedu and still stands. It is a record
+            of virtual practice, not a certificate or qualification.
           </p>
           <CertificateSheet certificate={check.data} />
         </>
       ) : (
         <p className="verify-banner is-invalid" role="alert">
-          This certificate could not be confirmed. The link may be wrong, or the result was later
-          changed by an instructor.
+          This practice record could not be confirmed. The link may be wrong, or the result was
+          later changed by an instructor.
         </p>
       )}
     </section>

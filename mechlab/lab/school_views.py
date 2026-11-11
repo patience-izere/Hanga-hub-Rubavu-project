@@ -9,7 +9,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import ProtectedError, Q
 from django.utils import timezone
 from django.utils.text import slugify
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -845,3 +845,34 @@ class SchoolCohortDetailView(APIView):
                 )
         refreshed = SchoolCohortListView()._cohorts([cohort.school_id]).get(pk=cohort.pk)
         return Response(_cohort_payload(refreshed))
+
+    @extend_schema(responses={204: None})
+    def delete(self, request, pk):
+        """Delete a class that never had learners; one with history is archived instead."""
+
+        cohort = Cohort.objects.filter(pk=pk, school_id__in=_admin_school_ids(request.user)).first()
+        if cohort is None:
+            return Response({"detail": "Cohort not found."}, status=status.HTTP_404_NOT_FOUND)
+        if cohort.enrollments.exists():
+            return Response(
+                {
+                    "detail": "This class has or had learners, so it is kept for their records. "
+                    "Archive it instead."
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        record_audit_event(
+            event_type="cohort.deleted",
+            actor=request.user,
+            school=cohort.school,
+            target=cohort.school,
+            payload={"cohortId": cohort.pk, "name": cohort.name},
+        )
+        try:
+            cohort.delete()
+        except ProtectedError:
+            return Response(
+                {"detail": "This class is referenced by assignments or a pilot study. Archive it."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)

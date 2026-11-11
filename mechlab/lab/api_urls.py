@@ -44,11 +44,15 @@ from .open_views import (
     DemoLessonView,
     LiveClassBoardView,
     OpenStatusView,
+    PublicCourseDetailView,
+    PublicCourseListView,
+    PublicLessonPracticeView,
 )
 from .pilot_views import PilotStudyViewSet
 from .platform_views import (
     ContactMessageDetailView,
     ContactMessageView,
+    PlatformSchoolDetailView,
     PlatformSchoolsView,
     RegistrationDecisionView,
 )
@@ -123,7 +127,15 @@ urlpatterns = [
         name="certificate-verify",
     ),
     path("schools/register/", SchoolRegistrationRequestView.as_view(), name="school-register"),
+    path("courses/", PublicCourseListView.as_view(), name="public-courses"),
+    path("courses/<slug:slug>/", PublicCourseDetailView.as_view(), name="public-course"),
+    path(
+        "courses/<slug:slug>/lessons/<int:lesson_id>/practice/",
+        PublicLessonPracticeView.as_view(),
+        name="public-lesson-practice",
+    ),
     path("platform/schools/", PlatformSchoolsView.as_view(), name="platform-schools"),
+    path("platform/schools/<int:pk>/", PlatformSchoolDetailView.as_view(), name="platform-school"),
     path("contact/", ContactMessageView.as_view(), name="contact-messages"),
     path("contact/<int:pk>/", ContactMessageDetailView.as_view(), name="contact-message"),
     path(
