@@ -9,6 +9,7 @@ import { OfflineBanner } from "./OfflineBanner";
 import { InstallAppButton } from "./InstallAppButton";
 import { useLocale } from "../i18n/LocaleProvider";
 import { LanguageSelect, ThemeSelect } from "./ShellControls";
+import { BrandLogo } from "./BrandLogo";
 import { SocialGlyph, SocialLinks } from "./SocialIcons";
 import { CONTACT } from "../config/site";
 
@@ -56,13 +57,12 @@ export function AppShell({ user }: AppShellProps) {
       </a>
       <header className="site-header">
         <Link className="brand" to="/" aria-label="OPedu home">
-          <span className="brand-mark" aria-hidden="true">
-            O
-          </span>
-          <span>
-            <strong>OPedu</strong>
-            {user?.organization ? <small>{user.organization}</small> : null}
-          </span>
+          <BrandLogo height={52} />
+          {user?.organization ? (
+            <span>
+              <small>{user.organization}</small>
+            </span>
+          ) : null}
         </Link>
         <button
           type="button"
@@ -115,11 +115,8 @@ export function AppShell({ user }: AppShellProps) {
       </main>
       <footer className="site-footer">
         <div className="footer-brand">
-          <span className="brand-mark" aria-hidden="true">
-            O
-          </span>
           <div>
-            <strong>OPedu</strong>
+            <BrandLogo height={56} />
             <p>Practical skills, safely learned.</p>
             <SocialLinks />
             <a

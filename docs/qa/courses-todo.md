@@ -52,3 +52,11 @@ Requested on 11 November 2026 after the UI release. `[x]` done · `[ ]` to do ·
 - "Certificate" in the learner pages is now "practice record", with a line saying it is not a
   certificate or qualification, to match the disclaimer.
 - `load_lessons` now adds the built-in courses once; later deploys keep edits made in the Studio.
+
+## Added during the session
+- [x] Brand kit: wordmark in the headers and footer (light and dark versions), favicon and app
+  icons from the door "O", Apple touch icon, web-app manifest, share image with the real logo.
+- [x] Google search: organisation data (name, logo, contacts) so Google can show the logo.
+- [x] Google Tag Manager GTM-W55LTRRF on the live site only; Content-Security-Policy and the
+  privacy page updated.
+- [x] Dark theme: the home page hero no longer stays pale (missed in the first fix).
