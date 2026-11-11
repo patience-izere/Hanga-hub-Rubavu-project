@@ -55,8 +55,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install system dependencies (Pillow build deps)
-        run: sudo apt-get update && sudo apt-get install -y libjpeg-dev zlib1g-dev libpng-dev
+      # No apt step: Pillow installs from a prebuilt wheel, and Ubuntu's package mirrors being
+      # unreachable from the runner must not fail the backend checks.
 
       - name: Install Python dependencies
         run: |
@@ -159,7 +159,13 @@ jobs:
         run: npm test
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        # The runner image already has Chromium's libraries; --with-deps only adds extra fonts via
+        # apt. When Ubuntu's mirrors cannot be reached, install the browser alone and carry on.
+        run: |
+          npx playwright install --with-deps chromium || {
+            echo "::warning::apt mirrors unreachable; installing Chromium without system packages."
+            npx playwright install chromium
+          }
 
       - name: End-to-end role routes
         run: npm run test:e2e
