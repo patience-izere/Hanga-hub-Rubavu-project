@@ -93,6 +93,63 @@ export function getDemoLesson(): Promise<DemoLesson> {
   return apiFetch<DemoLesson>("/api/v1/demo/");
 }
 
+// --- Public course catalogue -----------------------------------------------------------------
+
+export type CourseAccess = "public" | "account" | "members";
+
+export type PublicCourse = {
+  slug: string;
+  title: string;
+  trade: string;
+  summary: string;
+  access: CourseAccess;
+  accessLabel: string;
+  level: string;
+  levelLabel: string;
+  ageGroup: string;
+  durationHours: number | null;
+  language: string;
+  delivery: string;
+  deliveryLabel: string;
+  provider: string;
+  lessonCount: number;
+  minutes: number;
+};
+
+export type PublicCourseDetail = PublicCourse & {
+  description: string;
+  outcomes: string[];
+  requirements: string[];
+  prerequisites: string[];
+  recognition: string;
+  lessons: Array<{
+    id: number;
+    title: string;
+    summary: string;
+    minutes: number;
+    module: string;
+    language: string;
+    canTry: boolean;
+    canEnrol: boolean;
+  }>;
+};
+
+export async function listPublicCourses(): Promise<PublicCourse[]> {
+  return (await apiFetch<{ courses: PublicCourse[] }>("/api/v1/courses/")).courses;
+}
+
+export function getPublicCourse(slug: string): Promise<PublicCourseDetail> {
+  return apiFetch<PublicCourseDetail>(`/api/v1/courses/${encodeURIComponent(slug)}/`);
+}
+
+export type PublicLessonPractice = DemoLesson & { course: { slug: string; title: string } };
+
+export function getPublicLessonPractice(slug: string, lessonId: number) {
+  return apiFetch<PublicLessonPractice>(
+    `/api/v1/courses/${encodeURIComponent(slug)}/lessons/${lessonId}/practice/`,
+  );
+}
+
 // --- Certificates -----------------------------------------------------------------------------
 
 export type Certificate = {

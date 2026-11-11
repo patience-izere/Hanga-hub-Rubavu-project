@@ -569,12 +569,15 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
         </div>
       ) : null}
       {!editable ? (
-        <p className="studio-locked-note" role="status">
-          Submitted and published versions are locked so learners' evidence always matches what they
-          practised. Start a new version to make changes.{" "}
+        <div className="studio-locked-note" role="status">
+          <p>
+            Version {data.version} is {data.status.replace("_", " ")}. Editing opens version{" "}
+            {data.version + 1} as a draft, so learners who already practised keep the exact version
+            they used. Publish the new version when it is ready.
+          </p>
           <button
             type="button"
-            className="studio-link-button"
+            className="button button-primary"
             disabled={clone.isPending}
             onClick={() =>
               clone.mutate(data.id, {
@@ -583,9 +586,9 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
               })
             }
           >
-            Start a new version
+            {clone.isPending ? "Opening a new version…" : "Edit this practical"}
           </button>
-        </p>
+        </div>
       ) : null}
 
       <div className="studio-editor-grid">

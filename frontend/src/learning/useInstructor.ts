@@ -11,6 +11,7 @@ import {
   signOffAttempt,
   submitInstructorFeedback,
   updateInstructorAssignment,
+  cancelInstructorAssignment,
   updateInstructorFeedback,
   type InstructorAssignmentChanges,
 } from "../api/instructor";
@@ -122,6 +123,20 @@ export function useSignOffAttempt(id: number) {
     onSuccess: (review) => {
       queryClient.setQueryData(["learning", "instructor", "attempts", id], review);
       invalidate();
+    },
+  });
+}
+
+export function useCancelInstructorAssignment(learnerId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: cancelInstructorAssignment,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["learning", "instructor", "learners", learnerId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["learning", "instructor", "roster"] });
+      void queryClient.invalidateQueries({ queryKey: instructorOverviewKey });
     },
   });
 }

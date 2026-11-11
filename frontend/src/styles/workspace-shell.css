@@ -962,36 +962,6 @@
   flex: none;
 }
 
-/* ---- Breadcrumbs (N-5) ---- */
-.breadcrumbs ol {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px 6px;
-  margin: 0 0 16px;
-  padding: 0;
-  list-style: none;
-  font-size: 14px;
-  color: var(--muted);
-}
-.breadcrumbs li + li::before {
-  content: "›";
-  margin-right: 6px;
-  color: var(--muted);
-}
-.breadcrumbs a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  color: var(--green-800);
-  font-weight: 600;
-}
-.breadcrumbs [aria-current="page"] {
-  color: var(--ink);
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
 /* Faded rows kept readable: fading the whole row with opacity broke text contrast. */
 .invitation-list > li.invitation-revoked,
 .invitation-list > li.invitation-expired {
@@ -1038,4 +1008,130 @@
 }
 .not-found-page code {
   overflow-wrap: anywhere;
+}
+
+/* ---- Create / edit / delete lists (courses, modules, competencies, organisations) ---- */
+.crud-list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+.crud-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.crud-list > li > span:first-child {
+  display: grid;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+.crud-list small {
+  color: var(--muted);
+}
+.crud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+}
+.crud-actions .button-link,
+.crud-list .button-link {
+  min-height: 36px;
+}
+.crud-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+.crud-inline label {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 200px;
+  font-weight: 600;
+}
+.crud-inline input,
+.crud-actions select {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-input, #fff);
+  color: var(--ink);
+}
+.danger-link,
+.button-link.danger-link {
+  color: var(--danger);
+}
+.course-form {
+  display: grid;
+  gap: 18px;
+  max-width: 860px;
+}
+.course-form textarea {
+  width: 100%;
+}
+.access-choice {
+  display: grid;
+  gap: 10px;
+}
+.access-option {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.access-option input {
+  margin-top: 4px;
+  width: 18px;
+  height: 18px;
+}
+.access-option span {
+  display: grid;
+  gap: 6px;
+}
+.access-option small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.studio-course-access {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.studio-locked-note .button {
+  margin-top: 10px;
+}
+.course-form legend {
+  margin-bottom: 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.course-form .studio-plain-fieldset {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.access-option .access-badge {
+  justify-self: start;
+}
+.course-editor .dashboard-heading .button {
+  white-space: nowrap;
 }

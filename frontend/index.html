@@ -1,24 +1,38 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- Google Tag Manager (GTM-W55LTRRF); see public/analytics.js. Live site only. -->
+    <script src="/analytics.js" async></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0b5c4b" />
+    <meta name="theme-color" content="#000000" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" href="/opedu-icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta
       name="description"
-      content="OPedu helps technical learners practise procedures safely through guided 3D simulations and instructor-reviewable evidence."
+      content="OPedu is a free virtual workshop where technical learners in Rwanda practise real trade procedures in 3D, safely, on any phone or computer, before working on real equipment."
     />
     <meta
       name="keywords"
       content="technical education, TVET, 3D simulation, practical learning, competency-based education, Rwanda"
     />
-    <meta property="og:title" content="OPedu — Practical skills, safely learned" />
+    <meta
+      property="og:title"
+      content="OPedu Open Education: practise technical skills safely in 3D"
+    />
     <meta
       property="og:description"
-      content="Guided 3D practice, safety-aware feedback, and evidence instructors can review."
+      content="Practise automotive, electrical and workshop-safety procedures in 3D before touching real equipment. Free, works on any phone or computer. Made in Kigali, Rwanda."
     />
+    <meta
+      name="twitter:description"
+      content="Practise automotive, electrical and workshop-safety procedures in 3D before touching real equipment. Free, works on any phone or computer."
+    />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:locale" content="en_GB" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://opedu.izere.work/" />
     <meta property="og:site_name" content="OPedu" />
@@ -30,11 +44,30 @@
       content="OPedu: Practical skills, safely learned. Guided 3D practice for technical learners."
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="OPedu — Practical skills, safely learned" />
+    <meta
+      name="twitter:title"
+      content="OPedu Open Education: practise technical skills safely in 3D"
+    />
     <meta name="twitter:image" content="https://opedu.izere.work/og-image.jpg" />
     <!-- Applies a chosen Light or Dark theme before the first paint. A file, not inline, so the
          Content-Security-Policy can keep script-src 'self'. -->
     <script src="/theme-init.js"></script>
+    <!-- Lets Google show the OPedu logo and name in search results. Data, not a script, so the
+         Content-Security-Policy does not apply to it. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "EducationalOrganization",
+        "name": "OPedu",
+        "alternateName": "OPedu Open Education",
+        "url": "https://opedu.izere.work/",
+        "logo": "https://opedu.izere.work/icon-512.png",
+        "image": "https://opedu.izere.work/og-image.jpg",
+        "email": "izere02pacy@gmail.com",
+        "telephone": "+250789405950",
+        "address": { "@type": "PostalAddress", "addressLocality": "Kigali", "addressCountry": "RW" }
+      }
+    </script>
     <title>OPedu — Practical skills, safely learned</title>
   </head>
   <body>

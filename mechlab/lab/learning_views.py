@@ -934,6 +934,37 @@ class InstructorAssignmentDetailView(APIView):
                 )
         return Response(_assignment_row(assignment, attempts, timezone.now()))
 
+    @extend_schema(responses={204: None})
+    def delete(self, request, pk):
+        """Cancel an assignment the learner has not started. Started work is never deleted."""
+
+        assignment = (
+            Assignment.objects.filter(
+                pk=pk, lesson__course__school_id__in=_instructor_school_ids(request.user)
+            )
+            .select_related("lesson__course__school")
+            .first()
+        )
+        if assignment is None:
+            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+        if assignment.attempts.exists():
+            return Response(
+                {
+                    "detail": "The learner has started this lesson, so the assignment is kept "
+                    "with their work. Change its deadline or attempt limit instead."
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        record_audit_event(
+            event_type="assignment.cancelled",
+            actor=request.user,
+            school=assignment.lesson.course.school,
+            target=assignment.lesson,
+            payload={"learnerId": assignment.learner_id, "assignmentId": assignment.pk},
+        )
+        assignment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class _SpreadsheetSafeWriter:
     """CSV rows that spreadsheet software will not run as formulas.

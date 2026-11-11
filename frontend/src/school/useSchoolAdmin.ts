@@ -8,6 +8,7 @@ import {
 
 import {
   createSchoolCohort,
+  deleteSchoolCohort,
   createSchoolInvitation,
   getSchoolAudit,
   getSchoolOverview,
@@ -114,6 +115,10 @@ export function useUpdateSchoolCohort() {
       updateSchoolCohort(id, changes),
     onSuccess: useInvalidateCohorts(),
   });
+}
+
+export function useDeleteSchoolCohort() {
+  return useMutation({ mutationFn: deleteSchoolCohort, onSuccess: useInvalidateCohorts() });
 }
 
 export function useRevokeSchoolInvitation() {

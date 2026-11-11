@@ -153,6 +153,98 @@ class PlatformSchoolsView(APIView):
         )
 
 
+class SchoolUpdateInput(serializers.Serializer):
+    name = serializers.CharField(max_length=180, required=False)
+    kind = serializers.ChoiceField(choices=School.Kind.choices, required=False)
+    isActive = serializers.BooleanField(required=False)
+    researchEnabled = serializers.BooleanField(required=False)
+
+
+class PlatformSchoolDetailView(APIView):
+    """Rename an organisation, change its type, switch it off and on, or delete it when empty."""
+
+    permission_classes = [IsPlatformAdministrator]
+
+    @extend_schema(request=SchoolUpdateInput, responses=PlatformSchoolSerializer)
+    def patch(self, request, pk):
+        school = School.objects.filter(pk=pk).first()
+        if school is None:
+            return Response({"detail": "Organisation not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = SchoolUpdateInput(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        if "name" in values:
+            name = " ".join(values["name"].split())
+            if School.objects.filter(name__iexact=name).exclude(pk=school.pk).exists():
+                return Response(
+                    {"name": ["An organisation with this name already exists."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            values["name"] = name
+        if values.get("isActive") is False and school.is_open:
+            return Response(
+                {
+                    "isActive": [
+                        "The open class is where self sign-ups go; it cannot be switched off."
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        changed = {}
+        for key, field in (
+            ("name", "name"),
+            ("kind", "kind"),
+            ("isActive", "is_active"),
+            ("researchEnabled", "research_enabled"),
+        ):
+            if key in values and getattr(school, field) != values[key]:
+                setattr(school, field, values[key])
+                changed[key] = values[key]
+        if changed:
+            school.save(
+                update_fields=[
+                    f
+                    for k, f in (
+                        ("name", "name"),
+                        ("kind", "kind"),
+                        ("isActive", "is_active"),
+                        ("researchEnabled", "research_enabled"),
+                    )
+                    if k in changed
+                ]
+            )
+            record_audit_event(
+                event_type="school.updated",
+                actor=request.user,
+                school=school,
+                target=school,
+                payload=changed,
+            )
+        return Response(PlatformSchoolSerializer(_schools().get(pk=school.pk)).data)
+
+    @extend_schema(responses={204: None})
+    def delete(self, request, pk):
+        school = School.objects.filter(pk=pk).first()
+        if school is None:
+            return Response({"detail": "Organisation not found."}, status=status.HTTP_404_NOT_FOUND)
+        others = school.memberships.exclude(user=request.user).exists()
+        if school.is_open or others or school.courses.exists() or school.cohorts.exists():
+            return Response(
+                {
+                    "detail": "This organisation has people, courses or classes, so it cannot be "
+                    "deleted. Switch it off instead: nobody can use it, and its records are kept."
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        record_audit_event(
+            event_type="school.deleted",
+            actor=request.user,
+            payload={"schoolId": school.pk, "name": school.name},
+        )
+        school.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class RegistrationDecisionView(APIView):
     """Approve a registration (creating the organisation and inviting its contact) or decline."""
 
@@ -282,3 +374,10 @@ class ContactMessageDetailView(APIView):
         record.handled = bool(request.data.get("handled", True))
         record.save(update_fields=["handled"])
         return Response(ContactMessageSerializer(record).data)
+
+    @extend_schema(responses={204: None})
+    def delete(self, request, pk):
+        deleted, _ = ContactMessage.objects.filter(pk=pk).delete()
+        if not deleted:
+            return Response({"detail": "Message not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)

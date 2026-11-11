@@ -65,7 +65,7 @@ function ProfileForm({ user }: { user: User }) {
       <div className="account-card">
         <span className="eyebrow">My profile</span>
         <h1>Your details</h1>
-        <p>Your name appears on your certificates and to your instructors.</p>
+        <p>Your name appears on your practice records and to your instructors.</p>
         <form onSubmit={submit} noValidate={false}>
           <div className="form-row">
             <div>

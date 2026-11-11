@@ -186,6 +186,11 @@ export type InstructorAssignmentChanges = {
   instructions?: string;
 };
 
+export async function cancelInstructorAssignment(id: number): Promise<void> {
+  await ensureCsrf();
+  await apiFetch(`/api/v1/instructor/assignments/${id}/`, { method: "DELETE" });
+}
+
 export async function updateInstructorAssignment(
   id: number,
   changes: InstructorAssignmentChanges,

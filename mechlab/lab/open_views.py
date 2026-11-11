@@ -21,6 +21,7 @@ from .models import (
     Assignment,
     Attempt,
     Cohort,
+    Course,
     Enrollment,
     Lesson,
     SimulationScenario,
@@ -449,3 +450,146 @@ class OpenStatusView(APIView):
     @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
         return Response({"openRegistration": bool(settings.OPEN_REGISTRATION)})
+
+
+def _public_courses():
+    return (
+        Course.objects.filter(is_published=True, school__is_active=True)
+        .select_related("school")
+        .prefetch_related("modules", "lessons")
+        .order_by("title")
+    )
+
+
+def _published_lessons(course):
+    return sorted(
+        (lesson for lesson in course.lessons.all() if lesson.status == Lesson.Status.PUBLISHED),
+        key=lambda lesson: (
+            lesson.module.order if lesson.module_id else 9999,
+            lesson.title.casefold(),
+        ),
+    )
+
+
+def _course_card(course):
+    lessons = _published_lessons(course)
+    return {
+        "slug": course.slug,
+        "title": course.title,
+        "trade": course.trade,
+        "summary": course.summary or course.description[:240],
+        "access": course.access,
+        "accessLabel": course.get_access_display(),
+        "level": course.level,
+        "levelLabel": course.get_level_display(),
+        "ageGroup": course.age_group,
+        "durationHours": course.duration_hours,
+        "language": course.language,
+        "delivery": course.delivery,
+        "deliveryLabel": course.get_delivery_display(),
+        "provider": course.school.name if course.school_id else "OPedu",
+        "lessonCount": len(lessons),
+        "minutes": sum(lesson.estimated_minutes or 0 for lesson in lessons),
+    }
+
+
+class PublicCourseListView(APIView):
+    """Every published course, with who can take it. Anyone may look."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    @extend_schema(operation_id="public_courses_list", responses=OpenApiTypes.OBJECT)
+    def get(self, request):
+        return Response({"courses": [_course_card(course) for course in _public_courses()]})
+
+
+class PublicCourseDetailView(APIView):
+    """One course's full description, modules and lessons."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    @extend_schema(operation_id="public_course_retrieve", responses=OpenApiTypes.OBJECT)
+    def get(self, request, slug):
+        course = _public_courses().filter(slug=slug).first()
+        if course is None:
+            return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+        lessons = _published_lessons(course)
+        playable = {
+            scenario.lesson_id
+            for scenario in SimulationScenario.objects.filter(
+                lesson__in=lessons, status=SimulationScenario.Status.PUBLISHED
+            )
+        }
+        modules = {module.pk: module for module in course.modules.all()}
+        return Response(
+            {
+                **_course_card(course),
+                "description": course.description,
+                "outcomes": course.outcomes,
+                "requirements": course.requirements,
+                "prerequisites": course.prerequisites,
+                "recognition": course.recognition,
+                "lessons": [
+                    {
+                        "id": lesson.pk,
+                        "title": lesson.title,
+                        "summary": lesson.summary,
+                        "minutes": lesson.estimated_minutes,
+                        "module": modules[lesson.module_id].title
+                        if lesson.module_id in modules
+                        else "",
+                        "language": lesson.get_language_display(),
+                        # Public courses can be tried here without an account.
+                        "canTry": course.access == Course.Access.PUBLIC and lesson.pk in playable,
+                        "canEnrol": course.access != Course.Access.MEMBERS
+                        and lesson.pk in playable,
+                    }
+                    for lesson in lessons
+                ],
+            }
+        )
+
+
+class PublicLessonPracticeView(APIView):
+    """A lesson from a public course, practised on the device. Nothing is recorded."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    @extend_schema(operation_id="public_lesson_practice", responses=OpenApiTypes.OBJECT)
+    def get(self, request, slug, lesson_id):
+        scenario = (
+            SimulationScenario.objects.filter(
+                status=SimulationScenario.Status.PUBLISHED,
+                lesson_id=lesson_id,
+                lesson__status=Lesson.Status.PUBLISHED,
+                lesson__course__slug=slug,
+                lesson__course__is_published=True,
+                lesson__course__access=Course.Access.PUBLIC,
+                lesson__course__school__is_active=True,
+            )
+            .select_related("lesson", "lesson__course", "grading_policy")
+            .order_by("-version")
+            .first()
+        )
+        if scenario is None:
+            return Response(
+                {"detail": "This lesson cannot be tried without an account."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        variant_code = choose_variant(scenario.definition)
+        lesson = LessonSummarySerializer(
+            scenario.lesson, context={"scenario": scenario, "variant_code": variant_code}
+        ).data
+        return Response(
+            {
+                "lesson": lesson,
+                "scenario": SimulationScenarioSummarySerializer(scenario).data,
+                "course": {
+                    "slug": scenario.lesson.course.slug,
+                    "title": scenario.lesson.course.title,
+                },
+            }
+        )

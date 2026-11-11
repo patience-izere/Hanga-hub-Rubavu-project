@@ -1,6 +1,6 @@
-const CACHE_VERSION = "opedu-shell-v1";
+const CACHE_VERSION = "opedu-shell-v2";
 const LESSON_CACHE = "opedu-lessons-v1";
-const SHELL = ["/", "/manifest.webmanifest", "/opedu-icon.svg"];
+const SHELL = ["/", "/manifest.webmanifest", "/favicon-32.png", "/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_VERSION).then((cache) => cache.addAll(SHELL)));
