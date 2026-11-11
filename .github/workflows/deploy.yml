@@ -146,8 +146,22 @@ jobs:
           KNOWN_HOSTS: ${{ secrets.OPEDU_SSH_KNOWN_HOSTS }}
         run: |
           install -m 700 -d ~/.ssh
-          # Pasting a key into the secrets page can add Windows line endings or stray spaces.
-          printf '%s\n' "$SSH_KEY" | tr -d '\r' | sed 's/[[:space:]]*$//' > ~/.ssh/opedu_deploy
+          # Pasting a key into the secrets page can join its lines, add Windows line endings or
+          # spaces. Rebuild the standard layout from whatever arrived: the markers, then the
+          # base64 body in 70-character lines.
+          umask 077
+          python3 - > ~/.ssh/opedu_deploy <<'PY'
+          import os, re, textwrap
+          raw = os.environ["SSH_KEY"].replace("\\n", "\n")
+          match = re.search(r"-----BEGIN ([A-Z ]+)-----(.*?)-----END \1-----", raw, re.S)
+          if match:
+              body = re.sub(r"\s+", "", match.group(2))
+              print(f"-----BEGIN {match.group(1)}-----")
+              print("\n".join(textwrap.wrap(body, 70)))
+              print(f"-----END {match.group(1)}-----")
+          else:
+              print(raw.strip())
+          PY
           chmod 600 ~/.ssh/opedu_deploy
           if ! ssh-keygen -y -f ~/.ssh/opedu_deploy > /dev/null 2>&1; then
             echo "::error::OPEDU_SSH_KEY is not a usable private key. Paste the whole private key file, from '-----BEGIN OPENSSH PRIVATE KEY-----' to '-----END OPENSSH PRIVATE KEY-----', keeping its line breaks (not the .pub file)."
