@@ -6,6 +6,9 @@ import {
   useAuthoredAssetPackages,
   useAuthoringCourses,
   useCreateAuthoredAssetPackage,
+  useDeleteAuthoredAssetPackage,
+  useRemoveAuthoredAssetFile,
+  useUpdateAuthoredAssetPackage,
   usePublishAuthoredAssetPackage,
   useUploadAuthoredAsset,
 } from "../learning/useContentAuthoring";
@@ -110,6 +113,9 @@ export function AuthoringAssetsPage({ canPublish }: { canPublish: boolean }) {
   const assetPackages = useAuthoredAssetPackages();
   const uploadAsset = useUploadAuthoredAsset();
   const publishAsset = usePublishAuthoredAssetPackage();
+  const removeFile = useRemoveAuthoredAssetFile();
+  const renamePackage = useUpdateAuthoredAssetPackage();
+  const deletePackage = useDeleteAuthoredAssetPackage();
   const [selectedPackageId, setSelectedPackageId] = useState(0);
   const [assetFile, setAssetFile] = useState<File | null>(null);
   const [assetRole, setAssetRole] = useState("primary-scene");
@@ -170,9 +176,69 @@ export function AuthoringAssetsPage({ canPublish }: { canPublish: boolean }) {
                 <li key={file.id}>
                   <strong>{file.role}</strong> · {file.path} · {file.license_spdx} ·{" "}
                   {Math.ceil(file.byte_size / 1024)} KB
+                  {selectedPackage.status === "draft" ? (
+                    <>
+                      {" "}
+                      <button
+                        type="button"
+                        className="button-link danger-link"
+                        disabled={removeFile.isPending}
+                        onClick={() => {
+                          if (window.confirm(`Remove ${file.path} from this draft package?`)) {
+                            removeFile.mutate({ packageId: selectedPackage.id, fileId: file.id });
+                          }
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </>
+                  ) : null}
                 </li>
               ))}
             </ul>
+            {selectedPackage.status === "draft" ? (
+              <div className="button-row">
+                <button
+                  type="button"
+                  className="button-link"
+                  disabled={renamePackage.isPending}
+                  onClick={() => {
+                    const name = window.prompt("New name for this package", selectedPackage.name);
+                    if (name && name.trim()) {
+                      renamePackage.mutate({ id: selectedPackage.id, name: name.trim() });
+                    }
+                  }}
+                >
+                  Rename package
+                </button>
+                <button
+                  type="button"
+                  className="button-link danger-link"
+                  disabled={deletePackage.isPending}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Delete the draft package "${selectedPackage.name}" and its files?`,
+                      )
+                    ) {
+                      deletePackage.mutate(selectedPackage.id, {
+                        onSuccess: () => setSelectedPackageId(0),
+                      });
+                    }
+                  }}
+                >
+                  Delete draft package
+                </button>
+              </div>
+            ) : null}
+            {removeFile.isError || renamePackage.isError || deletePackage.isError ? (
+              <p className="form-error" role="alert">
+                {describeApiError(
+                  removeFile.error ?? renamePackage.error ?? deletePackage.error,
+                  "The package could not be changed.",
+                )}
+              </p>
+            ) : null}
             {selectedPackage.status !== "draft" ? (
               <p className="field-note">
                 This package is {selectedPackage.status}, so its files cannot change. Create a new

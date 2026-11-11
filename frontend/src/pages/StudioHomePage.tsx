@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { describeApiError } from "../api/client";
 import type { AuthoredScenario, AuthoringCourse, AuthoringLesson } from "../api/content";
 import { useCurrentUser } from "../auth/useAuth";
 import { useRoles } from "../auth/useRoles";
@@ -11,12 +10,10 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { QueryBoundary } from "../components/ui/QueryBoundary";
 import {
   useAuthoredScenarios,
-  useAddCourseCompetency,
-  useAddCourseModule,
   useAuthoringCourses,
   useAuthoringLessons,
-  useCreateAuthoringCourse,
 } from "../learning/useContentAuthoring";
+import { AccessBadge } from "./CoursesPage";
 
 /** Drafts first: a returned lesson is the thing an author must act on. */
 const STATUS_ORDER: ContentStatus[] = ["draft", "review", "approved", "published", "retired"];
@@ -140,174 +137,31 @@ function ReviewQueue({
 }
 
 function CourseCard({ course }: { course: AuthoringCourse }) {
-  const addCompetency = useAddCourseCompetency();
-  const addModule = useAddCourseModule();
-  const [code, setCode] = useState("");
-  const [competencyTitle, setCompetencyTitle] = useState("");
-  const [moduleTitle, setModuleTitle] = useState("");
-
   return (
     <article className="studio-course-card">
       <header>
-        <h3>{course.title}</h3>
+        <h3>
+          <Link to={`/authoring/courses/${course.id}`}>{course.title}</Link>
+        </h3>
         <span>
           {course.trade} · {course.lessonCount} {course.lessonCount === 1 ? "lesson" : "lessons"}
+          {" · "}
+          {course.modules.length} {course.modules.length === 1 ? "module" : "modules"} ·{" "}
+          {course.competencies.length}{" "}
+          {course.competencies.length === 1 ? "competency" : "competencies"}
         </span>
       </header>
-      <details>
-        <summary>
-          Competencies <span className="studio-count">{course.competencies.length}</span>
-        </summary>
-        {course.competencies.length ? (
-          <ul className="studio-competency-list">
-            {course.competencies.map((competency) => (
-              <li key={competency.id}>
-                <code>{competency.code}</code> {competency.title}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="field-note">
-            Add the competencies this course assesses. Every practical step maps to at least one.
-          </p>
-        )}
-        <form
-          className="studio-inline-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            addCompetency.mutate(
-              { courseId: course.id, code, title: competencyTitle, description: "" },
-              {
-                onSuccess: () => {
-                  setCode("");
-                  setCompetencyTitle("");
-                },
-              },
-            );
-          }}
-        >
-          <label>
-            Code
-            <input
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              placeholder="ELEC-03"
-              required
-              maxLength={60}
-            />
-          </label>
-          <label>
-            What the learner can do
-            <input
-              value={competencyTitle}
-              onChange={(event) => setCompetencyTitle(event.target.value)}
-              placeholder="Isolate a circuit safely"
-              required
-              maxLength={180}
-            />
-          </label>
-          <button
-            className="button button-secondary studio-small-button"
-            disabled={addCompetency.isPending}
-          >
-            Add competency
-          </button>
-          {addCompetency.isError ? (
-            <p className="form-error" role="alert">
-              {describeApiError(addCompetency.error, "The competency could not be added.")}
-            </p>
-          ) : null}
-        </form>
-      </details>
-      <details>
-        <summary>
-          Modules <span className="studio-count">{course.modules.length}</span>
-        </summary>
-        {course.modules.length ? (
-          <ol className="studio-competency-list">
-            {course.modules.map((module) => (
-              <li key={module.id}>{module.title}</li>
-            ))}
-          </ol>
-        ) : (
-          <p className="field-note">Modules group related lessons, for example "PV safety".</p>
-        )}
-        <form
-          className="studio-inline-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            addModule.mutate(
-              { courseId: course.id, title: moduleTitle, description: "" },
-              { onSuccess: () => setModuleTitle("") },
-            );
-          }}
-        >
-          <label>
-            Module title
-            <input
-              value={moduleTitle}
-              onChange={(event) => setModuleTitle(event.target.value)}
-              required
-              maxLength={180}
-            />
-          </label>
-          <button
-            className="button button-secondary studio-small-button"
-            disabled={addModule.isPending}
-          >
-            Add module
-          </button>
-          {addModule.isError ? (
-            <p className="form-error" role="alert">
-              {describeApiError(addModule.error, "The module could not be added.")}
-            </p>
-          ) : null}
-        </form>
-      </details>
+      <p className="studio-course-access">
+        <AccessBadge access={course.access} />
+        {course.isPublished ? " Listed on the Courses page" : " Not listed publicly"}
+      </p>
+      <Link
+        className="button button-secondary studio-small-button"
+        to={`/authoring/courses/${course.id}`}
+      >
+        Edit course, modules and competencies
+      </Link>
     </article>
-  );
-}
-
-function NewCourseForm({ onDone }: { onDone: () => void }) {
-  const create = useCreateAuthoringCourse();
-  const [title, setTitle] = useState("");
-  const [trade, setTrade] = useState("");
-  return (
-    <form
-      className="studio-inline-form studio-new-course"
-      onSubmit={(event) => {
-        event.preventDefault();
-        create.mutate({ title, trade, description: "" }, { onSuccess: onDone });
-      }}
-    >
-      <label>
-        Course title
-        <input
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          required
-          maxLength={180}
-        />
-      </label>
-      <label>
-        Trade
-        <input
-          value={trade}
-          onChange={(event) => setTrade(event.target.value)}
-          placeholder="Electrical installation"
-          required
-          maxLength={120}
-        />
-      </label>
-      <button className="button button-primary studio-small-button" disabled={create.isPending}>
-        {create.isPending ? "Creating…" : "Create course"}
-      </button>
-      {create.isError ? (
-        <p className="form-error" role="alert">
-          {describeApiError(create.error, "The course could not be created.")}
-        </p>
-      ) : null}
-    </form>
   );
 }
 
@@ -318,7 +172,6 @@ export function StudioHomePage() {
   const userId = useCurrentUser().data?.id;
   const scenarios = useAuthoredScenarios();
   const [courseFilter, setCourseFilter] = useState(0);
-  const [addingCourse, setAddingCourse] = useState(false);
 
   const visible = (lessons.data ?? []).filter(
     (lesson) => !courseFilter || lesson.course === courseFilter,
@@ -456,16 +309,13 @@ export function StudioHomePage() {
         <aside className="studio-courses" aria-labelledby="studio-courses-heading">
           <div className="studio-section-heading">
             <h2 id="studio-courses-heading">Courses</h2>
-            <button
-              type="button"
+            <Link
               className="button button-secondary studio-small-button"
-              onClick={() => setAddingCourse((value) => !value)}
-              aria-expanded={addingCourse}
+              to="/authoring/courses/new"
             >
-              {addingCourse ? "Cancel" : "New course"}
-            </button>
+              New course
+            </Link>
           </div>
-          {addingCourse ? <NewCourseForm onDone={() => setAddingCourse(false)} /> : null}
           <QueryBoundary
             query={courses}
             loading="Loading courses…"

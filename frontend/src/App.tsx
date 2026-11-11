@@ -26,7 +26,7 @@ import { AboutPage } from "./pages/AboutPage";
 import { FeaturesPage } from "./pages/FeaturesPage";
 import { UpdatesPage } from "./pages/UpdatesPage";
 import { ContactPage } from "./pages/ContactPage";
-import { PrivacyPage, TermsPage } from "./pages/LegalPages";
+import { DisclaimerPage, PrivacyPage, TermsPage } from "./pages/LegalPages";
 import { TrainingMarkerPage } from "./pages/TrainingMarkerPage";
 import { ClassJoinPage } from "./pages/ClassJoinPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -68,6 +68,11 @@ const VerifyCertificatePage = lazyPage(
 );
 const ClassAccessPage = lazyPage(() => import("./pages/ClassAccessPage"), "ClassAccessPage");
 const LiveBoardPage = lazyPage(() => import("./pages/LiveBoardPage"), "LiveBoardPage");
+const CoursesPage = lazyPage(() => import("./pages/CoursesPage"), "CoursesPage");
+const CourseDetailPage = lazyPage(() => import("./pages/CoursesPage"), "CourseDetailPage");
+const PublicLessonPage = lazy(() =>
+  import("./pages/DemoPage").then((module) => ({ default: module.PublicLessonPage })),
+);
 const DemoPage = lazy(() =>
   import("./pages/DemoPage").then((module) => ({ default: module.DemoPage })),
 );
@@ -133,6 +138,7 @@ const ContentAuthoringPage = lazyPage(
   "ContentAuthoringPage",
 );
 const LessonEditorPage = lazyPage(() => import("./pages/LessonEditorPage"), "LessonEditorPage");
+const CourseEditorPage = lazyPage(() => import("./pages/CourseEditorPage"), "CourseEditorPage");
 const StudioHomePage = lazyPage(() => import("./pages/StudioHomePage"), "StudioHomePage");
 const AuthoringAssetsPage = lazyPage(
   () => import("./pages/AuthoringAssetsPage"),
@@ -240,6 +246,31 @@ export function App() {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/disclaimer" element={<DisclaimerPage />} />
+          <Route
+            path="/courses"
+            element={
+              <Loading label="Loading courses…">
+                <CoursesPage />
+              </Loading>
+            }
+          />
+          <Route
+            path="/courses/:slug"
+            element={
+              <Loading label="Loading the course…">
+                <CourseDetailPage user={user} />
+              </Loading>
+            }
+          />
+          <Route
+            path="/courses/:slug/lessons/:lessonId/try"
+            element={
+              <Loading label="Setting up the workshop…">
+                <PublicLessonPage />
+              </Loading>
+            }
+          />
           <Route path="/markers/battery" element={<TrainingMarkerPage />} />
           <Route path="/class" element={<ClassJoinPage user={user} />} />
           <Route path="/class/:code" element={<ClassJoinPage user={user} />} />
@@ -421,6 +452,22 @@ export function App() {
             element={
               <RequireRole user={user} capability="canAuthorContent">
                 <StudioHomePage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/authoring/courses/new"
+            element={
+              <RequireRole user={user} capability="canAuthorContent">
+                <CourseEditorPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/authoring/courses/:courseId"
+            element={
+              <RequireRole user={user} capability="canAuthorContent">
+                <CourseEditorPage />
               </RequireRole>
             }
           />

@@ -22,6 +22,8 @@ export type Locale = (typeof LOCALES)[number];
 
 export const en = {
   // Public navigation
+  home: "Home",
+  courses: "Courses",
   about: "About",
   features: "Features",
   updates: "Updates",
@@ -226,7 +228,7 @@ export const en = {
   "result.result": "result",
   "result.practiseAgain": "Practise again",
   "result.tryAssessed": "Try another assessed attempt",
-  "result.certificate": "View and share your certificate",
+  "result.certificate": "View and share your practice record",
   "result.stepByStep": "Step by step",
   "result.rightFirst": "Right first time",
   "result.backToLearning": "Return to my learning",
@@ -271,6 +273,8 @@ export type MessageKey = keyof typeof en;
  * and everything else falls back to English.
  */
 export const rw: Partial<Record<MessageKey, string>> = {
+  home: "Ahabanza",
+  courses: "Amasomo",
   about: "Ibyerekeye",
   features: "Ibiranga",
   updates: "Amakuru",

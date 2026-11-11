@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
 import { apiFetch, describeApiError, ensureCsrf } from "@/api/client";
+import { CONTACT } from "@/config/site";
 
 const TOPICS = [
   { value: "school_pilot", label: "School pilot" },
@@ -70,8 +71,18 @@ export function ContactPage() {
           <div className="contact-location">
             <span aria-hidden="true">RW</span>
             <div>
-              <strong>Project location</strong>
-              <p>Kigali, Rwanda</p>
+              <strong>Reach us directly</strong>
+              <p>
+                <a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>
+                <br />
+                <a href={CONTACT.phoneHref}>Tel. {CONTACT.phoneDisplay}</a>
+                <br />
+                <a href={CONTACT.whatsappHref} target="_blank" rel="noopener noreferrer">
+                  WhatsApp {CONTACT.whatsappDisplay}
+                </a>
+                <br />
+                {CONTACT.address}
+              </p>
             </div>
           </div>
         </div>

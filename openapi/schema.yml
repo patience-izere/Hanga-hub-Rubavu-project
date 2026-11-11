@@ -834,6 +834,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContactMessage'
           description: ''
+    delete:
+      operationId: api_v1_contact_destroy
+      description: Mark an enquiry as handled, or not.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/content/asset-packages/:
     get:
       operationId: api_v1_content_asset_packages_list
@@ -1233,6 +1249,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthoringCourse'
           description: ''
+    delete:
+      operationId: api_v1_content_courses_destroy
+      description: Courses, with their modules and competencies, that an author can
+        build lessons in.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/content/courses/{id}/competencies/:
     post:
       operationId: api_v1_content_courses_competencies_create
@@ -1268,6 +1302,70 @@ paths:
               schema:
                 $ref: '#/components/schemas/CompetencyOption'
           description: ''
+  /api/v1/content/courses/{id}/competencies/{competency_id}/:
+    patch:
+      operationId: api_v1_content_courses_competencies_partial_update
+      description: Edit a competency, or delete it while no learner has evidence against
+        it.
+      parameters:
+      - in: path
+        name: competency_id
+        schema:
+          type: string
+          pattern: ^\d+$
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCompetencyOptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCompetencyOptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCompetencyOptionRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompetencyOption'
+          description: ''
+    delete:
+      operationId: api_v1_content_courses_competencies_destroy
+      description: Edit a competency, or delete it while no learner has evidence against
+        it.
+      parameters:
+      - in: path
+        name: competency_id
+        schema:
+          type: string
+          pattern: ^\d+$
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/content/courses/{id}/modules/:
     post:
       operationId: api_v1_content_courses_modules_create
@@ -1303,6 +1401,70 @@ paths:
               schema:
                 $ref: '#/components/schemas/ModuleOption'
           description: ''
+  /api/v1/content/courses/{id}/modules/{module_id}/:
+    patch:
+      operationId: api_v1_content_courses_modules_partial_update
+      description: Rename or describe a module, move it up or down, or delete it when
+        it is empty.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      - in: path
+        name: module_id
+        schema:
+          type: string
+          pattern: ^\d+$
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedModuleOptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedModuleOptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedModuleOptionRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleOption'
+          description: ''
+    delete:
+      operationId: api_v1_content_courses_modules_destroy
+      description: Rename or describe a module, move it up or down, or delete it when
+        it is empty.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      - in: path
+        name: module_id
+        schema:
+          type: string
+          pattern: ^\d+$
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/content/grading-policies/:
     get:
       operationId: api_v1_content_grading_policies_list
@@ -1845,6 +2007,72 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScenarioAuthoring'
           description: ''
+  /api/v1/courses/:
+    get:
+      operationId: public_courses_list
+      description: Every published course, with who can take it. Anyone may look.
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/courses/{slug}/:
+    get:
+      operationId: public_course_retrieve
+      description: One course's full description, modules and lessons.
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/courses/{slug}/lessons/{lesson_id}/practice/:
+    get:
+      operationId: public_lesson_practice
+      description: A lesson from a public course, practised on the device. Nothing
+        is recorded.
+      parameters:
+      - in: path
+        name: lesson_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/v1/demo/:
     get:
       operationId: api_v1_demo_retrieve
@@ -1962,6 +2190,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/InstructorLearnerAssignment'
           description: ''
+    delete:
+      operationId: api_v1_instructor_assignments_destroy
+      description: Cancel an assignment the learner has not started. Started work
+        is never deleted.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/instructor/attempts/{id}/:
     get:
       operationId: api_v1_instructor_attempts_retrieve
@@ -2321,6 +2566,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/PlatformSchool'
           description: ''
+  /api/v1/platform/schools/{id}/:
+    patch:
+      operationId: api_v1_platform_schools_partial_update
+      description: Rename an organisation, change its type, switch it off and on,
+        or delete it when empty.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSchoolUpdateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSchoolUpdateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSchoolUpdateInputRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformSchool'
+          description: ''
+    delete:
+      operationId: api_v1_platform_schools_destroy
+      description: Rename an organisation, change its type, switch it off and on,
+        or delete it when empty.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/research/consent-policy/:
     get:
       operationId: api_v1_research_consent_policy_retrieve
@@ -3291,6 +3586,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/SchoolCohort'
           description: ''
+    delete:
+      operationId: api_v1_school_cohorts_destroy
+      description: Delete a class that never had learners; one with history is archived
+        instead.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/school/invitations/:
     get:
       operationId: api_v1_school_invitations_list
@@ -3556,6 +3868,16 @@ components:
       - is_primary
       - label
       - tolerance
+    AccessEnum:
+      enum:
+      - public
+      - account
+      - members
+      type: string
+      description: |-
+        * `public` - Public: anyone, no account, progress not saved
+        * `account` - Free account: sign in, progress saved
+        * `members` - School members only
     AdaptiveRecommendation:
       type: object
       properties:
@@ -4391,8 +4713,51 @@ components:
         trade:
           type: string
           maxLength: 120
+        summary:
+          type: string
+          description: One or two sentences shown on the course card.
+          maxLength: 300
         description:
           type: string
+        access:
+          allOf:
+          - $ref: '#/components/schemas/AccessEnum'
+          description: |-
+            Who can open this course's lessons.
+
+            * `public` - Public: anyone, no account, progress not saved
+            * `account` - Free account: sign in, progress saved
+            * `members` - School members only
+        accessLabel:
+          type: string
+          readOnly: true
+        level:
+          $ref: '#/components/schemas/LevelEnum'
+        ageGroup:
+          type: string
+          maxLength: 60
+        durationHours:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          nullable: true
+        language:
+          type: string
+          maxLength: 60
+        delivery:
+          $ref: '#/components/schemas/DeliveryEnum'
+        outcomes:
+          description: What a learner will be able to do afterwards.
+        requirements:
+          description: Devices, tools or conditions a learner needs.
+        prerequisites:
+          description: Knowledge or courses to have before starting.
+        recognition:
+          type: string
+          description: 'Optional: how a partner institution recognises completion.
+            OPedu itself issues no certificates.'
+        isPublished:
+          type: boolean
         modules:
           type: array
           items:
@@ -4407,6 +4772,7 @@ components:
           type: integer
           readOnly: true
       required:
+      - accessLabel
       - competencies
       - id
       - lessonCount
@@ -4430,8 +4796,48 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        summary:
+          type: string
+          description: One or two sentences shown on the course card.
+          maxLength: 300
         description:
           type: string
+        access:
+          allOf:
+          - $ref: '#/components/schemas/AccessEnum'
+          description: |-
+            Who can open this course's lessons.
+
+            * `public` - Public: anyone, no account, progress not saved
+            * `account` - Free account: sign in, progress saved
+            * `members` - School members only
+        level:
+          $ref: '#/components/schemas/LevelEnum'
+        ageGroup:
+          type: string
+          maxLength: 60
+        durationHours:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          nullable: true
+        language:
+          type: string
+          maxLength: 60
+        delivery:
+          $ref: '#/components/schemas/DeliveryEnum'
+        outcomes:
+          description: What a learner will be able to do afterwards.
+        requirements:
+          description: Devices, tools or conditions a learner needs.
+        prerequisites:
+          description: Knowledge or courses to have before starting.
+        recognition:
+          type: string
+          description: 'Optional: how a partner institution recognises completion.
+            OPedu itself issues no certificates.'
+        isPublished:
+          type: boolean
       required:
       - title
       - trade
@@ -4864,6 +5270,14 @@ components:
       - reviewNotes
       - subject
       - summary
+    DeliveryEnum:
+      enum:
+      - virtual
+      - blended
+      type: string
+      description: |-
+        * `virtual` - Virtual practice only
+        * `blended` - Virtual practice, then a supervised physical workshop
     Detail:
       type: object
       properties:
@@ -6003,6 +6417,16 @@ components:
       - reviewedBy
       - submittedAt
       - title
+    LevelEnum:
+      enum:
+      - beginner
+      - intermediate
+      - advanced
+      type: string
+      description: |-
+        * `beginner` - Beginner
+        * `intermediate` - Intermediate
+        * `advanced` - Advanced
     MasteryStateEnum:
       enum:
       - not_demonstrated
@@ -6033,9 +6457,13 @@ components:
         order:
           type: integer
           readOnly: true
+        lessonCount:
+          type: integer
+          readOnly: true
       required:
       - code
       - id
+      - lessonCount
       - order
       - title
     ModuleOptionRequest:
@@ -6406,8 +6834,48 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        summary:
+          type: string
+          description: One or two sentences shown on the course card.
+          maxLength: 300
         description:
           type: string
+        access:
+          allOf:
+          - $ref: '#/components/schemas/AccessEnum'
+          description: |-
+            Who can open this course's lessons.
+
+            * `public` - Public: anyone, no account, progress not saved
+            * `account` - Free account: sign in, progress saved
+            * `members` - School members only
+        level:
+          $ref: '#/components/schemas/LevelEnum'
+        ageGroup:
+          type: string
+          maxLength: 60
+        durationHours:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          nullable: true
+        language:
+          type: string
+          maxLength: 60
+        delivery:
+          $ref: '#/components/schemas/DeliveryEnum'
+        outcomes:
+          description: What a learner will be able to do afterwards.
+        requirements:
+          description: Devices, tools or conditions a learner needs.
+        prerequisites:
+          description: Knowledge or courses to have before starting.
+        recognition:
+          type: string
+          description: 'Optional: how a partner institution recognises completion.
+            OPedu itself issues no certificates.'
+        isPublished:
+          type: boolean
     PatchedAuthoringLessonRequest:
       type: object
       properties:
@@ -6447,6 +6915,23 @@ components:
           type: array
           items:
             type: integer
+    PatchedCompetencyOptionRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 60
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        description:
+          type: string
+        masteryThreshold:
+          type: integer
+          maximum: 100
+          minimum: 1
     PatchedContactHandledInputRequest:
       type: object
       properties:
@@ -6484,6 +6969,15 @@ components:
           maxLength: 5000
         is_published:
           type: boolean
+    PatchedModuleOptionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 180
+        description:
+          type: string
     PatchedPilotStudyRequest:
       type: object
       properties:
@@ -6567,6 +7061,19 @@ components:
           type: boolean
         role:
           $ref: '#/components/schemas/RoleEnum'
+    PatchedSchoolUpdateInputRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 180
+        kind:
+          $ref: '#/components/schemas/OrganisationKindEnum'
+        isActive:
+          type: boolean
+        researchEnabled:
+          type: boolean
     PilotApproval:
       type: object
       properties:

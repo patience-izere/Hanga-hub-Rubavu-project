@@ -6,6 +6,7 @@
 
 /* ---- Heading scale (U-1): page titles 40–56 px, 32–36 px on phones ---- */
 .hero h1,
+.legal-page h1,
 .home-page .hero h1,
 .public-hero h1,
 .auth-message h1,
@@ -370,4 +371,128 @@
   font-size: clamp(1.1rem, 1.6vw, 1.45rem);
   line-height: 1.15;
   letter-spacing: -0.02em;
+}
+
+/* ---- Footer: social profiles, WhatsApp and contact details ---- */
+.site-footer {
+  --icon-cut: #073f35;
+}
+:root[data-theme="light"] .site-footer {
+  --icon-cut: #e9f0e4;
+}
+:root[data-theme="dark"] .site-footer {
+  --icon-cut: var(--deep-surface);
+}
+.social-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 16px 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.social-links a,
+.social-soon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: inherit;
+}
+.social-links a:hover {
+  background: rgba(127, 127, 127, 0.15);
+}
+.social-soon {
+  opacity: 0.55;
+}
+.footer-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #157a3f;
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.footer-contact {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  font-style: normal;
+  font-size: 0.85rem;
+}
+.footer-contact a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: inherit;
+}
+
+/* ---- Breadcrumbs (N-5) ---- */
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  color: var(--muted);
+}
+.breadcrumbs li + li::before {
+  content: "›";
+  margin-right: 6px;
+  color: var(--muted);
+}
+.breadcrumbs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--green-800);
+  font-weight: 600;
+}
+.breadcrumbs [aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Brand wordmark: one version per theme ---- */
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+}
+.brand-logo img {
+  display: block;
+  width: auto;
+  height: 100%;
+}
+.brand-logo-dark,
+:root[data-theme="dark"] .brand-logo-light {
+  display: none !important;
+}
+:root[data-theme="dark"] .brand-logo-dark {
+  display: block !important;
+}
+.footer-brand .brand-logo {
+  margin-bottom: 6px;
+}
+
+/* Dark theme: the home hero kept its light gradient, leaving pale text on a pale background. */
+:root[data-theme="dark"] .home-page .hero,
+:root[data-theme="dark"] .hero {
+  background:
+    radial-gradient(circle at 88% 18%, rgba(199, 229, 107, 0.3) 0 9%, transparent 9.3%),
+    linear-gradient(115deg, var(--sand) 0 54%, var(--surface-tint) 54% 100%);
+}
+@media (max-width: 1100px) {
+  :root[data-theme="dark"] .home-page .hero {
+    background: linear-gradient(150deg, var(--sand) 0 62%, var(--surface-tint) 62%);
+  }
 }

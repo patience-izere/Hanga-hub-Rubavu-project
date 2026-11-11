@@ -12,6 +12,7 @@ import {
   useAuthoringLesson,
   useCreateAuthoringLesson,
   useCreateLessonScenario,
+  useDeleteAuthoringLesson,
   useLessonHistory,
   useReviseAuthoringLesson,
   useTransitionAuthoringLesson,
@@ -62,6 +63,7 @@ export function LessonEditorPage() {
   const courses = useAuthoringCourses();
   const lesson = useAuthoringLesson(lessonId);
   const create = useCreateAuthoringLesson();
+  const remove = useDeleteAuthoringLesson();
   const update = useUpdateAuthoringLesson();
   const transition = useTransitionAuthoringLesson();
   const createScenario = useCreateLessonScenario();
@@ -96,7 +98,9 @@ export function LessonEditorPage() {
 
   const course = courses.data?.find((item) => item.id === form.course);
   const status = lesson.data?.status ?? "draft";
-  const editable = isNew || status === "draft";
+  // Authors edit drafts; administrators may correct a lesson in any status.
+  const adminEditing = !isNew && status !== "draft" && roles.canPublishContent;
+  const editable = isNew || status === "draft" || roles.canPublishContent;
   const saveError = create.error ?? update.error;
   const fieldErrors = saveError instanceof ApiError ? saveError.fieldErrors : {};
 
@@ -181,9 +185,17 @@ export function LessonEditorPage() {
           <p>{lesson.data.reviewNotes}</p>
         </div>
       ) : null}
+      {adminEditing ? (
+        <p className="studio-locked-note" role="status">
+          This lesson is {CONTENT_STATUS_LABELS[status].toLowerCase()}. As an administrator you can
+          still edit it; changes show to learners straight away. Learners&apos; recorded attempts
+          keep the practical version they used.
+        </p>
+      ) : null}
       {!editable ? (
         <p className="studio-locked-note" role="status">
-          This lesson is {CONTENT_STATUS_LABELS[status].toLowerCase()} and can no longer be edited.
+          This lesson is {CONTENT_STATUS_LABELS[status].toLowerCase()} and only an administrator can
+          edit it.
           {status === "review" || status === "approved"
             ? " A reviewer can return it to draft with notes."
             : ""}
@@ -464,8 +476,9 @@ export function LessonEditorPage() {
               {status === "published" || status === "retired" ? (
                 <>
                   <p className="field-note">
-                    Learners' evidence refers to this exact text, so it stays as published. Start a
-                    revision to change it; the current version stays live until you retire it.
+                    {roles.canPublishContent
+                      ? "Small corrections: edit the lesson on the left and save. For a bigger rewrite, start a revision: a new draft that goes through review while this version stays live."
+                      : "Ask a school administrator to correct this lesson, or start a revision: a new draft that goes through review while this version stays live."}
                   </p>
                   <button
                     type="button"
@@ -538,6 +551,32 @@ export function LessonEditorPage() {
                 </p>
               ) : null}
             </section>
+            {status === "draft" || roles.canPublishContent ? (
+              <section className="studio-side-panel" aria-labelledby="lesson-delete-heading">
+                <h2 id="lesson-delete-heading">Delete this lesson</h2>
+                <p className="field-note">
+                  Allowed while no learner has it. A lesson learners have worked on can only be
+                  retired, so their records stay complete.
+                </p>
+                <button
+                  type="button"
+                  className="button button-danger button-full"
+                  disabled={remove.isPending}
+                  onClick={() => {
+                    if (window.confirm(`Delete "${lesson.data?.title}" and its practical?`)) {
+                      remove.mutate(lessonId, { onSuccess: () => navigate("/authoring") });
+                    }
+                  }}
+                >
+                  {remove.isPending ? "Deleting…" : "Delete lesson"}
+                </button>
+                {remove.isError ? (
+                  <p className="form-error" role="alert">
+                    {describeApiError(remove.error, "The lesson could not be deleted.")}
+                  </p>
+                ) : null}
+              </section>
+            ) : null}
             <section className="studio-side-panel" aria-labelledby="lesson-history-heading">
               <h2 id="lesson-history-heading">Review history</h2>
               {history.data?.length ? (

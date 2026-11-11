@@ -90,3 +90,29 @@ export async function setContactHandled(id: number, handled: boolean): Promise<C
     body: JSON.stringify({ handled }),
   });
 }
+
+export async function updatePlatformSchool(
+  id: number,
+  changes: Partial<{
+    name: string;
+    kind: PlatformSchool["kind"];
+    isActive: boolean;
+    researchEnabled: boolean;
+  }>,
+): Promise<PlatformSchool> {
+  await ensureCsrf();
+  return apiFetch<PlatformSchool>(`/api/v1/platform/schools/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(changes),
+  });
+}
+
+export async function deletePlatformSchool(id: number): Promise<void> {
+  await ensureCsrf();
+  await apiFetch(`/api/v1/platform/schools/${id}/`, { method: "DELETE" });
+}
+
+export async function deleteContactMessage(id: number): Promise<void> {
+  await ensureCsrf();
+  await apiFetch(`/api/v1/contact/${id}/`, { method: "DELETE" });
+}

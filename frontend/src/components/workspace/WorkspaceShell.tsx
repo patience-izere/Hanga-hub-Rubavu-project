@@ -15,6 +15,7 @@ import { roleCapabilities } from "../../auth/useRoles";
 import { useLocale } from "../../i18n/LocaleProvider";
 import { OfflineBanner } from "../OfflineBanner";
 import { useDialogFocus } from "../ui/Dialog";
+import { BrandLogo } from "../BrandLogo";
 import { InstallAppButton } from "../InstallAppButton";
 import { LanguageSelect, ThemeSelect } from "../ShellControls";
 import { workspaceSections, type WorkspaceSection } from "./workspaceNav";
@@ -135,13 +136,12 @@ export function WorkspaceShell({ user }: { user: User }) {
       </a>
       <header className="workspace-header">
         <Link className="brand" to={roles.homePath} aria-label={t("shell.workspaceHome")}>
-          <span className="brand-mark" aria-hidden="true">
-            O
-          </span>
-          <span>
-            <strong>OPedu</strong>
-            {user.organization ? <small>{user.organization}</small> : null}
-          </span>
+          <BrandLogo height={46} />
+          {user.organization ? (
+            <span>
+              <small>{user.organization}</small>
+            </span>
+          ) : null}
         </Link>
         <div className="workspace-header-actions">
           <InstallAppButton />

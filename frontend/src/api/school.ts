@@ -179,6 +179,11 @@ export async function createSchoolCohort(input: {
   });
 }
 
+export async function deleteSchoolCohort(id: number): Promise<void> {
+  await ensureCsrf();
+  await apiFetch(`/api/v1/school/cohorts/${id}/`, { method: "DELETE" });
+}
+
 export async function updateSchoolCohort(
   id: number,
   changes: { name?: string; academicYear?: string; isActive?: boolean; learnerIds?: number[] },

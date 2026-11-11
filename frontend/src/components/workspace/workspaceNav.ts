@@ -70,7 +70,7 @@ export function workspaceSections(roles: RoleCapabilities): WorkspaceSection[] {
           to: "/authoring",
           label: "nav.studio",
           end: true,
-          alsoActiveFor: ["/authoring/lessons", "/authoring/scenarios"],
+          alsoActiveFor: ["/authoring/lessons", "/authoring/scenarios", "/authoring/courses"],
         },
         { to: "/authoring/assets", label: "nav.assets" },
       ],

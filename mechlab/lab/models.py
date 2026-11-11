@@ -366,16 +366,65 @@ class Course(models.Model):
         null=True,
         blank=True,
     )
+
+    class Access(models.TextChoices):
+        PUBLIC = "public", "Public: anyone, no account, progress not saved"
+        ACCOUNT = "account", "Free account: sign in, progress saved"
+        MEMBERS = "members", "School members only"
+
+    class Level(models.TextChoices):
+        BEGINNER = "beginner", "Beginner"
+        INTERMEDIATE = "intermediate", "Intermediate"
+        ADVANCED = "advanced", "Advanced"
+
+    class Delivery(models.TextChoices):
+        VIRTUAL = "virtual", "Virtual practice only"
+        BLENDED = "blended", "Virtual practice, then a supervised physical workshop"
+
     title = models.CharField(max_length=180)
     slug = models.SlugField(max_length=180, unique=True)
     trade = models.CharField(max_length=120)
+    summary = models.CharField(
+        max_length=300, blank=True, help_text="One or two sentences shown on the course card."
+    )
     description = models.TextField(blank=True)
+    access = models.CharField(
+        max_length=16,
+        choices=Access.choices,
+        default=Access.MEMBERS,
+        help_text="Who can open this course's lessons.",
+    )
+    level = models.CharField(max_length=16, choices=Level.choices, default=Level.BEGINNER)
+    age_group = models.CharField(
+        max_length=60, blank=True, help_text='For example "15 and over" or "Adults".'
+    )
+    duration_hours = models.PositiveSmallIntegerField(
+        null=True, blank=True, help_text="Approximate total learning time, in hours."
+    )
+    language = models.CharField(max_length=60, blank=True, default="English")
+    delivery = models.CharField(max_length=16, choices=Delivery.choices, default=Delivery.VIRTUAL)
+    outcomes = models.JSONField(
+        default=list, blank=True, help_text="What a learner will be able to do afterwards."
+    )
+    requirements = models.JSONField(
+        default=list, blank=True, help_text="Devices, tools or conditions a learner needs."
+    )
+    prerequisites = models.JSONField(
+        default=list, blank=True, help_text="Knowledge or courses to have before starting."
+    )
+    recognition = models.TextField(
+        blank=True,
+        help_text=(
+            "Optional: how a partner institution recognises completion. OPedu itself issues no "
+            "certificates."
+        ),
+    )
     is_published = models.BooleanField(default=False)
     open_enrollment = models.BooleanField(
         default=False,
         help_text=(
-            "List this course's published lessons in the open catalogue, so anyone signed in can "
-            "enrol themselves. The owning organisation's instructors can see their results."
+            "Derived from access: true for public and free-account courses, whose published "
+            "lessons are listed in the open catalogue."
         ),
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -389,6 +438,11 @@ class Course(models.Model):
             raise ValidationError({"program": "The program must belong to the course's school."})
 
     def save(self, *args, **kwargs):
+        # The open catalogue and enrolment code read open_enrollment; access decides it.
+        self.open_enrollment = self.access in {self.Access.PUBLIC, self.Access.ACCOUNT}
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "access" in update_fields:
+            kwargs["update_fields"] = {*update_fields, "open_enrollment"}
         self.full_clean()
         return super().save(*args, **kwargs)
 
@@ -559,6 +613,10 @@ class Lesson(models.Model):
         "content_version",
     )
 
+    # What ties a lesson to its recorded attempts. These never change once it is published, even
+    # for an administrator; the practical itself is versioned separately.
+    IDENTITY_FIELDS = ("course_id", "slug", "content_version")
+
     def save(self, *args, **kwargs):
         self.full_clean()
         self._prevent_published_changes()
@@ -570,9 +628,13 @@ class Lesson(models.Model):
         previous = type(self).objects.filter(pk=self.pk).first()
         if previous is None or previous.status not in {self.Status.PUBLISHED, self.Status.RETIRED}:
             return
-        if any(
-            getattr(previous, field) != getattr(self, field) for field in self.LEARNER_FACING_FIELDS
-        ):
+        # An administrator's audited edit (set by the authoring API) may correct the wording.
+        locked = (
+            self.IDENTITY_FIELDS
+            if getattr(self, "administrator_edit", False)
+            else self.LEARNER_FACING_FIELDS
+        )
+        if any(getattr(previous, field) != getattr(self, field) for field in locked):
             raise ValidationError(
                 "Published lessons cannot be edited in place. Start a revision instead."
             )

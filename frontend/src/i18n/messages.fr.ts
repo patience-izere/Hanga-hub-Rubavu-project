@@ -5,6 +5,8 @@ import type { MessageKey } from "./messages";
  * it is relied on. Lesson content is not translated here; it is authored per language.
  */
 export const fr: Partial<Record<MessageKey, string>> = {
+  home: "Accueil",
+  courses: "Cours",
   "shell.menu": "Menu",
   "shell.closeMenu": "Fermer",
   "theme.label": "Thème de couleur",
@@ -206,7 +208,7 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "result.result": "résultat",
   "result.practiseAgain": "S'entraîner encore",
   "result.tryAssessed": "Faire une autre tentative évaluée",
-  "result.certificate": "Voir et partager votre certificat",
+  "result.certificate": "Voir et partager votre relevé de pratique",
   "result.stepByStep": "Étape par étape",
   "result.rightFirst": "Réussi du premier coup",
   "result.backToLearning": "Retour à mes leçons",
