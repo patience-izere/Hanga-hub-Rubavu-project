@@ -1,0 +1,616 @@
+/*
+ * The practice workspace: the workshop first, one instruction card beside it.
+ *
+ * Colours come from the tokens in styles.css, which already switch for dark mode. The stage is
+ * dark in both themes because it is a lit workshop, not a page.
+ */
+
+.ws {
+  display: grid;
+  gap: 14px;
+  padding: clamp(12px, 2.5vw, 28px);
+  max-width: 1500px;
+  margin: 0 auto;
+  width: 100%;
+}
+.ws-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.ws-heading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.ws-heading h1 {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.6vw, 1.85rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.ws-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ws-count {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--brand-surface, var(--green-950));
+  color: #fff;
+}
+.ws-count strong {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+.ws-count span {
+  font-size: 0.75rem;
+  color: #cfe8db;
+}
+.ws-clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  color: var(--muted);
+}
+.ws-icon-button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.ws-icon-button[aria-pressed="false"] {
+  color: var(--muted);
+}
+
+.ws-rail {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ws-rail li {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+}
+.ws-rail li.is-done {
+  background: var(--green-650);
+}
+.ws-rail li.is-current {
+  background: var(--lime);
+  outline: 1px solid var(--green-650);
+}
+
+.ws-settings {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  font-size: 0.875rem;
+}
+.ws-settings summary {
+  padding: 10px 14px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.ws-settings summary strong {
+  color: var(--ink);
+}
+.ws-setting-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+  padding: 4px 14px 14px;
+}
+.ws-setting-group button {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-input, #fff);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ws-setting-group button small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+.ws-setting-group button[aria-pressed="true"] {
+  border-color: var(--green-650);
+  box-shadow: inset 0 0 0 1px var(--green-650);
+}
+.ws-setting-group button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ws-setting-group .field-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.ws-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.ws-mode-accessible_2d .ws-body {
+  grid-template-columns: minmax(0, 0.8fr) minmax(320px, 1.2fr);
+}
+.ws-stage {
+  position: relative;
+  display: grid;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #101a22;
+  color: #e6efe9;
+  min-width: 0;
+}
+.ws-simple {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 22px;
+}
+.ws-simple .eyebrow {
+  color: #c7e56b;
+}
+.ws-simple p {
+  margin: 0;
+  color: #cddad6;
+  line-height: 1.55;
+}
+.ws-simple img,
+.ws-simple video {
+  max-width: 100%;
+  border-radius: 10px;
+}
+
+/* --- the 3D workshop ------------------------------------------------------------------- */
+.scene-player {
+  position: relative;
+  height: clamp(340px, 64vh, 660px);
+  touch-action: none;
+}
+.scene-player-canvas {
+  position: absolute;
+  inset: 0;
+}
+.scene-player.is-overlay {
+  height: 100%;
+  background: transparent;
+}
+.scene-tag {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(13, 22, 28, 0.84);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+.scene-tag.is-name {
+  background: transparent;
+  color: #a9bbc4;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+.scene-tag.is-good {
+  background: #14553f;
+  color: #d9f7e6;
+}
+.scene-tag.is-bad {
+  background: #7d2a22;
+  color: #ffe1dc;
+}
+.scene-tag.is-display {
+  background: #0c1512;
+  color: #9cf0c4;
+  border: 1px solid #2b5a48;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+.scene-tag.is-chart {
+  background: #0c1512;
+  color: #9cf0c4;
+  border: 1px solid #2b5a48;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
+}
+.scene-held,
+.scene-notice {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 24px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(13, 22, 28, 0.9);
+  color: #fff;
+  font-size: 0.85rem;
+}
+.scene-held {
+  border: 1px solid #7fd8ff;
+}
+.scene-held button {
+  border: 0;
+  background: transparent;
+  color: #7fd8ff;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.scene-view-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  gap: 4px;
+}
+.scene-view-controls button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(13, 22, 28, 0.82);
+  color: #fff;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+.scene-view-controls button:focus-visible,
+.ws-option:focus-visible,
+.ws-icon-button:focus-visible,
+.ws-setting-group button:focus-visible {
+  outline: 3px solid var(--lime);
+  outline-offset: 2px;
+}
+
+/* A consequence colours the whole workshop for a moment. */
+.scene-player::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+.scene-player.is-effect-hazard::after,
+.scene-player.is-effect-damage::after {
+  box-shadow:
+    inset 0 0 0 6px #e5533f,
+    inset 0 0 90px rgba(229, 83, 63, 0.55);
+  animation: scene-flash 1.5s ease-out;
+}
+.scene-player.is-effect-spark::after,
+.scene-player.is-effect-blown_fuse::after {
+  background: rgba(255, 233, 160, 0.9);
+  animation: scene-arc 0.5s ease-out;
+}
+.scene-player.is-effect-wrong_reading::after,
+.scene-player.is-effect-none::after {
+  box-shadow: inset 0 0 0 4px #e8b93c;
+  animation: scene-flash 1.2s ease-out;
+}
+@keyframes scene-flash {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes scene-arc {
+  0% {
+    opacity: 0.85;
+  }
+  25% {
+    opacity: 0.1;
+  }
+  40% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-player.is-effect-spark::after,
+  .scene-player.is-effect-blown_fuse::after {
+    background: transparent;
+    box-shadow: inset 0 0 0 6px #ffd45c;
+    animation: scene-flash 1.5s linear;
+  }
+}
+
+/* Saved-state chip: quiet when everything is fine, a full bar when the learner must act. */
+.ws-stage .sync-banner {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  max-width: calc(100% - 240px);
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(13, 22, 28, 0.82);
+}
+.ws-stage .sync-banner.needs-attention {
+  position: static;
+  max-width: none;
+  border-radius: 0;
+  background: #17252e;
+  flex-wrap: wrap;
+}
+.ws-mode-accessible_2d .ws-stage .sync-banner,
+.ws-mode-marker_ar .ws-stage .sync-banner,
+.ws-mode-markerless_ar .ws-stage .sync-banner {
+  position: static;
+  max-width: none;
+  border-radius: 0;
+}
+.ws-stage .inline-confirm {
+  margin: 12px;
+}
+
+/* --- the instruction card -------------------------------------------------------------- */
+.ws-card {
+  display: grid;
+  gap: 14px;
+  padding: clamp(16px, 2vw, 24px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.ws-step-count {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--green-650);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ws-safety {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-warning, #fbf1c9);
+  color: var(--warning-text, #6d5200);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+.ws-card h2 {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.2vw, 1.6rem);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.ws-card h3 {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+.ws-card > p {
+  margin: 0;
+  line-height: 1.55;
+  font-size: 1.02rem;
+}
+.ws-hazard {
+  padding: 10px 12px;
+  border-left: 4px solid #d99a1c;
+  border-radius: 6px;
+  background: var(--surface-warning, #fdf6dd);
+  font-size: 0.9rem !important;
+}
+.ws-listen {
+  justify-self: start;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-input, #fff);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.ws-listen::before {
+  content: "▶ ";
+  color: var(--green-650);
+}
+.ws-feedback {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  line-height: 1.45;
+}
+.ws-feedback.is-correct {
+  background: var(--surface-success, #e3f5ea);
+  color: var(--success-text, #14553f);
+}
+.ws-feedback.is-incorrect {
+  background: var(--surface-danger, #fdeceb);
+  color: var(--danger);
+}
+.ws-feedback.is-incorrect strong {
+  font-size: 1.05rem;
+}
+.ws-options {
+  display: grid;
+  gap: 8px;
+}
+.ws-options.is-many {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.ws-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 54px;
+  padding: 10px 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-input, #fff);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+.ws-option:hover:not(:disabled) {
+  border-color: var(--green-650);
+}
+.ws-option:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ws-option.is-done {
+  background: var(--surface-success, #e3f5ea);
+}
+.ws-option small {
+  color: var(--success-text, #14553f);
+  font-weight: 700;
+}
+.ws-buttons-toggle summary,
+.ws-steps summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+.ws-buttons-toggle[open] summary {
+  margin-bottom: 10px;
+}
+.ws-steps ol {
+  margin: 10px 0 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.ws-steps li.is-done {
+  color: var(--success-text, #14553f);
+}
+.ws-steps li.is-done::after {
+  content: " ✓";
+}
+.ws-steps li[aria-current="step"] {
+  color: var(--ink);
+  font-weight: 700;
+}
+.ws-footer {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.ws-footer .button {
+  width: 100%;
+  min-height: 52px;
+}
+.ws-footer small {
+  color: var(--muted);
+}
+.ws-end {
+  justify-self: start;
+  color: var(--muted);
+}
+.ws-card .hint-panel {
+  margin: 0;
+}
+
+/* --- AR ---------------------------------------------------------------------------------- */
+.ar-bench {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: min(92%, 760px);
+  aspect-ratio: 4 / 3;
+  transform: translate(-50%, -50%);
+  transition:
+    left 0.2s linear,
+    top 0.2s linear,
+    transform 0.2s linear;
+}
+.markerless-actions {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+.markerless-feedback {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 900px) {
+  .ws {
+    padding: 10px;
+    gap: 10px;
+  }
+  .ws-body,
+  .ws-mode-accessible_2d .ws-body {
+    grid-template-columns: 1fr;
+  }
+  .scene-player {
+    height: clamp(280px, 48vh, 460px);
+  }
+  .ws-stage .sync-banner {
+    max-width: calc(100% - 20px);
+    bottom: 58px;
+  }
+  .ws-clock {
+    display: none;
+  }
+}
+
+.workspace-main > .ws {
+  padding: 0;
+}
+
+/* Keep the workshop in view while the instruction card scrolls on wide screens. */
+@media (min-width: 901px) {
+  .ws-stage {
+    position: sticky;
+    top: 84px;
+  }
+}
+
+/* The bench standing on the marker fills the camera view exactly, so its 3D camera matches. */
+.ar-bench-3d {
+  position: absolute;
+  inset: 0;
+}
+.ar-bench-3d .scene-player {
+  height: 100%;
+}

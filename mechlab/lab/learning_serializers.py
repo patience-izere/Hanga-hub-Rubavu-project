@@ -25,6 +25,14 @@ from .models import (
     SimulationScenario,
     StepResult,
 )
+from .scenario_runtime import (
+    public_knowledge_check,
+    resolved_steps,
+    scenario_distractors,
+    scenario_variants,
+    score_knowledge_check,
+    sequence_of,
+)
 from .scenario_snapshots import normalize_step
 
 MAX_CLIENT_JSON_BYTES = 16 * 1024
@@ -93,8 +101,15 @@ class HazardSnapshotSerializer(serializers.Serializer):
     )
 
 
+class StepChoiceSerializer(serializers.Serializer):
+    action_code = serializers.CharField(read_only=True)
+    label = serializers.CharField(read_only=True)
+
+
 class ProcedureStepSerializer(serializers.ModelSerializer):
     acceptable_actions = serializers.SerializerMethodField()
+    choices = serializers.SerializerMethodField()
+    mistakes = serializers.SerializerMethodField()
     hints = serializers.SerializerMethodField()
     tolerances = serializers.SerializerMethodField()
     tools = serializers.SerializerMethodField()
@@ -122,6 +137,8 @@ class ProcedureStepSerializer(serializers.ModelSerializer):
             "hazards",
             "feedback_rules",
             "competency_codes",
+            "choices",
+            "mistakes",
         ]
 
     def to_representation(self, instance):
@@ -137,6 +154,14 @@ class ProcedureStepSerializer(serializers.ModelSerializer):
     @extend_schema_field(AcceptableActionSnapshotSerializer(many=True))
     def get_acceptable_actions(self, obj) -> list[dict[str, object]]:
         return self._snapshot_value(obj, "acceptable_actions", [])
+
+    @extend_schema_field(StepChoiceSerializer(many=True))
+    def get_choices(self, obj) -> list[dict[str, object]]:
+        return self._snapshot_value(obj, "choices", [])
+
+    @extend_schema_field(serializers.DictField(child=serializers.DictField()))
+    def get_mistakes(self, obj) -> dict[str, dict[str, str]]:
+        return self._snapshot_value(obj, "mistakes", {})
 
     @extend_schema_field(StepHintSnapshotSerializer(many=True))
     def get_hints(self, obj) -> list[dict[str, object]]:
@@ -217,10 +242,26 @@ class AssetPackageSerializer(serializers.ModelSerializer):
         ]
 
 
+class KnowledgeCheckOptionSerializer(serializers.Serializer):
+    code = serializers.CharField(read_only=True)
+    label = serializers.CharField(read_only=True)
+
+
+class KnowledgeCheckQuestionSerializer(serializers.Serializer):
+    code = serializers.CharField(read_only=True)
+    prompt = serializers.CharField(read_only=True)
+    options = KnowledgeCheckOptionSerializer(many=True, read_only=True)
+
+
 class SimulationScenarioSummarySerializer(serializers.ModelSerializer):
     grading_policy = GradingPolicyReferenceSerializer(read_only=True)
     asset_package = AssetPackageSerializer(read_only=True, allow_null=True)
     renderer_config = serializers.SerializerMethodField()
+    sequence = serializers.SerializerMethodField()
+    scene = serializers.SerializerMethodField()
+    knowledge_check = serializers.SerializerMethodField()
+    has_variants = serializers.SerializerMethodField()
+    distractors = serializers.SerializerMethodField()
 
     class Meta:
         model = SimulationScenario
@@ -231,11 +272,39 @@ class SimulationScenarioSummarySerializer(serializers.ModelSerializer):
             "grading_policy",
             "asset_package",
             "renderer_config",
+            "sequence",
+            "scene",
+            "knowledge_check",
+            "has_variants",
+            "distractors",
         ]
 
     @extend_schema_field(serializers.DictField())
     def get_renderer_config(self, obj):
         return obj.definition.get("renderers", {})
+
+    @extend_schema_field(serializers.ChoiceField(choices=["ordered", "free"]))
+    def get_sequence(self, obj) -> str:
+        return sequence_of(obj.definition)
+
+    @extend_schema_field(serializers.DictField(allow_null=True))
+    def get_scene(self, obj):
+        scene = obj.definition.get("scene")
+        return scene if isinstance(scene, dict) else None
+
+    @extend_schema_field(KnowledgeCheckQuestionSerializer(many=True))
+    def get_knowledge_check(self, obj) -> list[dict[str, object]]:
+        # Answers and explanations stay on the server until the learner has answered.
+        return public_knowledge_check(obj.definition)
+
+    @extend_schema_field(StepChoiceSerializer(many=True))
+    def get_distractors(self, obj) -> list[dict[str, str]]:
+        """Things a learner may pick that are never right, offered with the real actions."""
+
+        return scenario_distractors(obj.definition)
+
+    def get_has_variants(self, obj) -> bool:
+        return len(scenario_variants(obj.definition)) > 1
 
 
 class LessonPrerequisiteSerializer(serializers.ModelSerializer):
@@ -278,8 +347,10 @@ class LessonSummarySerializer(serializers.ModelSerializer):
     def get_procedure_steps(self, obj) -> list[dict[str, object]]:
         scenario = self.context.get("scenario")
         if scenario is not None:
+            # An attempt sees the steps of the fault case it was given; a lesson overview sees
+            # the scenario's base steps.
             return ProcedureStepSerializer(
-                scenario.definition.get("steps", []),
+                resolved_steps(scenario.definition, self.context.get("variant_code", "")),
                 many=True,
             ).data
         return ProcedureStepSerializer(obj.procedure_steps.all(), many=True).data
@@ -307,6 +378,7 @@ class AttemptSummarySerializer(serializers.ModelSerializer):
             "resume_state",
             "renderer_mode",
             "learning_mode",
+            "is_practice",
             "capability_profile",
             "started_at",
             "completed_at",
@@ -439,11 +511,29 @@ class RendererSelectionSerializer(serializers.Serializer):
         return bounded_json(value, "The capability profile")
 
 
+class KnowledgeCheckResultSerializer(serializers.Serializer):
+    questionCode = serializers.CharField(read_only=True)
+    answered = serializers.BooleanField(read_only=True)
+    correct = serializers.BooleanField(read_only=True)
+    correctOption = serializers.CharField(read_only=True)
+    explanation = serializers.CharField(read_only=True)
+
+
 class KnowledgeCheckSubmissionSerializer(serializers.ModelSerializer):
+    results = serializers.SerializerMethodField()
+
     class Meta:
         model = KnowledgeCheckSubmission
-        fields = ["id", "answers", "score", "submitted_at"]
-        read_only_fields = ["id", "score", "submitted_at"]
+        fields = ["id", "answers", "score", "submitted_at", "results"]
+        read_only_fields = ["id", "score", "submitted_at", "results"]
+
+    @extend_schema_field(KnowledgeCheckResultSerializer(many=True))
+    def get_results(self, obj) -> list[dict[str, object]]:
+        """Per-question marking, shown only once the learner has answered."""
+
+        if not getattr(obj, "assignment_id", None):
+            return []
+        return score_knowledge_check(obj.assignment.scenario.definition, obj.answers)[1]
 
     def validate_answers(self, value):
         if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
@@ -662,7 +752,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
 
 
 class AttemptDetailSerializer(AttemptSummarySerializer):
-    assignment = AssignmentSerializer(read_only=True)
+    assignment = serializers.SerializerMethodField()
     events = AttemptEventSerializer(many=True, read_only=True)
     step_results = StepResultSerializer(many=True, read_only=True)
     competency_results = CompetencyResultSerializer(many=True, read_only=True)
@@ -678,6 +768,13 @@ class AttemptDetailSerializer(AttemptSummarySerializer):
             "feedback",
             "recommendation",
         ]
+
+    @extend_schema_field(AssignmentSerializer)
+    def get_assignment(self, obj) -> dict[str, object]:
+        return AssignmentSerializer(
+            obj.assignment,
+            context={**self.context, "variant_code": obj.variant_code},
+        ).data
 
     @extend_schema_field(LearnerFeedbackSerializer(many=True))
     def get_feedback(self, obj) -> list[dict[str, object]]:
@@ -740,6 +837,7 @@ class InstructorAttemptEvidenceSerializer(serializers.ModelSerializer):
             "score",
             "review_decision",
             "has_published_feedback",
+            "variant_code",
             "scenario_version",
             "grading_policy_code",
             "grading_policy_version",
@@ -830,7 +928,7 @@ class InstructorAttemptReviewSerializer(InstructorAttemptEvidenceSerializer):
     @extend_schema_field(ProcedureStepSerializer(many=True))
     def get_procedure_steps(self, obj) -> list[dict[str, object]]:
         return ProcedureStepSerializer(
-            obj.scenario.definition.get("steps", []),
+            resolved_steps(obj.scenario.definition, obj.variant_code),
             many=True,
         ).data
 

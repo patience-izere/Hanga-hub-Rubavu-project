@@ -41,6 +41,7 @@ export function workspaceSections(roles: RoleCapabilities): WorkspaceSection[] {
       heading: "nav.learning",
       links: [
         { to: "/learn", label: "nav.myLessons", end: true },
+        { to: "/learn/catalogue", label: "nav.catalogue" },
         { to: "/learn/progress", label: "nav.myProgress" },
       ],
     });
@@ -53,6 +54,8 @@ export function workspaceSections(roles: RoleCapabilities): WorkspaceSection[] {
         { to: "/teach", label: "nav.overview", end: true },
         { to: "/teach/learners", label: "nav.learners" },
         { to: "/teach/assign", label: "nav.assign" },
+        { to: "/teach/classes", label: "nav.classAccess" },
+        { to: "/teach/live", label: "nav.live" },
         { to: "/teach/competencies", label: "nav.competencies" },
         { to: "/teach/operations", label: "nav.operations" },
       ],
@@ -87,11 +90,14 @@ export function workspaceSections(roles: RoleCapabilities): WorkspaceSection[] {
     });
   }
 
-  const research: WorkspaceLink[] = [{ to: "/research/survey", label: "nav.survey" }];
-  if (roles.canReviewEvidence) {
-    research.unshift({ to: "/research/pilots", label: "nav.pilots" });
+  // Research tools belong to organisations taking part in a study; everyone else never sees them.
+  if (roles.researchEnabled) {
+    const research: WorkspaceLink[] = [{ to: "/research/survey", label: "nav.survey" }];
+    if (roles.canReviewEvidence) {
+      research.unshift({ to: "/research/pilots", label: "nav.pilots" });
+    }
+    sections.push({ heading: "nav.research", links: research });
   }
-  sections.push({ heading: "nav.research", links: research });
 
   sections.push({
     heading: "nav.account",

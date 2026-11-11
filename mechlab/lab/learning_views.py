@@ -80,6 +80,14 @@ from .research import (
     research_attempt_code,
     research_participant_code,
 )
+from .scenario_runtime import (
+    accepted_action_codes,
+    choose_variant,
+    consequence_for,
+    is_free_sequence,
+    resolved_steps,
+    score_knowledge_check,
+)
 from .xapi_validation import validate_xapi_statement
 
 
@@ -134,6 +142,8 @@ def _parse_client_datetime(value):
 
 
 MISTAKE_EVENT_TYPES = ("incorrect_action", "tolerance_failed")
+# Practice does not use up attempts, but an unbounded evidence log helps nobody.
+PRACTICE_ATTEMPT_LIMIT = 100
 SUBMITTED_STATUSES = (Attempt.Status.COMPLETED, Attempt.Status.REQUIRES_REVIEW)
 
 
@@ -296,7 +306,8 @@ def _has_procedure_evidence(attempt):
 
 
 def _procedure_progress(attempt):
-    steps = attempt.scenario.definition.get("steps", [])
+    # The attempt's own fault case decides what each step expects.
+    steps = resolved_steps(attempt.scenario.definition, attempt.variant_code)
     completed_codes = {
         event.payload.get("stepCode")
         for event in attempt.events.filter(event_type="step_completed")
@@ -364,8 +375,11 @@ def _instructor_attempt_queryset(user):
         raise PermissionDenied("An active instructor or school administrator role is required.")
     # Evidence belongs to the school that owns the lesson. Scoping by the learner's memberships
     # leaked attempts to every other school the learner also belonged to.
+    # Free practice is the learner's own space; instructors see assessed attempts only.
     return (
-        Attempt.objects.filter(assignment__lesson__course__school_id__in=school_ids)
+        Attempt.objects.filter(
+            assignment__lesson__course__school_id__in=school_ids, is_practice=False
+        )
         .select_related(
             "learner",
             "assignment",
@@ -461,7 +475,9 @@ class InstructorOverviewView(APIView):
 
         now = timezone.now()
         assignments = Assignment.objects.filter(lesson__course__school_id__in=school_ids)
-        scope = Attempt.objects.filter(assignment__lesson__course__school_id__in=school_ids)
+        scope = Attempt.objects.filter(
+            assignment__lesson__course__school_id__in=school_ids, is_practice=False
+        )
         statuses = dict(scope.values_list("status").annotate(total=Count("id")))
         outcomes = dict(scope.values_list("outcome").annotate(total=Count("id")))
         events = AttemptEvent.objects.filter(attempt__in=scope)
@@ -791,7 +807,7 @@ class InstructorAssignmentDetailView(APIView):
                 return Response(
                     {"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND
                 )
-            attempts = list(assignment.attempts.order_by("-started_at"))
+            attempts = list(assignment.attempts.filter(is_practice=False).order_by("-started_at"))
             if "attemptLimit" in values and values["attemptLimit"] < len(attempts):
                 return Response(
                     {
@@ -1310,9 +1326,11 @@ class AssignmentViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return (
-            Assignment.objects.filter(
-                learner=self.request.user,
-                lesson__course__school_id__in=_active_learner_school_ids(self.request.user),
+            Assignment.objects.filter(learner=self.request.user)
+            .filter(
+                Q(lesson__course__school_id__in=_active_learner_school_ids(self.request.user))
+                # Lessons someone enrolled in themselves from the open catalogue.
+                | Q(lesson__course__open_enrollment=True)
             )
             .filter(
                 # Retiring content must not strand a learner part-way through: an attempt already
@@ -1351,42 +1369,69 @@ class AssignmentViewSet(viewsets.ReadOnlyModelViewSet):
                 {"detail": "This assignment is not available yet."},
                 status=status.HTTP_409_CONFLICT,
             )
+        practice = request.data.get("practice") is True
         with transaction.atomic():
             assignment = Assignment.objects.select_for_update().get(pk=assignment.pk)
             attempt = assignment.attempts.filter(
                 learner=request.user,
                 status=Attempt.Status.IN_PROGRESS,
             ).first()
+            if attempt is not None and attempt.is_practice != practice:
+                return Response(
+                    {
+                        "detail": (
+                            "Finish or end your assessed attempt before starting a practice run."
+                            if practice
+                            else "Finish or end your practice run before starting an assessed "
+                            "attempt."
+                        ),
+                        "code": "other_attempt_open",
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
             created = attempt is None
             if created:
-                if (
-                    assignment.attempts.filter(learner=request.user).count()
-                    >= assignment.attempt_limit
-                ):
+                earlier = assignment.attempts.filter(learner=request.user)
+                if practice:
+                    if earlier.filter(is_practice=True).count() >= PRACTICE_ATTEMPT_LIMIT:
+                        return Response(
+                            {"detail": "You have reached the practice limit for this lesson."},
+                            status=status.HTTP_409_CONFLICT,
+                        )
+                elif earlier.filter(is_practice=False).count() >= assignment.attempt_limit:
                     return Response(
                         {"detail": "The attempt limit for this assignment has been reached."},
                         status=status.HTTP_409_CONFLICT,
                     )
-                scenario_steps = assignment.scenario.definition.get("steps", [])
+                definition = assignment.scenario.definition
+                # Equivalent fault cases keep a repeat from being the same click-through.
+                variant_code = choose_variant(
+                    definition,
+                    earlier.order_by("-started_at").values_list("variant_code", flat=True)[:1],
+                )
+                scenario_steps = resolved_steps(definition, variant_code)
                 attempt = Attempt.objects.create(
                     assignment=assignment,
                     learner=request.user,
                     scenario=assignment.scenario,
                     grading_policy=assignment.scenario.grading_policy,
+                    is_practice=practice,
+                    variant_code=variant_code,
                     resume_state={
                         "completedSteps": [],
                         "currentStep": scenario_steps[0]["code"] if scenario_steps else None,
                     },
                 )
-                _create_attempt_event(
-                    attempt,
-                    "attempt_started",
-                    {
-                        "lessonId": assignment.lesson_id,
-                        "scenarioVersion": attempt.scenario.version,
-                        "gradingPolicyVersion": attempt.grading_policy.version,
-                    },
-                )
+                started_payload = {
+                    "lessonId": assignment.lesson_id,
+                    "scenarioVersion": attempt.scenario.version,
+                    "gradingPolicyVersion": attempt.grading_policy.version,
+                }
+                if practice:
+                    started_payload["practice"] = True
+                if variant_code:
+                    started_payload["variant"] = variant_code
+                _create_attempt_event(attempt, "attempt_started", started_payload)
                 record_audit_event(
                     event_type="assessment.attempt_started",
                     actor=request.user,
@@ -1396,6 +1441,7 @@ class AssignmentViewSet(viewsets.ReadOnlyModelViewSet):
                         "assignmentId": assignment.pk,
                         "scenarioVersion": attempt.scenario.version,
                         "gradingPolicyVersion": attempt.grading_policy.version,
+                        "practice": practice,
                     },
                 )
         return Response(
@@ -1421,14 +1467,18 @@ class AssignmentViewSet(viewsets.ReadOnlyModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         answers = serializer.validated_data.get("answers", submission.answers if submission else [])
-        true_answers = sum(
-            isinstance(item, dict) and item.get("response") is True for item in answers
-        )
-        score = (
-            (Decimal(true_answers) / Decimal(len(answers)) * 100).quantize(Decimal("0.01"))
-            if answers
-            else None
-        )
+        # A scenario with authored questions is marked against its answer key. Older scenarios
+        # keep the self-declared readiness check.
+        score, _results = score_knowledge_check(assignment.scenario.definition, answers)
+        if score is None:
+            true_answers = sum(
+                isinstance(item, dict) and item.get("response") is True for item in answers
+            )
+            score = (
+                (Decimal(true_answers) / Decimal(len(answers)) * 100).quantize(Decimal("0.01"))
+                if answers
+                else None
+            )
         saved = serializer.save(assignment=assignment, learner=request.user, score=score)
         return Response(
             KnowledgeCheckSubmissionSerializer(saved).data,
@@ -1445,11 +1495,14 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return (
-            Attempt.objects.filter(
-                learner=self.request.user,
-                assignment__lesson__course__school_id__in=_active_learner_school_ids(
-                    self.request.user
-                ),
+            Attempt.objects.filter(learner=self.request.user)
+            .filter(
+                Q(
+                    assignment__lesson__course__school_id__in=_active_learner_school_ids(
+                        self.request.user
+                    )
+                )
+                | Q(assignment__lesson__course__open_enrollment=True)
             )
             .select_related(
                 "assignment",
@@ -1733,10 +1786,40 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
                     }
                 )
 
+            definition = attempt.scenario.definition
+            if is_free_sequence(definition):
+                if any(
+                    step["code"] in completed_codes and action_code in accepted_action_codes(step)
+                    for step in steps
+                ):
+                    # Finding the same thing twice is neither progress nor a mistake.
+                    return Response(
+                        {
+                            "correct": True,
+                            "message": "You have already done that one.",
+                            "consequence": None,
+                            "currentStep": ProcedureStepSerializer(current_step).data,
+                            "isReadyToComplete": False,
+                            "attempt": AttemptSummarySerializer(attempt).data,
+                        }
+                    )
+                # Any outstanding step may be done next; the action decides which one it was.
+                current_step = next(
+                    (
+                        step
+                        for step in steps
+                        if step["code"] not in completed_codes
+                        and action_code in accepted_action_codes(step)
+                    ),
+                    current_step,
+                )
             is_correct, tolerance_result = _evaluate_action(
                 current_step,
                 action_code,
                 metadata,
+            )
+            consequence = (
+                None if is_correct else consequence_for(definition, current_step, action_code)
             )
             event_type = (
                 "step_completed"
@@ -1753,6 +1836,8 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
             }
             if tolerance_result is not None:
                 payload["tolerance"] = tolerance_result
+            if consequence is not None:
+                payload["consequence"] = consequence["effect"]
             if is_correct:
                 payload.update(
                     {
@@ -1805,11 +1890,14 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
                     if feedback_outcome == "tolerance"
                     else "That action is out of sequence. Review the current instruction and try again.",
                 )
+                if consequence is not None:
+                    message = consequence["message"]
 
         return Response(
             {
                 "correct": is_correct,
                 "message": message,
+                "consequence": consequence,
                 "currentStep": ProcedureStepSerializer(next_step).data if next_step else None,
                 "isReadyToComplete": next_step is None,
                 "attempt": AttemptSummarySerializer(attempt).data,
@@ -1937,7 +2025,9 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
                 },
             )
             attempt._prefetched_objects_cache.pop("events", None)
-            for statement in _xapi_statements(attempt):
+            # Practice is not assessment evidence, so it is not queued for the learning record
+            # store.
+            for statement in [] if attempt.is_practice else _xapi_statements(attempt):
                 errors = validate_xapi_statement(statement)
                 if errors:
                     raise DjangoValidationError({"xapi": errors})
@@ -1956,6 +2046,7 @@ class AttemptViewSet(viewsets.ReadOnlyModelViewSet):
                     "outcome": attempt.outcome,
                     "scenarioVersion": attempt.scenario.version,
                     "gradingPolicyVersion": attempt.grading_policy.version,
+                    "practice": attempt.is_practice,
                 },
             )
 

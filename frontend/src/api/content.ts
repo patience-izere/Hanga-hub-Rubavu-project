@@ -185,7 +185,7 @@ export type AuthoringLesson = {
   objectives: string[];
   safetyNotes: string[];
   estimatedMinutes: number;
-  language: "en" | "rw" | "en-rw";
+  language: "en" | "rw" | "en-rw" | "fr" | "sw";
   competencies: number[];
   status: LessonStatus;
   contentVersion: number;

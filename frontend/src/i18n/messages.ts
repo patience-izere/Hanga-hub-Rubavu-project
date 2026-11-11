@@ -8,9 +8,16 @@
  *
  * Kinyarwanda entries below cover this chrome only. Any key missing from `rw` falls back to
  * English rather than rendering a key, so a partial catalogue degrades gracefully.
+ *
+ * French and Swahili (`messages.fr.ts`, `messages.sw.ts`) cover every key, but are drafts: they
+ * have not yet been reviewed by native speakers, and the interface says so while they are used.
+ * `{name}` placeholders are filled in by `t(key, { name })`.
  */
 
-export const LOCALES = ["en", "rw"] as const;
+import { fr } from "./messages.fr";
+import { sw } from "./messages.sw";
+
+export const LOCALES = ["en", "rw", "fr", "sw"] as const;
 export type Locale = (typeof LOCALES)[number];
 
 export const en = {
@@ -39,6 +46,9 @@ export const en = {
   // Workspace navigation links
   "nav.myLessons": "My lessons",
   "nav.myProgress": "My progress",
+  "nav.catalogue": "Find lessons",
+  "nav.classAccess": "Class sign-in",
+  "nav.live": "Live challenge",
   "nav.overview": "Overview",
   "nav.learners": "Learners",
   "nav.assign": "Assign a lesson",
@@ -64,6 +74,183 @@ export const en = {
   // Shared states
   "state.loading": "Loading…",
   "state.error": "This information could not be loaded.",
+
+  // Learner journey
+  "shell.lessonLanguageNote": "Lessons stay in the language they were written in.",
+  "shell.draftTranslation": "This translation is a draft awaiting review by a native speaker.",
+  "login.eyebrow": "Welcome back",
+  "login.title": "Welcome back to the workshop.",
+  "login.lead":
+    "Sign in with your email, your phone number or the sign-in name on your class slip.",
+  "login.haveCode": "I have a class code",
+  "login.learnAlone": "I want to learn on my own",
+  "login.tryDemo": "Try a lesson without an account",
+  "login.heading": "Sign in",
+  "login.identifier": "Email, phone or sign-in name",
+  "login.password": "Password or PIN",
+  "login.submit": "Sign in",
+  "login.submitting": "Signing in…",
+  "login.forgot": "Forgot your password?",
+  "login.forgotPin": "Forgot your PIN? Your instructor can give you a new one.",
+  "login.needAccount": "Need an account? See the ways to join.",
+  "login.expired": "Your session expired. Sign in again to continue.",
+  "learn.eyebrow": "My learning",
+  "learn.greeting": "Good to see you, {name}.",
+  "learn.lead": "Pick up a lesson, practise as often as you like, and beat your best score.",
+  "learn.findMore": "Find more lessons",
+  "learn.dayInRow": "day in a row",
+  "learn.daysInRow": "days in a row",
+  "learn.lessonsFinished": "lessons finished",
+  "learn.bestScore": "best score",
+  "learn.continueTitle": "Continue where you left off",
+  "learn.stepsDone": "{done} of {total} steps done.",
+  "learn.resume": "Resume attempt",
+  "learn.openLesson": "Open lesson",
+  "learn.continueLesson": "Continue lesson",
+  "learn.practiseAgain": "Practise again",
+  "learn.course": "Course",
+  "learn.attempts": "Attempts",
+  "learn.best": "Best",
+  "brief.back": "My learning",
+  "brief.time": "Time",
+  "brief.minutes": "{n} min",
+  "brief.steps": "Steps",
+  "brief.attempts": "Attempts",
+  "brief.attemptsUsed": "{used} of {limit} used",
+  "brief.attemptsLeft": "{n} left",
+  "brief.yourBest": "Your best",
+  "brief.instructions": "Instructions from your instructor",
+  "brief.whatYouDo": "What you will do",
+  "brief.variantsNote":
+    "Each attempt gives you a different fault to find, so read the readings carefully every time.",
+  "brief.skills": "Skills this lesson checks",
+  "brief.staySafe": "Stay safe",
+  "brief.youWillUse": "You will use: {tools}.",
+  "brief.quickCheck": "Quick check",
+  "brief.checkAnswers": "Check my answers",
+  "brief.checking": "Checking…",
+  "brief.quizDone":
+    "Quick check done: {right} of {total} right. It helps you prepare; it is not part of your score.",
+  "brief.answer": "Answer: {answer}.",
+  "brief.readyTitle": "Ready to practise?",
+  "brief.readyText":
+    "Practise as often as you like: practice runs are not counted and your instructor does not see them. When you are ready, start an assessed attempt.",
+  "brief.practise": "Practise (not counted)",
+  "brief.startAssessed": "Start learning attempt",
+  "brief.checkFirst": "Complete knowledge check first",
+  "brief.starting": "Starting…",
+  "brief.openSimulation": "Open simulation",
+  "brief.resumeSimulation": "Resume simulation",
+  "ws.lessonOverview": "Lesson overview",
+  "ws.kickerPractice": "Practice run · not counted",
+  "ws.kickerAssessed": "Assessed attempt",
+  "ws.steps": "steps",
+  "ws.found": "found",
+  "ws.soundOn": "Sound on",
+  "ws.soundOff": "Sound off",
+  "ws.view": "View:",
+  "ws.mode.accessible_2d": "Simple view",
+  "ws.mode.desktop_3d": "3D workshop",
+  "ws.mode.marker_ar": "Camera AR",
+  "ws.mode.markerless_ar": "Room AR",
+  "ws.modeNote.accessible_2d": "Buttons and text. Works on any device and with a screen reader.",
+  "ws.modeNote.desktop_3d": "Touch the tools and equipment on a 3D bench.",
+  "ws.modeNote.marker_ar": "The bench stands on a printed marker in your camera view.",
+  "ws.modeNote.markerless_ar": "Place guidance on a real surface with a supported phone.",
+  "ws.notAvailable": "Not available on this device.",
+  "ws.recommended": "recommended",
+  "ws.withGuidance": "With guidance",
+  "ws.withoutGuidance": "Without guidance",
+  "ws.guidedNote": "Shows each step, highlights and hints.",
+  "ws.unguidedNote": "Hides the order and the hints. Scoring is the same.",
+  "ws.guidanceLocked": "Guidance is fixed once you have taken the first step.",
+  "ws.simpleView": "Simple view",
+  "ws.simpleText":
+    "Use the buttons beside this panel. They record exactly the same actions and score as the 3D workshop.",
+  "ws.allDone": "All done",
+  "ws.readyToFinish": "Ready to finish",
+  "ws.readyText": "Every step is saved. Finish to see how you did.",
+  "ws.stepOf": "Step {n} of {total}",
+  "ws.safetyStep": "Safety step",
+  "ws.listen": "Listen",
+  "ws.stillToFind": "{n} still to find",
+  "ws.lookAround": "Look around",
+  "ws.freeText": "Touch anything you think is a hazard. You can find them in any order.",
+  "ws.noGuidance": "Without guidance",
+  "ws.noGuidanceTitle": "Choose the next correct action",
+  "ws.noGuidanceText": "The order is not shown. Safety rules still apply.",
+  "ws.useButtons": "Use buttons instead",
+  "ws.chooseOne": "Choose one",
+  "ws.whatCanYouSee": "What can you see?",
+  "ws.actions": "Actions",
+  "ws.allSteps": "All steps",
+  "ws.done": "Done",
+  "ws.notThat": "Not that",
+  "ws.effect.spark": "Spark!",
+  "ws.effect.blown_fuse": "Fuse blown",
+  "ws.effect.wrong_reading": "No useful reading",
+  "ws.effect.hazard": "Stop: hazard",
+  "ws.effect.damage": "Equipment damaged",
+  "ws.complete": "Complete and view result",
+  "ws.scoring": "Scoring attempt…",
+  "ws.reconnect": "Reconnect to submit",
+  "ws.sendFirst": "Send saved actions before submitting",
+  "ws.endPractice": "End practice",
+  "ws.endRestart": "End and restart safely",
+  "ws.giveHint": "Give me a hint",
+  "ws.anotherHint": "Show another hint",
+  "ws.noMoreHints": "No more hints for this step.",
+  "result.practiceComplete": "Practice run complete",
+  "result.attemptComplete": "Attempt complete",
+  "result.practiceBadge": "Practice: not counted, not seen by your instructor",
+  "result.notYet": "Not there yet: have another go",
+  "result.cleanRun": "Clean run!",
+  "result.wellDone": "Well done",
+  "result.noMistakes": "You finished all {steps} steps with no mistakes.",
+  "result.oneMistake": "You finished all {steps} steps with 1 mistake.",
+  "result.manyMistakes": "You finished all {steps} steps with {count} mistakes.",
+  "result.stepsDone": "steps done",
+  "result.mistakes": "mistakes",
+  "result.time": "time",
+  "result.result": "result",
+  "result.practiseAgain": "Practise again",
+  "result.tryAssessed": "Try another assessed attempt",
+  "result.certificate": "View and share your certificate",
+  "result.stepByStep": "Step by step",
+  "result.rightFirst": "Right first time",
+  "result.backToLearning": "Return to my learning",
+  "result.backToLesson": "Back to the lesson",
+  "join.eyebrow": "Join a class",
+  "join.enterCode": "Enter the code from your instructor.",
+  "join.codeHelp":
+    "The code is usually written on the board or on a slip of paper. It has six letters and numbers.",
+  "join.codeHeading": "Class code",
+  "join.code": "Code",
+  "join.continue": "Continue",
+  "join.alreadyJoined": "Already joined? Sign in",
+  "join.checking": "Checking the code…",
+  "join.badCode": "That code did not work.",
+  "join.tryAnother": "Try another code",
+  "join.aboutYou": "About you",
+  "join.firstName": "First name",
+  "join.familyName": "Family name",
+  "join.phone": "Phone number",
+  "join.phoneOptional": "(optional: use it to sign in)",
+  "join.choosePin": "Choose a 6-digit PIN",
+  "join.pinAgain": "Type the PIN again",
+  "join.pinAdvice": "Avoid easy PINs like 123456 or 111111, and do not share it.",
+  "join.pinMismatch": "The two PINs are different. Type the same six digits twice.",
+  "join.submit": "Join the class",
+  "join.joining": "Joining…",
+  "join.youAreIn": "You are in",
+  "join.welcome": "Welcome to {name}.",
+  "join.yourName": "Your sign-in name",
+  "join.yourPin": "Your PIN",
+  "join.pinChosen": "the six digits you just chose",
+  "join.writeDown":
+    "Write your sign-in name down. You need it and your PIN to sign in on any device.",
+  "join.goLessons": "I have written it down: go to my lessons",
+  "demo.banner": "You are trying a lesson without an account. Nothing you do here is saved.",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -106,4 +293,14 @@ export const rw: Partial<Record<MessageKey, string>> = {
   "state.loading": "Birimo gupakirwa…",
 };
 
-export const catalogues: Record<Locale, Partial<Record<MessageKey, string>>> = { en, rw };
+export const catalogues: Record<Locale, Partial<Record<MessageKey, string>>> = { en, rw, fr, sw };
+
+/** Catalogues still awaiting review by a native speaker. */
+export const DRAFT_LOCALES: ReadonlySet<Locale> = new Set(["fr", "sw"]);
+
+export const LOCALE_NAMES: Record<Locale, string> = {
+  en: "English",
+  rw: "Kinyarwanda",
+  fr: "Français",
+  sw: "Kiswahili",
+};

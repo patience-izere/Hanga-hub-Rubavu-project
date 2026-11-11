@@ -20,6 +20,7 @@ import {
   type TelemetryEventInput,
 } from "../api/learning";
 import { isNetworkError } from "../api/client";
+import { evaluateAction } from "../procedure/engine";
 import {
   createOfflineAction,
   createTelemetryEvent,
@@ -45,7 +46,8 @@ export function useAssignment(id: number) {
 export function useStartAssignment(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => startAssignment(id),
+    /** `practice` starts a free practice run, which does not use up an attempt. */
+    mutationFn: (practice: boolean | undefined = false) => startAssignment(id, practice),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: assignmentsQueryKey });
     },
@@ -122,19 +124,25 @@ export function useRecordAttemptAction(id: number) {
       if (!detail) throw new Error("Open the lesson online once before completing it offline.");
       const completed = detail.resume_state.completedSteps ?? [];
       const steps = detail.assignment.lesson.procedure_steps;
-      const current = steps.find((step) => !completed.includes(step.code));
-      if (!current) {
+      // The same rules the server applies, so offline practice shows the same consequences.
+      const outcome = evaluateAction(
+        steps,
+        completed,
+        action,
+        detail.assignment.scenario?.sequence ?? "ordered",
+      );
+      if (!outcome.step) {
         return {
           correct: true,
-          message: "All procedure steps are complete. Submit the attempt when you are back online.",
-          currentStep: null,
-          isReadyToComplete: true,
+          message: outcome.repeated
+            ? outcome.message
+            : "All procedure steps are complete. Submit the attempt when you are back online.",
+          consequence: null,
+          currentStep: outcome.nextStep,
+          isReadyToComplete: outcome.nextStep === null,
           attempt: detail,
         };
       }
-      const accepted = current.acceptable_actions.length
-        ? current.acceptable_actions.some((item) => item.action_code === action)
-        : current.action_code === action;
       // Wrong actions are queued too: the server scores them, so practising offline must not hide
       // mistakes from the instructor.
       const outboxItem = createOfflineAction(id, action, rendererMode, {
@@ -144,27 +152,28 @@ export function useRecordAttemptAction(id: number) {
       outboxItem.id = eventId;
       outboxItem.createdAt = occurredAt;
       await queueOutboxItem(outboxItem);
-      if (!accepted) {
+      if (!outcome.correct) {
         return {
           correct: false,
-          message: current.safety_critical
-            ? "Safety sequence interrupted. Follow the current instruction before continuing. This attempt is saved on this device."
-            : "That action is out of sequence. Review the current instruction and try again. This attempt is saved on this device.",
-          currentStep: current,
+          message: `${outcome.message} This attempt is saved on this device.`,
+          consequence: outcome.consequence,
+          currentStep: outcome.nextStep,
           isReadyToComplete: false,
           attempt: detail,
         };
       }
-      const completedSteps = [...completed, current.code];
-      const nextStep = steps.find((step) => !completedSteps.includes(step.code)) ?? null;
       return {
         correct: true,
-        message: "Saved on this device. Evidence will synchronize when the connection returns.",
-        currentStep: nextStep,
-        isReadyToComplete: nextStep === null,
+        message: "Saved on this device. It will be sent when the connection returns.",
+        consequence: null,
+        currentStep: outcome.nextStep,
+        isReadyToComplete: outcome.nextStep === null,
         attempt: {
           ...detail,
-          resume_state: { completedSteps, currentStep: nextStep?.code ?? null },
+          resume_state: {
+            completedSteps: outcome.completedCodes,
+            currentStep: outcome.nextStep?.code ?? null,
+          },
         },
       };
     },

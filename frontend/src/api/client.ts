@@ -9,6 +9,10 @@ export type User = {
   roles: Array<"platform_admin" | "admin" | "instructor" | "learner" | "content_author">;
   /** Language chosen at invitation time; used as the initial interface locale. */
   preferredLanguage?: string;
+  /** Signs in with a class-issued sign-in name and PIN rather than an email and password. */
+  usesPin?: boolean;
+  /** Optional parts of the product this person's organisation has switched on. */
+  features?: { research?: boolean };
 };
 
 type ApiErrorBody = {
@@ -185,6 +189,22 @@ export async function signIn(email: string, password: string): Promise<User> {
   const response = await apiFetch<{ user: User }>("/api/v1/auth/login/", {
     method: "POST",
     body: JSON.stringify({ email, password }),
+  });
+  rememberUser(response.user);
+  return response.user;
+}
+
+/** Keeps the app able to open offline after an account was created rather than signed in to. */
+export function rememberSignedInUser(user: User) {
+  rememberUser(user);
+}
+
+/** Saves the interface language on the account, so it follows the learner to other devices. */
+export async function savePreferredLanguage(preferredLanguage: string): Promise<User> {
+  await ensureCsrf();
+  const response = await apiFetch<{ user: User }>("/api/v1/auth/preferences/", {
+    method: "POST",
+    body: JSON.stringify({ preferredLanguage }),
   });
   rememberUser(response.user);
   return response.user;

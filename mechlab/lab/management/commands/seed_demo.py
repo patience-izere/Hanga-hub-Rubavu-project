@@ -5,6 +5,16 @@ from datetime import UTC, datetime
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
+from lab.access import generate_join_code, open_school
+from lab.demo_content import (
+    AUTO_COMPETENCIES,
+    AUTO_LESSONS,
+    BATTERY_LESSON,
+    ELECTRICAL_COURSE,
+    HAZARD_LESSON,
+    SAFETY_COURSE,
+    apply_overlays,
+)
 from lab.models import (
     AcceptableAction,
     AssetPackage,
@@ -82,6 +92,11 @@ class Command(BaseCommand):
             code="rubavu-demo-tss",
             defaults={"name": "Rubavu Demo Technical School"},
         )
+        # The demonstration school takes part in the pilot study, so it shows the research tools.
+        if not school.research_enabled:
+            school.research_enabled = True
+            school.save(update_fields=["research_enabled"])
+        open_school()
         SchoolMembership.objects.update_or_create(
             school=school,
             user=instructor,
@@ -130,6 +145,9 @@ class Command(BaseCommand):
             learner=learner,
             defaults={"status": Enrollment.Status.ACTIVE},
         )
+        if not cohort.join_code:
+            cohort.join_code = generate_join_code()
+            cohort.save()
 
         course, _ = Course.objects.update_or_create(
             slug="automotive-electrical-foundations",
@@ -140,6 +158,8 @@ class Command(BaseCommand):
                 "trade": "Automobile Technology",
                 "description": "Safe, structured introduction to automotive electrical diagnosis.",
                 "is_published": True,
+                # Listed in the open catalogue so anyone can try the demonstration lessons.
+                "open_enrollment": True,
             },
         )
         module, _ = Module.objects.update_or_create(
@@ -475,14 +495,269 @@ class Command(BaseCommand):
                 "published_at": datetime(2026, 1, 10, tzinfo=UTC),
             },
         )
+        # Version 2 of the battery practical adds options, consequences, fault cases, a marked
+        # knowledge check and the data-driven scene. Version 1 stays as published for anyone
+        # already part-way through it.
+        battery_v2 = self._publish_scenario(
+            lesson,
+            BATTERY_LESSON,
+            grading_policy=grading_policy,
+            asset_package=asset_package,
+            author=administrator,
+        )
         assignment, _ = Assignment.objects.get_or_create(
-            scenario=scenario,
+            scenario=battery_v2,
             learner=learner,
             defaults={"lesson": lesson, "assigned_by": instructor},
         )
 
+        for code, values in AUTO_COMPETENCIES.items():
+            Competency.objects.update_or_create(
+                course=course,
+                code=code,
+                defaults={**values, "level": 1, "mastery_criteria": [values["description"]]},
+            )
+        for spec in AUTO_LESSONS:
+            self._seed_lesson(
+                course,
+                module,
+                spec,
+                grading_policy=grading_policy,
+                asset_package=asset_package,
+                author=administrator,
+                learner=learner,
+                instructor=instructor,
+            )
+
+        safety_course, _ = Course.objects.update_or_create(
+            slug=SAFETY_COURSE["slug"],
+            defaults={
+                "school": school,
+                "title": SAFETY_COURSE["title"],
+                "trade": SAFETY_COURSE["trade"],
+                "description": SAFETY_COURSE["description"],
+                "is_published": True,
+                "open_enrollment": True,
+            },
+        )
+        safety_module, _ = Module.objects.update_or_create(
+            course=safety_course,
+            code=SAFETY_COURSE["module"]["code"],
+            defaults={"title": SAFETY_COURSE["module"]["title"], "order": 1, "is_published": True},
+        )
+        for code, values in SAFETY_COURSE["competencies"].items():
+            Competency.objects.update_or_create(
+                course=safety_course,
+                code=code,
+                defaults={**values, "level": 1, "mastery_criteria": [values["description"]]},
+            )
+        safety_manifest = {**asset_manifest, "curriculumOwner": school.name}
+        safety_package, _ = AssetPackage.objects.get_or_create(
+            course=safety_course,
+            code="workshop-floor",
+            version=1,
+            defaults={
+                "name": "Workshop floor procedural assets",
+                "manifest": safety_manifest,
+                "sha256": hashlib.sha256(
+                    json.dumps(safety_manifest, sort_keys=True).encode("utf-8")
+                ).hexdigest(),
+                "total_byte_size": 0,
+                "status": AssetPackage.Status.PUBLISHED,
+                "published_at": datetime(2026, 1, 9, tzinfo=UTC),
+            },
+        )
+        self._seed_lesson(
+            safety_course,
+            safety_module,
+            HAZARD_LESSON,
+            grading_policy=grading_policy,
+            asset_package=safety_package,
+            author=administrator,
+            learner=learner,
+            instructor=instructor,
+        )
+
+        self._seed_course(
+            school,
+            ELECTRICAL_COURSE,
+            manifest=asset_manifest,
+            grading_policy=grading_policy,
+            author=administrator,
+            learner=learner,
+            instructor=instructor,
+        )
+
         self.stdout.write(self.style.SUCCESS("Demo learning workflow is ready."))
+        self.stdout.write(f"Class join code: {cohort.join_code}")
         self.stdout.write(f"Learner: {learner.email}")
         self.stdout.write(f"Instructor: {instructor.email}")
         self.stdout.write(f"Administrator: {administrator.email}")
         self.stdout.write(f"Assignment ID: {assignment.pk}")
+
+    def _publish_scenario(self, lesson, spec, *, grading_policy, asset_package, author):
+        """Publish a lesson's practical from its authoring rows plus the spec's extras.
+
+        Create-only: a published scenario is immutable, so re-seeding keeps what an existing
+        database already published under this version number.
+        """
+
+        existing = SimulationScenario.objects.filter(
+            lesson=lesson, version=spec["scenario_version"]
+        ).first()
+        if existing is not None:
+            return existing
+        return SimulationScenario.objects.create(
+            lesson=lesson,
+            version=spec["scenario_version"],
+            title=spec["scenario_title"],
+            definition=apply_overlays(build_scenario_definition(lesson), spec),
+            grading_policy=grading_policy,
+            asset_package=asset_package,
+            status=SimulationScenario.Status.PUBLISHED,
+            authored_by=author,
+            published_at=datetime(2026, 1, 10, tzinfo=UTC),
+        )
+
+    def _seed_lesson(
+        self,
+        course,
+        module,
+        spec,
+        *,
+        grading_policy,
+        asset_package,
+        author,
+        learner,
+        instructor,
+    ):
+        lesson = Lesson.objects.filter(course=course, slug=spec["slug"]).first()
+        if lesson is None:
+            lesson = Lesson.objects.create(
+                course=course,
+                module=module,
+                slug=spec["slug"],
+                title=spec["title"],
+                summary=spec["summary"],
+                objectives=spec["objectives"],
+                safety_notes=spec["safety_notes"],
+                estimated_minutes=spec["estimated_minutes"],
+                language=Lesson.Language.ENGLISH,
+                content_version=1,
+                authored_by=author,
+                reviewed_by=author,
+                status=Lesson.Status.PUBLISHED,
+                submitted_at=datetime(2026, 1, 5, tzinfo=UTC),
+                reviewed_at=datetime(2026, 1, 7, tzinfo=UTC),
+                published_at=datetime(2026, 1, 10, tzinfo=UTC),
+            )
+        competencies = {
+            item.code: item
+            for item in Competency.objects.filter(course=course, code__in=spec["competencies"])
+        }
+        lesson.competencies.set(competencies.values())
+        for authored in spec["steps"]:
+            step, _ = ProcedureStep.objects.update_or_create(
+                lesson=lesson,
+                code=authored["code"],
+                defaults={
+                    "order": authored["order"],
+                    "title": authored["title"],
+                    "instruction": authored["instruction"],
+                    "action_code": authored["action_code"],
+                    "feedback": authored["feedback"],
+                    "safety_critical": authored["safety_critical"],
+                    "metadata": authored.get("metadata", {}),
+                },
+            )
+            step.competencies.set(
+                [competencies[code] for code in authored.get("competency_codes", [])]
+            )
+            AcceptableAction.objects.update_or_create(
+                step=step,
+                action_code=step.action_code,
+                defaults={"label": step.title, "is_primary": True},
+            )
+            StepFeedback.objects.update_or_create(
+                step=step,
+                outcome=StepFeedback.Outcome.CORRECT,
+                defaults={"message": step.feedback},
+            )
+            for index, hint in enumerate(authored.get("hints", []), start=1):
+                StepHint.objects.update_or_create(
+                    step=step,
+                    code=hint["code"],
+                    defaults={
+                        "order": index,
+                        "text": hint["text"],
+                        "points_penalty": hint.get("points_penalty", 0),
+                    },
+                )
+        scenario = self._publish_scenario(
+            lesson, spec, grading_policy=grading_policy, asset_package=asset_package, author=author
+        )
+        Assignment.objects.get_or_create(
+            scenario=scenario,
+            learner=learner,
+            defaults={"lesson": lesson, "assigned_by": instructor},
+        )
+        return scenario
+
+    def _seed_course(self, school, spec, *, manifest, grading_policy, author, learner, instructor):
+        """A whole course from data: program, module, competencies, assets and lessons."""
+
+        program, _ = Program.objects.update_or_create(
+            school=school,
+            code=spec["program"]["code"],
+            defaults={"name": spec["program"]["name"], "is_active": True},
+        )
+        course, _ = Course.objects.update_or_create(
+            slug=spec["slug"],
+            defaults={
+                "school": school,
+                "program": program,
+                "title": spec["title"],
+                "trade": spec["trade"],
+                "description": spec["description"],
+                "is_published": True,
+                "open_enrollment": True,
+            },
+        )
+        module, _ = Module.objects.update_or_create(
+            course=course,
+            code=spec["module"]["code"],
+            defaults={"title": spec["module"]["title"], "order": 1, "is_published": True},
+        )
+        for code, values in spec["competencies"].items():
+            Competency.objects.update_or_create(
+                course=course,
+                code=code,
+                defaults={**values, "level": 1, "mastery_criteria": [values["description"]]},
+            )
+        course_manifest = {**manifest, "curriculumOwner": school.name}
+        package, _ = AssetPackage.objects.get_or_create(
+            course=course,
+            code=f"{spec['slug']}-procedural",
+            version=1,
+            defaults={
+                "name": f"{spec['title']} procedural assets",
+                "manifest": course_manifest,
+                "sha256": hashlib.sha256(
+                    json.dumps(course_manifest, sort_keys=True).encode("utf-8")
+                ).hexdigest(),
+                "total_byte_size": 0,
+                "status": AssetPackage.Status.PUBLISHED,
+                "published_at": datetime(2026, 1, 9, tzinfo=UTC),
+            },
+        )
+        for lesson_spec in spec["lessons"]:
+            self._seed_lesson(
+                course,
+                module,
+                lesson_spec,
+                grading_policy=grading_policy,
+                asset_package=package,
+                author=author,
+                learner=learner,
+                instructor=instructor,
+            )

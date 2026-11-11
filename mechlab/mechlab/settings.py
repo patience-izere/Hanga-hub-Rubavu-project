@@ -278,6 +278,13 @@ if RESEARCH_RETENTION_DAYS < 1:
     raise ImproperlyConfigured("OPEDU_RESEARCH_RETENTION_DAYS must be at least 1.")
 LOGIN_FAILURE_LIMIT = int(os.environ.get("DJANGO_LOGIN_FAILURE_LIMIT", "5"))
 LOGIN_LOCKOUT_SECONDS = int(os.environ.get("DJANGO_LOGIN_LOCKOUT_SECONDS", "300"))
+# Learners who sign in with a class-issued PIN: fewer tries and a longer lock than passwords get.
+PIN_LOGIN_FAILURE_LIMIT = int(os.environ.get("OPEDU_PIN_LOGIN_FAILURE_LIMIT", "8"))
+PIN_LOCKOUT_SECONDS = int(os.environ.get("OPEDU_PIN_LOCKOUT_SECONDS", "3600"))
+# Let people create an account without a school and practise the open catalogue.
+OPEN_REGISTRATION = env_bool("OPEDU_OPEN_REGISTRATION", True)
+# The published lesson offered to visitors who are not signed in.
+DEMO_LESSON_SLUG = os.environ.get("OPEDU_DEMO_LESSON_SLUG", "battery-inspection-and-diagnosis")
 # Failures for one account from any address, and from one address across accounts (password
 # spraying). Both are higher than the per-address-and-account limit so a shared school network
 # is not locked out by a few typing mistakes.

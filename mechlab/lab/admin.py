@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
 from .models import (
     AcceptableAction,
@@ -37,6 +37,7 @@ from .models import (
     School,
     SchoolInvitation,
     SchoolMembership,
+    SchoolRegistrationRequest,
     SimulationScenario,
     StepFeedback,
     StepHint,
@@ -71,8 +72,56 @@ class AssetFileInline(admin.TabularInline):
 
 @admin.register(School)
 class SchoolAdmin(admin.ModelAdmin):
-    list_display = ("name", "code", "is_active", "allow_self_approval")
+    list_display = (
+        "name",
+        "code",
+        "kind",
+        "is_active",
+        "is_open",
+        "research_enabled",
+        "allow_self_approval",
+    )
+    list_filter = ("kind", "is_active", "research_enabled")
     search_fields = ("name", "code")
+
+
+@admin.register(SchoolRegistrationRequest)
+class SchoolRegistrationRequestAdmin(admin.ModelAdmin):
+    """Requests from organisations that want to use the platform."""
+
+    list_display = ("organisation_name", "kind", "contact_name", "email", "status", "created_at")
+    list_filter = ("status", "kind")
+    search_fields = ("organisation_name", "contact_name", "email")
+    readonly_fields = ("school", "reviewed_by", "reviewed_at", "created_at")
+    actions = ("approve_requests", "decline_requests")
+
+    @admin.action(description="Approve: create the organisation and invite its contact")
+    def approve_requests(self, request, queryset):
+        from .access import approve_school_registration
+
+        for record in queryset.filter(status=SchoolRegistrationRequest.Status.PENDING):
+            school, accept_url, email_sent = approve_school_registration(record, request.user)
+            if email_sent:
+                self.message_user(request, f"{school.name} created; invitation emailed.")
+            else:
+                # The link is the only way in, so show it when mail could not be sent.
+                self.message_user(
+                    request,
+                    f"{school.name} created, but the email failed. Share this link with "
+                    f"{record.email}: {accept_url}",
+                    level=messages.WARNING,
+                )
+
+    @admin.action(description="Decline the selected requests")
+    def decline_requests(self, request, queryset):
+        from django.utils import timezone
+
+        updated = queryset.filter(status=SchoolRegistrationRequest.Status.PENDING).update(
+            status=SchoolRegistrationRequest.Status.DECLINED,
+            reviewed_by=request.user,
+            reviewed_at=timezone.now(),
+        )
+        self.message_user(request, f"{updated} request(s) declined.")
 
 
 @admin.register(SchoolMembership)

@@ -2,12 +2,18 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Suspense, useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
-import { describeApiError, forgetCachedUser, isNetworkError, type User } from "../../api/client";
+import {
+  describeApiError,
+  forgetCachedUser,
+  isNetworkError,
+  savePreferredLanguage,
+  type User,
+} from "../../api/client";
 import { clearLocalLearningData, listOutboxItems } from "../../offline/outbox";
 import { authQueryKey, useSignOut } from "../../auth/useAuth";
 import { roleCapabilities } from "../../auth/useRoles";
 import { useLocale } from "../../i18n/LocaleProvider";
-import type { Locale } from "../../i18n/messages";
+import { LOCALE_NAMES, LOCALES, type Locale } from "../../i18n/messages";
 import { InstallAppButton } from "../InstallAppButton";
 import { workspaceSections } from "./workspaceNav";
 
@@ -30,7 +36,7 @@ export function WorkspaceShell({ user }: { user: User }) {
   const location = useLocation();
   const queryClient = useQueryClient();
   const logout = useSignOut();
-  const { locale, setLocale, t, coverage } = useLocale();
+  const { locale, setLocale, t, coverage, draft } = useLocale();
   const roles = roleCapabilities(user);
   const sections = workspaceSections(roles);
   const displayName = user.firstName || user.email;
@@ -97,16 +103,30 @@ export function WorkspaceShell({ user }: { user: User }) {
           <InstallAppButton />
           <label className="locale-select">
             <span className="sr-only">{t("language")}</span>
-            <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
-              <option value="en">EN</option>
-              <option value="rw">RW</option>
+            <select
+              value={locale}
+              onChange={(event) => {
+                const next = event.target.value as Locale;
+                setLocale(next);
+                // Kept on the account too, so it follows the learner to a shared or new device.
+                void savePreferredLanguage(next)
+                  .then((saved) => queryClient.setQueryData(authQueryKey, saved))
+                  .catch(() => undefined);
+              }}
+            >
+              {LOCALES.map((code) => (
+                <option key={code} value={code} title={LOCALE_NAMES[code]}>
+                  {code.toUpperCase()}
+                </option>
+              ))}
             </select>
           </label>
-          {locale !== "en" && coverage < 1 ? (
-            // Say plainly which parts are translated rather than leaving a learner to discover
-            // that most of the interface is still English.
+          {locale !== "en" ? (
+            // Say plainly what is translated, rather than leaving a learner to discover it.
             <span className="locale-coverage" role="status">
-              Navigation translated; lesson content stays in its authored language.
+              {coverage < 1 ? "Navigation translated. " : ""}
+              {t("shell.lessonLanguageNote")}
+              {draft ? ` ${t("shell.draftTranslation")}` : ""}
             </span>
           ) : null}
           <button

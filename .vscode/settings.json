@@ -1,13 +1,8 @@
 {
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "typescript.preferences.importModuleSpecifier": "relative",
-  "task.allowAutomaticTasks": true,
-  "debug.openDebug": "neverOpen",
-  "terminal.integrated.inheritEnv": false,
-  "tasks": {
-    "label": "lint on open",
-    "type": "shell",
-    "command": "npm run lint",
-    "runOn": "folderOpen"
+  "task.allowAutomaticTasks": "off",
+  "[javascript]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
   }
 }

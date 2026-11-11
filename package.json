@@ -2,12 +2,12 @@
   "name": "opedu-platform",
   "private": true,
   "scripts": {
-    "dev": "node init && python tools/project.py dev",
+    "dev": "python tools/project.py dev",
     "seed": "python tools/project.py seed",
     "lint": "python tools/project.py lint",
     "format": "python tools/project.py format",
     "test": "python tools/project.py test",
-    "build": "node init && python tools/project.py build",
+    "build": "python tools/project.py build",
     "check": "python tools/project.py check",
     "api:generate": "python tools/project.py api-generate"
   }

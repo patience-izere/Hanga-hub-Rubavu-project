@@ -3,6 +3,15 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
 
 from . import api_views
+from .access_views import (
+    ClassAccessListView,
+    ClassBulkLearnersView,
+    ClassJoinCodeView,
+    ClassJoinView,
+    LearnerPinResetView,
+    OpenRegistrationView,
+    SchoolRegistrationRequestView,
+)
 from .content_views import (
     AssetPackageAuthoringViewSet,
     AuthoringCourseViewSet,
@@ -25,6 +34,15 @@ from .learning_views import (
     InstructorRosterView,
     ResearchConsentPolicyView,
     ResearchSurveyView,
+)
+from .open_views import (
+    AttemptCertificateView,
+    CatalogueEnrollView,
+    CatalogueView,
+    CertificateVerifyView,
+    DemoLessonView,
+    LiveClassBoardView,
+    OpenStatusView,
 )
 from .pilot_views import PilotStudyViewSet
 from .school_views import (
@@ -73,6 +91,37 @@ urlpatterns = [
         api_views.password_reset_confirm,
         name="api-password-reset-confirm",
     ),
+    path("auth/preferences/", api_views.preferences, name="api-auth-preferences"),
+    path("auth/register/", OpenRegistrationView.as_view(), name="api-auth-register"),
+    path("auth/class/<str:code>/", ClassJoinView.as_view(), name="api-auth-class-join"),
+    path("open/status/", OpenStatusView.as_view(), name="open-status"),
+    path("demo/", DemoLessonView.as_view(), name="demo-lesson"),
+    path("catalogue/", CatalogueView.as_view(), name="catalogue"),
+    path(
+        "catalogue/<int:lesson_id>/enroll/",
+        CatalogueEnrollView.as_view(),
+        name="catalogue-enroll",
+    ),
+    path(
+        "attempts/<int:pk>/certificate/",
+        AttemptCertificateView.as_view(),
+        name="attempt-certificate",
+    ),
+    path(
+        "certificates/verify/<str:code>/",
+        CertificateVerifyView.as_view(),
+        name="certificate-verify",
+    ),
+    path("schools/register/", SchoolRegistrationRequestView.as_view(), name="school-register"),
+    path("classes/access/", ClassAccessListView.as_view(), name="class-access"),
+    path("classes/<int:pk>/join-code/", ClassJoinCodeView.as_view(), name="class-join-code"),
+    path("classes/<int:pk>/learners/", ClassBulkLearnersView.as_view(), name="class-learners"),
+    path(
+        "classes/learners/<int:pk>/reset-pin/",
+        LearnerPinResetView.as_view(),
+        name="class-learner-pin-reset",
+    ),
+    path("instructor/live/", LiveClassBoardView.as_view(), name="instructor-live-board"),
     path("instructor/overview/", InstructorOverviewView.as_view(), name="instructor-overview"),
     path("instructor/learners/", InstructorRosterView.as_view(), name="instructor-roster"),
     path(

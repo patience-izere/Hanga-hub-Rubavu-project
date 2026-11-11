@@ -1,0 +1,11 @@
+# OPedu's site on the server's shared HTTPS proxy (/opt/edge), which also serves other,
+# unrelated sites on this VPS. deploy.sh fills in {$DOMAIN} from .env, writes the result to
+# /opt/edge/sites/opedu.caddy and reloads the proxy. The domain's DNS A record must point at the
+# server for the certificate to issue.
+#
+# Caddy replaces any X-Forwarded-For a visitor sends with their real address; nginx in `web`
+# adds one more hop, which is why the backend trusts two proxies.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy opedu-web:80
+}

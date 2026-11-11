@@ -3,14 +3,15 @@ import { Link } from "react-router-dom";
 import { MetricGrid, MetricTile } from "../components/ui/MetricTile";
 import { QueryBoundary } from "../components/ui/QueryBoundary";
 import { attemptOutcomeLabel, attemptStatusLabel } from "../learning/labels";
-import { competencyProfile } from "../learning/progress";
+import { competencyProfile, practiceStreak } from "../learning/progress";
 import { useAttempts } from "../learning/useAssignments";
+import "../styles/engagement.css";
 
 const MASTERY_LABELS: Record<string, string> = {
   mastered: "Mastered",
-  developing: "Developing",
-  not_demonstrated: "Not demonstrated",
-  requires_review: "Requires review",
+  developing: "Still developing",
+  not_demonstrated: "Not shown yet",
+  requires_review: "Waiting for review",
 };
 
 export function LearnerProgressPage() {
@@ -21,10 +22,10 @@ export function LearnerProgressPage() {
       <div className="dashboard-heading">
         <div>
           <span className="eyebrow">My progress</span>
-          <h1>Everything you have practised.</h1>
+          <h1>Your skills passport.</h1>
           <p>
-            Your competency profile takes the most recent result for each competency across all
-            attempts.
+            Each skill shows your most recent assessed result. Practice runs help you improve but
+            are not counted here.
           </p>
         </div>
       </div>
@@ -35,43 +36,53 @@ export function LearnerProgressPage() {
         error="Your attempts could not be loaded."
         empty={{
           title: "No attempts yet",
-          description: "Open an assigned lesson to make your first attempt.",
+          description: "Open a lesson to make your first attempt.",
           symbol: "⚙",
         }}
       >
         {(items) => {
-          const completed = items.filter((attempt) => attempt.status === "completed");
+          const assessed = items.filter((attempt) => !attempt.is_practice);
+          const completed = assessed.filter((attempt) => attempt.status === "completed");
           const scores = completed
             .map((attempt) => Number(attempt.score))
             .filter((score) => Number.isFinite(score));
           const average = scores.length
             ? Math.round(scores.reduce((total, score) => total + score, 0) / scores.length)
             : null;
-          const profile = competencyProfile(items);
+          const profile = competencyProfile(assessed);
           const mastered = profile.filter((item) => item.mastery_state === "mastered").length;
+          const titles = new Map(
+            items.flatMap((attempt) =>
+              attempt.assignment.lesson.competencies.map((item) => [item.code, item.title]),
+            ),
+          );
+          const streak = practiceStreak(items.map((attempt) => attempt.started_at));
 
           return (
             <>
               <MetricGrid>
-                <MetricTile label="Attempts made" value={items.length} />
-                <MetricTile label="Completed" value={completed.length} />
+                <MetricTile label="Days in a row" value={streak} />
+                <MetricTile label="Practice runs" value={items.length - assessed.length} />
                 <MetricTile label="Average score" value={average === null ? "—" : `${average}%`} />
                 <MetricTile
-                  label="Competencies mastered"
+                  label="Skills mastered"
                   value={profile.length === 0 ? "—" : `${mastered}/${profile.length}`}
                 />
               </MetricGrid>
 
-              <h2 className="section-title">Competency profile</h2>
+              <h2 className="section-title">Skills</h2>
               {profile.length === 0 ? (
                 <p className="field-note">
-                  Competency results appear once you complete an attempt.
+                  Your skills appear once you finish an assessed attempt.
                 </p>
               ) : (
                 <ul className="learner-competencies">
                   {profile.map((result) => (
                     <li key={result.competency_code} className={`mastery-${result.mastery_state}`}>
                       <div>
+                        <strong>
+                          {titles.get(result.competency_code) ?? result.competency_code}
+                        </strong>
                         <span className="competency-code">{result.competency_code}</span>
                       </div>
                       <span className="mastery-state">
@@ -87,7 +98,7 @@ export function LearnerProgressPage() {
                 </ul>
               )}
 
-              <h2 className="section-title">Attempt history</h2>
+              <h2 className="section-title">History</h2>
               <div className="evidence-table-wrap">
                 <table className="evidence-table">
                   <thead>
@@ -106,7 +117,10 @@ export function LearnerProgressPage() {
                       <tr key={attempt.id}>
                         <td>
                           <strong>{attempt.assignment.lesson.title}</strong>
-                          <small>{attempt.assignment.lesson.course_title}</small>
+                          <small>
+                            {attempt.is_practice ? "Practice · " : ""}
+                            {attempt.assignment.lesson.course_title}
+                          </small>
                         </td>
                         <td>
                           <strong>{new Date(attempt.started_at).toLocaleDateString()}</strong>

@@ -4,6 +4,18 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { describeApiError } from "../api/client";
 import type { AuthoredScenario, CompetencyOption } from "../api/content";
 import { ContentStatusBadge, ListEditor } from "../components/authoring/AuthoringFields";
+import { allActionCodes } from "../procedure/authoring";
+import {
+  BehaviourEditor,
+  FaultCasesEditor,
+  KnowledgeCheckEditor,
+  SceneEditor,
+  StepChoicesEditor,
+  type EditableDefinition,
+} from "../components/authoring/InteractionEditors";
+import { LocalPractice } from "../components/simulation/LocalPractice";
+import { resolvedSteps, variantsOf } from "../procedure/variants";
+import "../styles/authoring.css";
 import { useCurrentUser } from "../auth/useAuth";
 import {
   useAuthoredAssetPackages,
@@ -113,6 +125,7 @@ type StepEditorProps = {
   step: Step;
   index: number;
   total: number;
+  suggestions: string[];
   competencies: CompetencyOption[];
   onChange: (step: Step) => void;
   onMove: (direction: -1 | 1) => void;
@@ -123,6 +136,7 @@ function StepEditor({
   step,
   index,
   total,
+  suggestions,
   competencies,
   onChange,
   onMove,
@@ -318,7 +332,74 @@ function StepEditor({
           }
         />
       </details>
+      <StepChoicesEditor
+        step={step}
+        index={index}
+        suggestions={suggestions}
+        onChange={(next) => onChange(asStep(next, index))}
+        onSetCorrect={(code) => onChange(withActionCode(step, code))}
+      />
     </fieldset>
+  );
+}
+
+/** The draft as a learner would get it, run on this device with nothing recorded. */
+function PracticePreview({
+  title,
+  definition,
+  onClose,
+}: {
+  title: string;
+  definition: Definition;
+  onClose(): void;
+}) {
+  const variants = variantsOf(definition);
+  const [variant, setVariant] = useState(variants[0]?.code ?? "");
+  const [run, setRun] = useState(0);
+  const steps = resolvedSteps(definition, variant);
+  return (
+    <div
+      className="studio-preview-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Try the practical"
+    >
+      <div className="studio-preview-bar">
+        <strong>Preview: nothing is recorded</strong>
+        {variants.length ? (
+          <label>
+            Fault case
+            <select
+              value={variant}
+              onChange={(event) => {
+                setVariant(event.target.value);
+                setRun((value) => value + 1);
+              }}
+            >
+              {variants.map((item) => (
+                <option key={item.code} value={item.code}>
+                  {item.label || item.code}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <button type="button" className="button button-secondary" onClick={onClose}>
+          Close preview
+        </button>
+      </div>
+      <LocalPractice
+        key={`${variant}-${run}`}
+        title={title}
+        kicker="Studio preview"
+        steps={steps}
+        sequence={definition.sequence === "free" ? "free" : "ordered"}
+        scene={(definition.scene as never) ?? null}
+        distractors={
+          Array.isArray(definition.distractors) ? (definition.distractors as never) : undefined
+        }
+      />
+    </div>
   );
 }
 
@@ -344,6 +425,7 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
   const [rawJson, setRawJson] = useState("");
   const [rawError, setRawError] = useState("");
   const [reviewNotes, setReviewNotes] = useState("");
+  const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
     const data = scenario.data;
@@ -380,6 +462,10 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
         .filter((competency) => lesson.data?.competencies.includes(competency.id))
         .map((competency) => competency.code),
     [competencies, lesson.data],
+  );
+  const actionSuggestions = useMemo(
+    () => allActionCodes(definition as EditableDefinition),
+    [definition],
   );
   const coursePackages = (packages.data ?? []).filter(
     (item) => item.course === lesson.data?.course && item.status === "published",
@@ -435,6 +521,16 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
     );
 
   const mutationError = update.error ?? transition.error ?? publish.error ?? clone.error;
+
+  if (previewing) {
+    return (
+      <PracticePreview
+        title={title || data.title}
+        definition={definition}
+        onClose={() => setPreviewing(false)}
+      />
+    );
+  }
 
   return (
     <section className="dashboard studio-page">
@@ -512,6 +608,7 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
                 step={step}
                 index={index}
                 total={definition.steps.length}
+                suggestions={actionSuggestions}
                 competencies={competencies}
                 onChange={(next) =>
                   setSteps(definition.steps.map((item, i) => (i === index ? next : item)))
@@ -536,6 +633,31 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
                 Add step
               </button>
             ) : null}
+
+            <h2 className="studio-form-heading">How it runs</h2>
+            <BehaviourEditor
+              definition={definition as EditableDefinition}
+              onChange={(next) => setDefinition(asDefinition(next))}
+            />
+
+            <h2 className="studio-form-heading">Fault cases</h2>
+            <FaultCasesEditor
+              definition={definition as EditableDefinition}
+              onChange={(next) => setDefinition(asDefinition(next))}
+            />
+
+            <h2 className="studio-form-heading">Quick check before practising</h2>
+            <KnowledgeCheckEditor
+              definition={definition as EditableDefinition}
+              onChange={(next) => setDefinition(asDefinition(next))}
+            />
+
+            <h2 className="studio-form-heading">3D scene</h2>
+            <SceneEditor
+              definition={definition as EditableDefinition}
+              suggestions={actionSuggestions}
+              onChange={(next) => setDefinition(asDefinition(next))}
+            />
 
             <h2 className="studio-form-heading">Delivery</h2>
             <fieldset className="studio-delivery">
@@ -777,8 +899,16 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
           <section className="studio-side-panel" aria-label="Learner preview">
             <h2>Learner preview</h2>
             <p className="field-note">
-              What learners see in accessible 2D. No evidence is recorded.
+              Try the draft as a learner, including unsaved changes. Nothing is recorded.
             </p>
+            <button
+              type="button"
+              className="button button-primary button-full"
+              disabled={!definition.steps.length}
+              onClick={() => setPreviewing(true)}
+            >
+              Try it as a learner
+            </button>
             <ol className="studio-preview-steps">
               {definition.steps.map((step, index) => (
                 <li key={`${step.code}-${index}`}>

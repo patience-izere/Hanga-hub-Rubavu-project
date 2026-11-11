@@ -11,10 +11,16 @@ import {
   formatDue,
   groupAssignments,
   hasAttemptsLeft,
+  isCompleted,
+  personalBests,
+  practiceStreak,
 } from "../learning/progress";
 import { useAssignments } from "../learning/useAssignments";
+import { useLocale } from "../i18n/LocaleProvider";
+import "../styles/engagement.css";
 
-function AssignmentCard({ assignment }: { assignment: Assignment }) {
+function AssignmentCard({ assignment, best }: { assignment: Assignment; best?: number }) {
+  const { t } = useLocale();
   const state = dueState(assignment);
   const used = attemptsUsed(assignment);
   const inProgress = assignment.latest_attempt?.status === "in_progress";
@@ -38,23 +44,27 @@ function AssignmentCard({ assignment }: { assignment: Assignment }) {
 
       <dl>
         <div>
-          <dt>Course</dt>
+          <dt>{t("learn.course")}</dt>
           <dd>{assignment.lesson.course_title}</dd>
         </div>
         <div>
-          <dt>Duration</dt>
-          <dd>{assignment.lesson.estimated_minutes} minutes</dd>
-        </div>
-        <div>
-          <dt>Attempts</dt>
+          <dt>{t("learn.attempts")}</dt>
           <dd>
             {used}/{assignment.attempt_limit}
           </dd>
         </div>
+        <div>
+          <dt>{t("learn.best")}</dt>
+          <dd>{best === undefined ? "—" : `${Math.round(best)}%`}</dd>
+        </div>
       </dl>
 
       <Link className="button button-primary" to={`/assignments/${assignment.id}`}>
-        {inProgress ? "Continue lesson" : exhausted ? "Review lesson" : "Open lesson"}
+        {inProgress
+          ? t("learn.continueLesson")
+          : exhausted
+            ? t("learn.practiseAgain")
+            : t("learn.openLesson")}
       </Link>
     </article>
   );
@@ -62,17 +72,21 @@ function AssignmentCard({ assignment }: { assignment: Assignment }) {
 
 export function LearnerDashboardPage() {
   const user = useCurrentUser().data;
-  const displayName = user?.firstName || user?.email || "learner";
+  const displayName = user?.firstName || user?.username || "learner";
   const assignments = useAssignments();
+  const { t } = useLocale();
 
   return (
     <section className="dashboard">
       <div className="dashboard-heading">
         <div>
-          <div className="eyebrow">My learning</div>
-          <h1>Good to see you, {displayName}.</h1>
-          <p>Continue an assigned competency lesson or prepare for your next workshop task.</p>
+          <div className="eyebrow">{t("learn.eyebrow")}</div>
+          <h1>{t("learn.greeting", { name: displayName })}</h1>
+          <p>{t("learn.lead")}</p>
         </div>
+        <Link className="button button-secondary" to="/learn/catalogue">
+          {t("learn.findMore")}
+        </Link>
       </div>
 
       <QueryBoundary
@@ -80,8 +94,9 @@ export function LearnerDashboardPage() {
         loading="Loading assignments…"
         error="Assignments could not be loaded."
         empty={{
-          title: "No lessons assigned yet",
-          description: "Your instructor’s assignments will appear here.",
+          title: "No lessons yet",
+          description:
+            "Your instructor's lessons appear here. You can also add lessons yourself from Find more lessons.",
           symbol: "⚙",
         }}
       >
@@ -89,25 +104,51 @@ export function LearnerDashboardPage() {
           const resume = items.find(
             (assignment) => assignment.latest_attempt?.status === "in_progress",
           );
+          const bests = personalBests(items);
+          const streak = practiceStreak(
+            items.flatMap((item) =>
+              (item.attempt_history ?? []).map((attempt) => attempt.started_at),
+            ),
+          );
+          const finished = items.filter(isCompleted).length;
 
           return (
             <>
+              <ul className="learner-stats" aria-label="Your progress at a glance">
+                <li>
+                  <strong>{streak}</strong>
+                  <span>{streak === 1 ? t("learn.dayInRow") : t("learn.daysInRow")}</span>
+                </li>
+                <li>
+                  <strong>
+                    {finished}/{items.length}
+                  </strong>
+                  <span>{t("learn.lessonsFinished")}</span>
+                </li>
+                <li>
+                  <strong>
+                    {bests.size ? `${Math.round(Math.max(...bests.values()))}%` : "—"}
+                  </strong>
+                  <span>{t("learn.bestScore")}</span>
+                </li>
+              </ul>
+
               {resume ? (
                 <section className="resume-band">
                   <div>
-                    <span className="eyebrow">Continue where you left off</span>
+                    <span className="eyebrow">{t("learn.continueTitle")}</span>
                     <h2>{resume.lesson.title}</h2>
                     <p>
-                      Attempt {resume.latest_attempt?.id} is saved.{" "}
-                      {resume.latest_attempt?.resume_state?.completedSteps?.length ?? 0} step(s)
-                      already evidenced.
+                      {resume.latest_attempt?.is_practice ? "Practice run" : "Attempt"} saved.{" "}
+                      {resume.latest_attempt?.resume_state?.completedSteps?.length ?? 0} of{" "}
+                      {resume.lesson.procedure_steps.length} steps done.
                     </p>
                   </div>
                   <Link
                     className="button button-primary"
                     to={`/attempts/${resume.latest_attempt?.id}`}
                   >
-                    Resume attempt
+                    {t("learn.resume")}
                   </Link>
                 </section>
               ) : null}
@@ -120,7 +161,11 @@ export function LearnerDashboardPage() {
                   </div>
                   <div className="assignment-grid">
                     {group.assignments.map((assignment) => (
-                      <AssignmentCard key={assignment.id} assignment={assignment} />
+                      <AssignmentCard
+                        key={assignment.id}
+                        assignment={assignment}
+                        best={bests.get(assignment.lesson.id)}
+                      />
                     ))}
                   </div>
                 </section>

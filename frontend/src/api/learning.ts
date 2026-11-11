@@ -79,6 +79,49 @@ export type ProcedureStep = {
   }>;
   feedback_rules: Record<string, string>;
   competency_codes: string[];
+  /** The options a decision step offers. Empty for a step with a single action. */
+  choices?: Array<{ action_code: string; label: string }>;
+  /** What specific wrong actions lead to, keyed by action code. */
+  mistakes?: Record<string, Consequence>;
+};
+
+export type ConsequenceEffect =
+  "spark" | "blown_fuse" | "wrong_reading" | "hazard" | "damage" | "none";
+
+export type Consequence = { effect: ConsequenceEffect; message: string };
+
+export type SceneBinding =
+  | { action: string | string[] }
+  | { tool: string; label?: string }
+  /** Tool → action; a list means the first one not yet done, e.g. a check before and after. */
+  | { accepts: Record<string, string | string[]> };
+
+export type SceneDefinition = {
+  version?: number;
+  /** "bench" (default) places props on a table; "floor" spreads them over a workshop floor. */
+  layout?: "bench" | "floor";
+  props: Array<{
+    id: string;
+    kind: string;
+    position: [number, number];
+    rotation?: number;
+    label?: string;
+    state?: Record<string, unknown>;
+    reading_step?: string;
+    /** The meter mode that shows the reading: "dcv" (default) or "ohm". */
+    reading_mode?: string;
+  }>;
+  /** "propId.part" to what clicking that part does. */
+  bindings: Record<string, SceneBinding>;
+  effects?: Array<{ when: string; set: Record<string, Record<string, unknown>> }>;
+  /** Clickable things that are never the right answer, for the button view. */
+  extra_actions?: Array<{ action_code: string; label: string }>;
+};
+
+export type KnowledgeCheckQuestion = {
+  code: string;
+  prompt: string;
+  options: Array<{ code: string; label: string }>;
 };
 
 export type Attempt = {
@@ -95,6 +138,8 @@ export type Attempt = {
   };
   renderer_mode: RendererMode;
   learning_mode: "guided" | "independent";
+  /** A free practice run: scored for the learner, never counted or shown to instructors. */
+  is_practice?: boolean;
   capability_profile: Partial<CapabilityProfile>;
   started_at: string;
   completed_at: string | null;
@@ -150,6 +195,13 @@ export type SimulationScenario = {
     accessible_2d?: Record<string, unknown>;
     desktop_3d?: Record<string, unknown>;
   };
+  /** "free" lets the learner complete the steps in any order. */
+  sequence?: "ordered" | "free";
+  scene?: SceneDefinition | null;
+  knowledge_check?: KnowledgeCheckQuestion[];
+  has_variants?: boolean;
+  /** Things a learner may pick that are never right (a hazard hunt's safe items). */
+  distractors?: Array<{ action_code: string; label: string }>;
 };
 
 export type Assignment = {
@@ -170,7 +222,7 @@ export type Assignment = {
     objectives: string[];
     safety_notes: string[];
     estimated_minutes: number;
-    language: "en" | "rw" | "en-rw";
+    language: "en" | "rw" | "en-rw" | "fr" | "sw";
     content_version: number;
     course_title: string;
     trade: string;
@@ -222,9 +274,17 @@ export type AdaptiveRecommendation = {
 
 export type KnowledgeCheckSubmission = {
   id: number;
-  answers: Array<{ questionCode: string; response: boolean }>;
+  answers: Array<{ questionCode: string; response: boolean | string }>;
   score: string | null;
   submitted_at: string;
+  /** Per-question marking for an authored quiz; empty for the older readiness check. */
+  results?: Array<{
+    questionCode: string;
+    answered: boolean;
+    correct: boolean;
+    correctOption: string;
+    explanation: string;
+  }>;
 };
 
 export type AttemptDetail = Attempt & {
@@ -268,6 +328,7 @@ export type CompetencyResult = {
 export type ActionResult = {
   correct: boolean;
   message: string;
+  consequence?: Consequence | null;
   currentStep: ProcedureStep | null;
   isReadyToComplete: boolean;
   attempt: Attempt;
@@ -295,16 +356,23 @@ export async function getAssignment(id: number): Promise<Assignment> {
   return apiFetch<Assignment>(`/api/v1/assignments/${id}/`);
 }
 
-export async function startAssignment(id: number): Promise<Attempt> {
+export async function startAssignment(id: number, practice = false): Promise<Attempt> {
   await ensureCsrf();
   const response = await apiFetch<{ attempt: Attempt }>(`/api/v1/assignments/${id}/start/`, {
     method: "POST",
+    body: JSON.stringify({ practice }),
   });
   return response.attempt;
 }
 
-export function getAssignmentKnowledgeCheck(id: number): Promise<KnowledgeCheckSubmission | null> {
-  return apiFetch<KnowledgeCheckSubmission | null>(`/api/v1/assignments/${id}/knowledge-check/`);
+export async function getAssignmentKnowledgeCheck(
+  id: number,
+): Promise<KnowledgeCheckSubmission | null> {
+  const submission = await apiFetch<Partial<KnowledgeCheckSubmission> | null>(
+    `/api/v1/assignments/${id}/knowledge-check/`,
+  );
+  // With nothing saved the API answers with an empty body, which arrives here as `{}`.
+  return submission?.id ? (submission as KnowledgeCheckSubmission) : null;
 }
 
 export async function saveAssignmentKnowledgeCheck(

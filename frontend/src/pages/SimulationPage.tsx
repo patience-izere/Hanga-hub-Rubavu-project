@@ -2,20 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { describeApiError } from "../api/client";
-import type {
-  CapabilityProfile,
-  ProcedureStep,
-  RendererMode,
-  TelemetryEventInput,
-} from "../api/learning";
-import { detectCapabilities, recommendedRenderer, rendererAvailability } from "../ar/capabilities";
+import type { CapabilityProfile, RendererMode, TelemetryEventInput } from "../api/learning";
+import { detectCapabilities, rendererAvailability } from "../ar/capabilities";
 import { BatteryWorkshopScene } from "../components/simulation/BatteryWorkshopScene";
 import { CameraArView } from "../components/simulation/CameraArView";
-import { AttemptResultBody } from "./AttemptResultPage";
 import { MarkerlessArView } from "../components/simulation/MarkerlessArView";
 import {
-  useAttempt,
+  ProcedureWorkspace,
+  type ActionSource,
+  type WorkspaceFeedback,
+} from "../components/simulation/ProcedureWorkspace";
+import { ScenePlayer } from "../components/simulation/ScenePlayer";
+import {
   useAbandonAttempt,
+  useAttempt,
   useCompleteAttempt,
   useRecordAttemptAction,
   useRecordAttemptTelemetry,
@@ -28,28 +28,32 @@ import {
   listOutboxItems,
   synchronizeOutbox,
 } from "../offline/outbox";
+import { allOptions, completedActionCodes, stepOptions } from "../procedure/engine";
+import { fallbackScene } from "../procedure/scene";
+import { useLocale } from "../i18n/LocaleProvider";
+import { AttemptResultBody } from "./AttemptResultPage";
 
-const rendererLabels: Record<RendererMode, string> = {
-  accessible_2d: "Accessible 2D",
-  desktop_3d: "Desktop 3D",
-  marker_ar: "Camera AR",
-  markerless_ar: "Markerless AR",
-};
+const RENDERER_MODES: RendererMode[] = [
+  "accessible_2d",
+  "desktop_3d",
+  "marker_ar",
+  "markerless_ar",
+];
 
-function deterministicActionOrder(steps: ProcedureStep[], attemptId: number) {
-  return [...steps].sort((left, right) => {
-    const rank = (code: string) =>
-      Array.from(`${attemptId}:${code}`).reduce(
-        (total, character) => (total * 31 + character.charCodeAt(0)) >>> 0,
-        7,
-      );
-    return rank(left.code) - rank(right.code);
-  });
+/** Checked before the first paint, so a device without WebGL never tries to draw the 3D bench. */
+function canDraw3d(): boolean {
+  try {
+    const canvas = document.createElement("canvas");
+    return Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+  } catch {
+    return false;
+  }
 }
 
 export function SimulationPage() {
   const attemptId = Number(useParams().attemptId);
   const navigate = useNavigate();
+  const { t } = useLocale();
   const attemptQuery = useAttempt(attemptId);
   const record = useRecordAttemptAction(attemptId);
   const complete = useCompleteAttempt(attemptId);
@@ -58,7 +62,9 @@ export function SimulationPage() {
   const telemetry = useRecordAttemptTelemetry(attemptId);
   const recordTelemetryMutation = telemetry.mutate;
   const hint = useRequestAttemptHint(attemptId);
-  const [mode, setMode] = useState<RendererMode>("desktop_3d");
+  const [mode, setMode] = useState<RendererMode>(() =>
+    canDraw3d() ? "desktop_3d" : "accessible_2d",
+  );
   const [capabilities, setCapabilities] = useState<CapabilityProfile | null>(null);
   const [online, setOnline] = useState(navigator.onLine);
   const [pendingSync, setPendingSync] = useState(0);
@@ -69,6 +75,8 @@ export function SimulationPage() {
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [revealedHints, setRevealedHints] = useState<Record<string, string[]>>({});
+  const [feedback, setFeedback] = useState<WorkspaceFeedback | null>(null);
+  const feedbackId = useRef(0);
   const selectionInitialized = useRef(false);
   const capabilityDetected = useRef(false);
   const initialRendererMode = useRef(mode);
@@ -120,9 +128,11 @@ export function SimulationPage() {
       return;
     }
     selectionInitialized.current = true;
-    const recommended = recommendedRenderer(capabilities);
-    setMode(recommended);
-    selectRenderer.mutate({ mode: recommended, capabilityProfile: capabilities });
+    // Start somewhere that works everywhere: the 3D bench when the device can draw it, the
+    // simple view otherwise. Camera and room AR are a choice, never a surprise.
+    const starting = capabilities.webgl ? "desktop_3d" : "accessible_2d";
+    setMode(starting);
+    selectRenderer.mutate({ mode: starting, capabilityProfile: capabilities });
   }, [attemptQuery.data, capabilities, selectRenderer]);
 
   useEffect(() => {
@@ -184,33 +194,24 @@ export function SimulationPage() {
 
   const attempt = complete.data || attemptQuery.data;
   const independent = attempt.learning_mode === "independent";
-  const { lesson } = attempt.assignment;
+  const { lesson, scenario } = attempt.assignment;
+  const steps = lesson.procedure_steps;
   const liveResume = record.data?.attempt.resume_state || attempt.resume_state;
   const completedCodes = liveResume.completedSteps || [];
-  const currentCode =
-    liveResume.currentStep === undefined
-      ? (lesson.procedure_steps[0]?.code ?? null)
-      : liveResume.currentStep;
-  const currentStep = lesson.procedure_steps.find((step) => step.code === currentCode) || null;
-  const completedActions = new Set(
-    lesson.procedure_steps
-      .filter((step) => completedCodes.includes(step.code))
-      .map((step) => step.action_code),
-  );
-  const isReady =
-    lesson.procedure_steps.length > 0 && completedCodes.length === lesson.procedure_steps.length;
+  const currentStep = steps.find((step) => !completedCodes.includes(step.code)) ?? null;
+  const sequence = scenario?.sequence ?? "ordered";
+  const isReady = steps.length > 0 && completedCodes.length === steps.length;
   const isBusy = record.isPending || complete.isPending;
-  const productionModelFile = attempt.assignment.scenario?.asset_package?.files.find(
+  const packageFiles = scenario?.asset_package?.files ?? [];
+  const productionModelFile = packageFiles.find(
     (file) =>
       file.role === "primary-scene" || file.path.endsWith(".glb") || file.path.endsWith(".gltf"),
   );
-  const fallbackMediaFiles =
-    attempt.assignment.scenario?.asset_package?.files.filter(
-      (file) => file.role === "fallback-media",
-    ) ?? [];
-  const captionFile = attempt.assignment.scenario?.asset_package?.files.find(
+  const fallbackMediaFiles = packageFiles.filter((file) => file.role === "fallback-media");
+  const captionFile = packageFiles.find(
     (file) => file.role === "captions" || file.mime_type === "text/vtt",
   );
+  const narrationFiles = packageFiles.filter((file) => file.role === "narration");
   const productionModelAsset = productionModelFile
     ? {
         url: productionModelFile.url,
@@ -221,8 +222,10 @@ export function SimulationPage() {
       }
     : undefined;
   const expectedMarker =
-    attempt.assignment.scenario?.renderer_config?.marker_ar?.targetValue ||
+    scenario?.renderer_config?.marker_ar?.targetValue ||
     `OPEDU-${lesson.slug}-V${lesson.content_version}`;
+  const sceneDefinition = scenario?.scene ?? null;
+  const prompted = !independent && sequence !== "free";
 
   const usedHintCodes = currentStep
     ? new Set([
@@ -260,10 +263,23 @@ export function SimulationPage() {
     await attemptQuery.refetch();
   }
 
-  function performAction(action: string, source: "scene" | "accessible-controls" | "camera-ar") {
-    if (!isBusy && attempt.status === "in_progress") {
-      record.mutate({ action, source, rendererMode: mode });
-    }
+  function performAction(action: string, source: ActionSource) {
+    if (isBusy || attempt.status !== "in_progress") return;
+    record.mutate(
+      { action, source, rendererMode: mode },
+      {
+        onSuccess: (result) => {
+          feedbackId.current += 1;
+          setFeedback({
+            id: feedbackId.current,
+            correct: result.correct,
+            message: result.message,
+            consequence: result.consequence ?? null,
+            action,
+          });
+        },
+      },
+    );
   }
 
   function chooseMode(nextMode: RendererMode) {
@@ -288,414 +304,349 @@ export function SimulationPage() {
     );
   }
 
-  return (
-    <section className="simulation-page">
-      <header className="simulation-header">
-        <div>
-          <Link className="back-link" to={`/assignments/${attempt.assignment.id}`}>
-            ← Lesson overview
-          </Link>
-          <span className="eyebrow">
-            {independent ? "Independent assessment" : "Guided practical"} · Attempt {attempt.id}
-          </span>
-          <h1>{lesson.title}</h1>
-        </div>
-        <div
-          className="simulation-progress"
-          aria-label={`${completedCodes.length} of ${lesson.procedure_steps.length} steps complete`}
-        >
-          <strong>
-            {completedCodes.length}/{lesson.procedure_steps.length}
-          </strong>
-          <span>steps complete</span>
-        </div>
-      </header>
+  const completedActions = completedActionCodes(steps, completedCodes);
+  const arOptions = prompted
+    ? currentStep
+      ? stepOptions(currentStep)
+      : []
+    : allOptions(steps, scenario?.distractors ?? sceneDefinition?.extra_actions ?? [], attempt.id);
 
-      <div className="simulation-layout">
-        <div className="scene-panel">
-          <div className="renderer-toolbar" aria-label="Learning mode">
-            {(["accessible_2d", "desktop_3d", "marker_ar", "markerless_ar"] as RendererMode[]).map(
-              (rendererMode) => (
-                <button
-                  type="button"
-                  key={rendererMode}
-                  aria-pressed={mode === rendererMode}
-                  disabled={availableModes?.[rendererMode] === false || selectRenderer.isPending}
-                  onClick={() => chooseMode(rendererMode)}
-                >
-                  {rendererLabels[rendererMode]}
-                  {capabilities && recommendedRenderer(capabilities) === rendererMode
-                    ? " · recommended"
-                    : ""}
-                </button>
-              ),
-            )}
-          </div>
-          <div className="renderer-toolbar" aria-label="Guidance level">
-            {(["guided", "independent"] as const).map((learningMode) => (
-              <button
-                type="button"
-                key={learningMode}
-                aria-pressed={attempt.learning_mode === learningMode}
-                disabled={!capabilities || selectRenderer.isPending}
-                onClick={() => chooseLearningMode(learningMode)}
-              >
-                {learningMode === "guided" ? "Guided practice" : "Independent assessment"}
-              </button>
-            ))}
-          </div>
-          {independent ? (
-            <p className="scene-help" role="status">
-              Ordered prompts, active-step highlights, and hints are hidden. Scoring and required
-              evidence are unchanged.
-            </p>
-          ) : null}
-
-          {mode === "desktop_3d" && (
-            <>
-              <BatteryWorkshopScene
-                currentAction={independent ? null : (currentStep?.action_code ?? null)}
-                completedActions={completedActions}
-                disabled={isBusy}
-                onAction={(action) => performAction(action, "scene")}
-                modelAsset={productionModelAsset}
-                onAssetLoaded={handleAssetLoaded}
-                onAssetFailure={handleAssetFailure}
-              />
-              <p className="scene-help">
-                Drag to orbit · scroll to zoom · select workshop objects to act
-              </p>
-            </>
-          )}
-          {mode === "accessible_2d" && (
-            <div className="accessible-renderer" role="region" aria-label="Accessible lesson">
-              <span className="eyebrow">Equivalent learning path</span>
-              <h2>
-                {independent
-                  ? "Complete the procedure independently"
-                  : (currentStep?.title ?? "Procedure complete")}
-              </h2>
-              <p>
-                {independent
-                  ? "Choose actions from the unnumbered panel. No ordered answer prompts are shown."
-                  : (currentStep?.instruction ?? "All required evidence is saved.")}
-              </p>
-              {!independent &&
-                currentStep?.hazards?.map((hazard) => (
-                  <div className="accessible-hazard" key={hazard.code}>
-                    <strong>{hazard.title}</strong>
-                    <p>{hazard.mitigation}</p>
-                  </div>
-                ))}
-              {!independent
-                ? fallbackMediaFiles.map((file) =>
-                    file.mime_type.startsWith("image/") ? (
-                      <figure key={file.path}>
-                        <img
-                          src={file.url}
-                          alt={String(file.metadata.altText ?? "Technical procedure reference")}
-                        />
-                        <figcaption>{file.source_attribution}</figcaption>
-                      </figure>
-                    ) : file.mime_type.startsWith("video/") ? (
-                      <div key={file.path}>
-                        <video controls preload="metadata">
-                          <source src={file.url} type={file.mime_type} />
-                          {captionFile ? (
-                            <track
-                              kind="captions"
-                              src={captionFile.url}
-                              srcLang="en"
-                              label="English captions"
-                              default
-                            />
-                          ) : null}
-                        </video>
-                        <details>
-                          <summary>Read video transcript</summary>
-                          <p>{String(file.metadata.transcript ?? "Transcript unavailable.")}</p>
-                        </details>
-                      </div>
-                    ) : null,
-                  )
-                : null}
-              <p>
-                Use the procedure controls beside this panel. They create the same evidence and
-                score as 3D or AR.
-              </p>
-            </div>
-          )}
-          {mode === "marker_ar" && (
-            <CameraArView
-              currentStep={currentStep}
-              independent={independent}
+  function renderStage(stageMode: RendererMode) {
+    if (stageMode === "marker_ar") {
+      return (
+        <CameraArView
+          currentStep={currentStep}
+          independent={!prompted}
+          disabled={isBusy}
+          onAction={(action) => performAction(action, "camera-ar")}
+          onTelemetry={recordTelemetry}
+          expectedMarker={expectedMarker}
+          bench={(arPose) => (
+            <ScenePlayer
+              overlay
+              arPose={arPose}
+              scene={sceneDefinition ?? fallbackScene(steps)}
+              steps={steps}
+              completedActions={completedActions}
+              currentAction={prompted ? (currentStep?.action_code ?? null) : null}
               disabled={isBusy}
               onAction={(action) => performAction(action, "camera-ar")}
-              onTelemetry={recordTelemetry}
-              expectedMarker={expectedMarker}
             />
           )}
-          {mode === "markerless_ar" && (
-            <MarkerlessArView currentStep={currentStep} onTelemetry={recordTelemetry} />
-          )}
-          <div className={`sync-banner ${online ? "is-online" : "is-offline"}`} role="status">
-            <strong>
-              {record.isPending
-                ? "Saving"
-                : synchronizing
-                  ? "Synchronizing"
-                  : online
-                    ? "Online"
-                    : "Offline"}
-            </strong>
-            <span>
-              {blockedSync
-                ? staleSync
-                  ? "This lesson changed after you started, so the server cannot accept the actions saved on this device."
-                  : "This attempt was closed on another device or by your instructor, so the actions saved on this device cannot be added to it."
-                : failedSync
-                  ? `${pendingSync} saved ${pendingSync === 1 ? "action was" : "actions were"} not accepted yet. Try again, or ask your instructor if it keeps failing.`
-                  : pendingSync
-                    ? `${pendingSync} ${pendingSync === 1 ? "action is" : "actions are"} saved on this device and will be sent when you are online.`
-                    : "All your actions are saved."}
-            </span>
-            {blockedSync > 0 && !confirmingDiscard ? (
-              <button type="button" onClick={() => setConfirmingDiscard(true)}>
-                Review saved actions
-              </button>
-            ) : null}
-            {online && pendingSync > 0 && blockedSync === 0 && (
-              <button
-                type="button"
-                disabled={synchronizing}
-                onClick={async () => {
-                  setSynchronizing(true);
-                  try {
-                    await synchronizeOutbox(attemptId);
-                  } finally {
-                    setSynchronizing(false);
-                  }
-                }}
-              >
-                {synchronizing ? "Synchronizing…" : "Synchronize now"}
-              </button>
-            )}
-          </div>
-          {confirmingDiscard ? (
-            <div className="inline-confirm" role="alertdialog" aria-labelledby="discard-title">
-              <strong id="discard-title">Delete the actions saved on this device?</strong>
-              <p>
-                {pendingSync} saved {pendingSync === 1 ? "action" : "actions"} for this attempt
-                cannot be delivered. Deleting them lets you carry on; your instructor still sees
-                everything the server already received. To keep them, leave this page and ask your
-                instructor before deleting.
-              </p>
-              <div className="button-row">
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  onClick={() => setConfirmingDiscard(false)}
-                >
-                  Keep them
-                </button>
-                <button
-                  className="button button-danger"
-                  type="button"
-                  onClick={() => void discardRefusedEvidence()}
-                >
-                  Delete saved actions
-                </button>
-              </div>
-            </div>
-          ) : null}
-          {!independent && currentStep?.hints?.length ? (
-            <div className="hint-panel">
-              {shownHints.length > 0 ? (
-                <ol className="hint-list" aria-label="Hints for this step">
-                  {shownHints.map((item) => (
-                    <li key={item.code}>{item.text}</li>
-                  ))}
-                </ol>
-              ) : null}
-              {nextHint ? (
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  disabled={!online || hint.isPending}
-                  onClick={requestHint}
-                >
-                  {hint.isPending
-                    ? "Loading hint…"
-                    : shownHints.length
-                      ? "Show another hint"
-                      : "Request a guided hint"}
-                  {nextHint.points_penalty > 0 ? ` (−${nextHint.points_penalty} points)` : ""}
-                </button>
-              ) : (
-                <small>No more hints for this step.</small>
-              )}
-              {!online && nextHint ? (
-                <small>Hints need a connection so your instructor can see which you used.</small>
-              ) : null}
-              {hint.isError ? (
-                <p className="form-error" role="alert">
-                  {describeApiError(hint.error, "The hint could not be loaded.")}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+        />
+      );
+    }
+    if (stageMode === "markerless_ar") {
+      return (
+        <MarkerlessArView
+          currentStep={prompted ? currentStep : null}
+          onTelemetry={recordTelemetry}
+          options={arOptions}
+          disabled={isBusy}
+          feedback={feedback?.message ?? ""}
+          onAction={(action) => performAction(action, "camera-ar")}
+        />
+      );
+    }
+    if (stageMode === "desktop_3d" && productionModelAsset) {
+      // A lesson that ships a verified 3D model uses it; its parts name their own actions.
+      return (
+        <>
+          <BatteryWorkshopScene
+            currentAction={prompted ? (currentStep?.action_code ?? null) : null}
+            completedActions={completedActions}
+            disabled={isBusy}
+            onAction={(action) => performAction(action, "scene")}
+            modelAsset={productionModelAsset}
+            onAssetLoaded={handleAssetLoaded}
+            onAssetFailure={handleAssetFailure}
+          />
+          <p className="scene-help">Drag to look around · pinch or scroll to zoom</p>
+        </>
+      );
+    }
+    return null;
+  }
 
-        <aside className="procedure-panel" aria-live="polite">
-          {currentStep ? (
-            <>
-              {independent ? (
-                <>
-                  <div className="step-count">Independent evidence capture</div>
-                  <h2>Choose the next correct action</h2>
-                  <p>Required safety rules still apply. The procedure order is not displayed.</p>
-                </>
-              ) : (
-                <>
-                  <div className="step-count">
-                    Step {currentStep.order} of {lesson.procedure_steps.length}
-                  </div>
-                  <h2>{currentStep.title}</h2>
-                  <p>{currentStep.instruction}</p>
-                  {currentStep.safety_critical && (
-                    <p className="safety-callout">Safety-critical step</p>
-                  )}
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="step-count">Procedure complete</div>
-              <h2>Ready to submit</h2>
-              <p>Your ordered action evidence is saved. Submit it for server-side scoring.</p>
-            </>
-          )}
-
-          {record.data && (
-            <p
-              className={`action-feedback ${record.data.correct ? "is-correct" : "is-incorrect"}`}
-              role="status"
-            >
-              {record.data.message}
-            </p>
-          )}
-          {record.isError && (
-            <p className="form-error" role="alert">
-              {describeApiError(record.error, "The action could not be saved.")}
-            </p>
-          )}
-
-          <div className="accessible-actions">
-            <h3>{independent ? "Independent action panel" : "Accessible procedure controls"}</h3>
-            <p>
-              {independent
-                ? "Actions use a stable, attempt-specific order that does not reveal the procedure sequence."
-                : "These buttons provide the same actions as the 3D objects."}
-            </p>
-            {(independent
-              ? deterministicActionOrder(lesson.procedure_steps, attempt.id)
-              : lesson.procedure_steps
-            ).map((step: ProcedureStep) => {
-              const completed = completedCodes.includes(step.code);
-              const active = step.code === currentStep?.code;
-              return (
-                <button
-                  key={step.code}
-                  className={`procedure-action${active ? " is-active" : ""}${completed ? " is-complete" : ""}`}
-                  onClick={() => performAction(step.action_code, "accessible-controls")}
-                  disabled={isBusy || completed}
-                  aria-current={!independent && active ? "step" : undefined}
-                >
-                  <span>{independent ? "•" : step.order}</span>
-                  <strong>{step.title}</strong>
-                  <small>
-                    {completed
-                      ? "Completed"
-                      : !independent && active
-                        ? "Current step"
-                        : "Available action"}
-                  </small>
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            className="button button-primary submit-attempt"
-            disabled={!isReady || isBusy || !online || pendingSync > 0}
-            onClick={() => complete.mutate()}
-          >
-            {complete.isPending
-              ? "Scoring attempt…"
-              : !online
-                ? "Reconnect to submit"
-                : pendingSync > 0
-                  ? "Send saved actions before submitting"
-                  : "Complete and view result"}
+  const syncStatus = (
+    <>
+      <div
+        className={`sync-banner ${online ? "is-online" : "is-offline"}${
+          pendingSync || !online ? " needs-attention" : ""
+        }`}
+        role="status"
+      >
+        <strong>
+          {record.isPending
+            ? "Saving"
+            : synchronizing
+              ? "Synchronizing"
+              : online
+                ? "Online"
+                : "Offline"}
+        </strong>
+        <span>
+          {blockedSync
+            ? staleSync
+              ? "This lesson changed after you started, so the server cannot accept the actions saved on this device."
+              : "This attempt was closed on another device or by your instructor, so the actions saved on this device cannot be added to it."
+            : failedSync
+              ? `${pendingSync} saved ${pendingSync === 1 ? "action was" : "actions were"} not accepted yet. Try again, or ask your instructor if it keeps failing.`
+              : pendingSync
+                ? `${pendingSync} ${pendingSync === 1 ? "action is" : "actions are"} saved on this device and will be sent when you are online.`
+                : "All your actions are saved."}
+        </span>
+        {blockedSync > 0 && !confirmingDiscard ? (
+          <button type="button" onClick={() => setConfirmingDiscard(true)}>
+            Review saved actions
           </button>
-          {confirmingEnd ? (
-            <div className="inline-confirm" role="alertdialog" aria-labelledby="end-title">
-              <strong id="end-title">End this attempt?</strong>
-              <p>
-                It will not be scored and counts towards your attempt limit. Its evidence stays in
-                your history, and a new attempt starts from the safe beginning.
-              </p>
-              <div className="button-row">
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  onClick={() => setConfirmingEnd(false)}
-                >
-                  Keep working
-                </button>
-                <button
-                  className="button button-danger"
-                  type="button"
-                  disabled={abandon.isPending}
-                  onClick={() =>
-                    abandon.mutate(undefined, {
-                      onSuccess: () => navigate(`/assignments/${attempt.assignment.id}`),
-                    })
-                  }
-                >
-                  {abandon.isPending ? "Ending attempt…" : "End attempt"}
-                </button>
-              </div>
-            </div>
-          ) : (
+        ) : null}
+        {online && pendingSync > 0 && blockedSync === 0 && (
+          <button
+            type="button"
+            disabled={synchronizing}
+            onClick={async () => {
+              setSynchronizing(true);
+              try {
+                await synchronizeOutbox(attemptId);
+              } finally {
+                setSynchronizing(false);
+              }
+            }}
+          >
+            {synchronizing ? "Synchronizing…" : "Synchronize now"}
+          </button>
+        )}
+      </div>
+      {confirmingDiscard ? (
+        <div className="inline-confirm" role="alertdialog" aria-labelledby="discard-title">
+          <strong id="discard-title">Delete the actions saved on this device?</strong>
+          <p>
+            {pendingSync} saved {pendingSync === 1 ? "action" : "actions"} for this attempt cannot
+            be delivered. Deleting them lets you carry on; your instructor still sees everything the
+            server already received. To keep them, leave this page and ask your instructor before
+            deleting.
+          </p>
+          <div className="button-row">
             <button
               className="button button-secondary"
               type="button"
-              disabled={!online || pendingSync > 0 || abandon.isPending}
-              onClick={() => setConfirmingEnd(true)}
+              onClick={() => setConfirmingDiscard(false)}
             >
-              End and restart safely
+              Keep them
             </button>
-          )}
-          {!online || pendingSync > 0 ? (
-            <small>
-              {!online
-                ? "You can keep practising offline. Submitting or ending needs a connection."
-                : "Send the actions saved on this device before submitting or ending."}
-            </small>
-          ) : null}
-          {abandon.isError && (
-            <p className="form-error" role="alert">
-              {describeApiError(abandon.error, "The attempt could not be ended.")}
-            </p>
-          )}
-          {complete.isError && (
-            <p className="form-error" role="alert">
-              {describeApiError(complete.error, "The attempt could not be completed.")}
-            </p>
-          )}
-        </aside>
+            <button
+              className="button button-danger"
+              type="button"
+              onClick={() => void discardRefusedEvidence()}
+            >
+              Delete saved actions
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+
+  const hintPanel =
+    prompted && currentStep?.hints?.length ? (
+      <div className="hint-panel">
+        {shownHints.length > 0 ? (
+          <ol className="hint-list" aria-label="Hints for this step">
+            {shownHints.map((item) => (
+              <li key={item.code}>{item.text}</li>
+            ))}
+          </ol>
+        ) : null}
+        {nextHint ? (
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={!online || hint.isPending}
+            onClick={requestHint}
+          >
+            {hint.isPending
+              ? "Loading hint…"
+              : shownHints.length
+                ? t("ws.anotherHint")
+                : t("ws.giveHint")}
+            {nextHint.points_penalty > 0 ? ` (−${nextHint.points_penalty} points)` : ""}
+          </button>
+        ) : (
+          <small>{t("ws.noMoreHints")}</small>
+        )}
+        {!online && nextHint ? (
+          <small>Hints need a connection so your instructor can see which you used.</small>
+        ) : null}
+        {hint.isError ? (
+          <p className="form-error" role="alert">
+            {describeApiError(hint.error, "The hint could not be loaded.")}
+          </p>
+        ) : null}
       </div>
-    </section>
+    ) : null;
+
+  const footer = (
+    <>
+      {record.isError ? (
+        <p className="form-error" role="alert">
+          {describeApiError(record.error, "The action could not be saved.")}
+        </p>
+      ) : null}
+      <button
+        className="button button-primary submit-attempt"
+        disabled={!isReady || isBusy || !online || pendingSync > 0}
+        onClick={() => complete.mutate()}
+      >
+        {complete.isPending
+          ? t("ws.scoring")
+          : !online
+            ? t("ws.reconnect")
+            : pendingSync > 0
+              ? t("ws.sendFirst")
+              : t("ws.complete")}
+      </button>
+      {confirmingEnd ? (
+        <div className="inline-confirm" role="alertdialog" aria-labelledby="end-title">
+          <strong id="end-title">
+            {attempt.is_practice ? "End this practice run?" : "End this attempt?"}
+          </strong>
+          <p>
+            {attempt.is_practice
+              ? "Practice runs are free. You can start another whenever you like."
+              : "It will not be scored and counts towards your attempt limit. A new attempt starts from the safe beginning."}
+          </p>
+          <div className="button-row">
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={() => setConfirmingEnd(false)}
+            >
+              Keep working
+            </button>
+            <button
+              className="button button-danger"
+              type="button"
+              disabled={abandon.isPending}
+              onClick={() =>
+                abandon.mutate(undefined, {
+                  onSuccess: () => navigate(`/assignments/${attempt.assignment.id}`),
+                })
+              }
+            >
+              {abandon.isPending
+                ? "Ending…"
+                : attempt.is_practice
+                  ? t("ws.endPractice")
+                  : "End attempt"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          className="button-link ws-end"
+          type="button"
+          disabled={!online || pendingSync > 0 || abandon.isPending}
+          onClick={() => setConfirmingEnd(true)}
+        >
+          {attempt.is_practice ? t("ws.endPractice") : t("ws.endRestart")}
+        </button>
+      )}
+      {!online || pendingSync > 0 ? (
+        <small>
+          {!online
+            ? "You can keep practising offline. Submitting or ending needs a connection."
+            : "Send the actions saved on this device before submitting or ending."}
+        </small>
+      ) : null}
+      {abandon.isError && (
+        <p className="form-error" role="alert">
+          {describeApiError(abandon.error, "The attempt could not be ended.")}
+        </p>
+      )}
+      {complete.isError && (
+        <p className="form-error" role="alert">
+          {describeApiError(complete.error, "The attempt could not be completed.")}
+        </p>
+      )}
+    </>
+  );
+
+  const simpleMedia = prompted
+    ? fallbackMediaFiles.map((file) =>
+        file.mime_type.startsWith("image/") ? (
+          <figure key={file.path}>
+            <img
+              src={file.url}
+              alt={String(file.metadata.altText ?? "Technical procedure reference")}
+            />
+            <figcaption>{file.source_attribution}</figcaption>
+          </figure>
+        ) : file.mime_type.startsWith("video/") ? (
+          <div key={file.path}>
+            <video controls preload="metadata">
+              <source src={file.url} type={file.mime_type} />
+              {captionFile ? (
+                <track
+                  kind="captions"
+                  src={captionFile.url}
+                  srcLang="en"
+                  label="English captions"
+                  default
+                />
+              ) : null}
+            </video>
+            <details>
+              <summary>Read video transcript</summary>
+              <p>{String(file.metadata.transcript ?? "Transcript unavailable.")}</p>
+            </details>
+          </div>
+        ) : null,
+      )
+    : null;
+
+  return (
+    <ProcedureWorkspace
+      title={lesson.title}
+      kicker={attempt.is_practice ? t("ws.kickerPractice") : t("ws.kickerAssessed")}
+      back={{ to: `/assignments/${attempt.assignment.id}`, label: t("ws.lessonOverview") }}
+      steps={steps}
+      completedCodes={completedCodes}
+      sequence={sequence}
+      scene={sceneDefinition}
+      distractors={scenario?.distractors}
+      independent={independent}
+      mode={mode}
+      modes={RENDERER_MODES.map((rendererMode) => ({
+        mode: rendererMode,
+        available: availableModes?.[rendererMode] !== false && !selectRenderer.isPending,
+        // The view the attempt opens in: it works without a camera, a marker or a headset.
+        recommended:
+          rendererMode === (capabilities?.webgl === false ? "accessible_2d" : "desktop_3d"),
+      }))}
+      onModeChange={chooseMode}
+      guidance={
+        sequence === "free"
+          ? null
+          : {
+              value: attempt.learning_mode,
+              // The server refuses a change once the procedure has evidence.
+              locked: completedCodes.length > 0 || feedback !== null,
+              onChange: chooseLearningMode,
+            }
+      }
+      busy={isBusy}
+      feedback={feedback}
+      onAction={performAction}
+      seed={attempt.id}
+      startedAt={attempt.started_at}
+      language={lesson.language === "en-rw" ? "rw" : lesson.language}
+      narrationFiles={narrationFiles}
+      renderStage={renderStage}
+      simpleMedia={simpleMedia}
+      status={syncStatus}
+      hint={hintPanel}
+      footer={footer}
+    />
   );
 }

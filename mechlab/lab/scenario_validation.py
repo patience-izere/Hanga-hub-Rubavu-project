@@ -3,6 +3,7 @@
 from django.core.exceptions import ValidationError
 
 from .models import AssetPackage, Competency, GradingPolicy, Lesson
+from .scenario_runtime import validate_runtime_extensions
 
 # The battery workshop scene is drawn in code; packages declaring this renderer need no GLB.
 PROCEDURAL_RENDERER = "procedural-r3f"
@@ -92,6 +93,7 @@ def validate_scenario_for_publication(scenario, *, for_publish=True):
             errors.append(f"{prefix} primary action is missing from acceptable_actions.")
     if orders and orders != set(range(1, len(steps) + 1)):
         errors.append("Step order must be contiguous from 1.")
+    errors.extend(validate_runtime_extensions(definition))
 
     enabled_spatial = any(
         isinstance(renderers.get(name), dict) and renderers[name].get("enabled")

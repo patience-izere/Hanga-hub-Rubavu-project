@@ -99,6 +99,29 @@ npm run build
 
 ## Current milestone
 
-The current vertical slice covers normalized programs, modules, cohorts and enrollment; controlled school onboarding; and the learner/instructor evidence paths. It includes assignment, lesson briefing, a resumable guided 3D battery procedure, immutable action evidence, server-side completion/scoring, learner results, school-level instructor metrics, and attempt review. The 3D route is lazy-loaded so the engine does not slow public, authentication, or dashboard pages.
+The platform now stands on its own for more than one school:
 
-The next priority is instructor observations and published learner feedback, plus stable xAPI-compatible evidence identifiers. Offline action buffering and an optimized glTF asset pipeline follow that assessment foundation, then broader competency reporting. WebXR should be added only after the same procedure is validated with technical instructors on desktop hardware.
+- **Ways in without email.** Learners join a class with a code from the board and choose a
+  six-digit PIN, or receive printed sign-in slips. Anyone can sign up to practise the open
+  catalogue, visitors can try a lesson at `/demo` with no account, and schools, garages and
+  hubs can ask to be set up (approved in Django Admin).
+- **Practice that can go wrong safely.** Decision steps offer real options, specific wrong
+  actions have consequences (a spark, a blown meter fuse, a wrong reading), and each attempt
+  gets one of several equivalent fault cases. Free practice runs do not use up attempts and
+  stay private to the learner.
+- **One scene player for every lesson.** Lessons describe their 3D bench as data built from a
+  shared prop library, so new lessons need no new code. In Camera AR the same bench stands on
+  the printed marker and tilts with it.
+- **Feedback and motivation.** A marked pre-lesson quiz, a step-by-step replay, streaks,
+  personal bests, a skills passport, and certificates with a public check link that only claim
+  what happened.
+- **Class tools.** A live team challenge for the projector that ranks safety before speed.
+
+`seed_demo` ships demonstration lessons in two trades. Automobile Technology: battery diagnosis,
+jump-starting, replacing a fuse, checking charging voltage. Electrical Installation: safe
+isolation and continuity testing. Plus a workshop hazard hunt for all trades. Authors build and
+try practicals like these in the Module Studio without writing JSON, and the learner interface is
+available in English, French and Swahili (the last two as drafts awaiting review). **Their procedures, readings and
+fault cases are draft content** and must be validated by a qualified instructor against the
+Rwanda TVET Board curriculum before learners are assessed with them. See
+`docs/product/learner-experience.md` for the scenario format and what remains.

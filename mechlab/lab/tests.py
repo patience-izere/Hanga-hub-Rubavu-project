@@ -566,31 +566,36 @@ class SeedDemoTests(TestCase):
                 stdout=output,
             )
 
-        self.assertEqual(Program.objects.count(), 1)
+        # Automobile Technology and Electrical Installation.
+        self.assertEqual(Program.objects.count(), 2)
         self.assertEqual(Cohort.objects.count(), 1)
         self.assertEqual(Enrollment.objects.count(), 1)
-        self.assertEqual(Module.objects.count(), 1)
         self.assertEqual(LearnerProfile.objects.count(), 1)
         self.assertEqual(InstructorProfile.objects.count(), 1)
-        course = Course.objects.get()
-        lesson = Lesson.objects.get()
-        self.assertEqual(course.program, Program.objects.get())
-        self.assertEqual(lesson.module, Module.objects.get())
-        scenario = SimulationScenario.objects.get()
-        self.assertEqual(scenario.lesson, lesson)
-        self.assertEqual(scenario.version, lesson.content_version)
-        self.assertEqual(scenario.status, SimulationScenario.Status.PUBLISHED)
-        self.assertEqual(len(scenario.definition["steps"]), 7)
-        self.assertEqual(scenario.definition["format"], "opedu-scenario/v2")
+        course = Course.objects.get(slug="automotive-electrical-foundations")
+        lesson = Lesson.objects.get(slug="battery-inspection-and-diagnosis")
+        self.assertEqual(course.program, Program.objects.get(code="automobile-technology"))
+        self.assertEqual(lesson.module, Module.objects.get(course=course))
+        # Version 1 stays as first published; version 2 adds options, consequences and fault
+        # cases on top of the same seven steps.
+        original, current = SimulationScenario.objects.filter(lesson=lesson).order_by("version")
+        self.assertEqual(original.version, lesson.content_version)
+        for scenario in (original, current):
+            self.assertEqual(scenario.status, SimulationScenario.Status.PUBLISHED)
+            self.assertEqual(len(scenario.definition["steps"]), 7)
+            self.assertEqual(scenario.definition["format"], "opedu-scenario/v2")
+            self.assertEqual(scenario.grading_policy.version, 1)
+        self.assertNotIn("variants", original.definition)
+        self.assertEqual(len(current.definition["variants"]), 3)
         self.assertEqual(Tool.objects.count(), 2)
         self.assertEqual(Hazard.objects.count(), 2)
-        self.assertEqual(AcceptableAction.objects.count(), 7)
-        self.assertEqual(StepHint.objects.count(), 2)
+        self.assertEqual(AcceptableAction.objects.filter(step__lesson=lesson).count(), 7)
+        self.assertEqual(StepHint.objects.filter(step__lesson=lesson).count(), 2)
         self.assertEqual(StepTolerance.objects.count(), 1)
-        self.assertEqual(scenario.grading_policy.version, 1)
-        self.assertEqual(AssetPackage.objects.get().version, 1)
-        assignment = Assignment.objects.get()
-        self.assertEqual(assignment.scenario, scenario)
+        self.assertEqual(AssetPackage.objects.get(course=course).version, 1)
+        # The learner is given the current practical of every demonstration lesson, once.
+        self.assertEqual(Assignment.objects.get(lesson=lesson).scenario, current)
+        self.assertEqual(Assignment.objects.count(), Lesson.objects.count())
 
 
 class AssetGovernanceCommandTests(TestCase):
@@ -2331,9 +2336,13 @@ class PilotWorkflowTests(TestCase):
         self.admin = User.objects.get(username="admin@opedu.local")
         self.instructor = User.objects.get(username="instructor@opedu.local")
         self.learner = User.objects.get(username="learner@opedu.local")
-        self.scenario = SimulationScenario.objects.get(
-            lesson__slug="battery-inspection-and-diagnosis",
-            status=SimulationScenario.Status.PUBLISHED,
+        self.scenario = (
+            SimulationScenario.objects.filter(
+                lesson__slug="battery-inspection-and-diagnosis",
+                status=SimulationScenario.Status.PUBLISHED,
+            )
+            .order_by("-version")
+            .first()
         )
         self.cohort = Cohort.objects.get(school=self.school)
         self.payload = {
@@ -3334,7 +3343,7 @@ class ResearchConsentTests(TestCase):
     freeze_and_start = PilotWorkflowTests.freeze_and_start
 
     def learner_attempt(self):
-        assignment = Assignment.objects.get(learner=self.learner)
+        assignment = Assignment.objects.get(learner=self.learner, scenario=self.scenario)
         self.client.force_login(self.learner)
         return self.client.post(f"/api/v1/assignments/{assignment.pk}/start/").json()["attempt"]
 

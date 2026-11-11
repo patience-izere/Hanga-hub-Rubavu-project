@@ -170,7 +170,9 @@ def build_pilot_report(study):
     }
 
     attempts = list(
-        Attempt.objects.filter(scenario=study.scenario, learner_id__in=learner_ids)
+        Attempt.objects.filter(
+            scenario=study.scenario, learner_id__in=learner_ids, is_practice=False
+        )
         .prefetch_related("events", "sync_audits")
         .order_by("learner_id", "started_at")
     )

@@ -3,6 +3,7 @@
 from django.db.models import Prefetch
 
 from .models import ProcedureStep, StepTolerance
+from .scenario_runtime import normalize_choices, normalize_mistakes
 
 
 def build_scenario_definition(lesson):
@@ -199,6 +200,9 @@ def normalize_step(step, order):
         "safety_critical": step.get("safety_critical") is True,
         "points": points if isinstance(points, int) and points >= 0 else 10,
         "metadata": step.get("metadata") if isinstance(step.get("metadata"), dict) else {},
+        # Optional: the options a decision step offers, and what specific wrong actions lead to.
+        "choices": normalize_choices(step),
+        "mistakes": normalize_mistakes(step),
     }
 
 

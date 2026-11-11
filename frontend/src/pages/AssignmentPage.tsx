@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { describeApiError } from "../api/client";
+import { ApiError, describeApiError } from "../api/client";
+import type { Assignment, KnowledgeCheckSubmission } from "../api/learning";
 import {
   useAssignment,
   useKnowledgeCheck,
@@ -9,16 +10,150 @@ import {
   useStartAssignment,
 } from "../learning/useAssignments";
 import { downloadAssignmentAssets, removeAssignmentAssets } from "../offline/outbox";
-import { attemptsUsed, dueRelative, dueState, formatDue } from "../learning/progress";
+import { dueRelative, dueState, formatDue } from "../learning/progress";
+import { useLocale } from "../i18n/LocaleProvider";
+import "../styles/engagement.css";
+
+/** Lessons authored before quizzes existed keep the self-declared readiness check. */
+const READINESS_STATEMENTS: Array<[string, string]> = [
+  ["ppe", "I can identify the required personal protective equipment."],
+  ["isolation", "I know the equipment must be made safe before measurement."],
+  ["meter", "I can select the correct meter mode and range."],
+];
+
+function KnowledgeCheck({
+  assignment,
+  saved,
+}: {
+  assignment: Assignment;
+  saved: KnowledgeCheckSubmission | null | undefined;
+}) {
+  const save = useSaveKnowledgeCheck(assignment.id);
+  const { t } = useLocale();
+  const questions = assignment.scenario.knowledge_check ?? [];
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [readiness, setReadiness] = useState<Record<string, boolean>>({});
+
+  if (saved) {
+    const results = saved.results ?? [];
+    const wrong = results.filter((item) => !item.correct);
+    return (
+      <div className="brief-check-done" role="status">
+        <p className="knowledge-check-complete">
+          {questions.length
+            ? t("brief.quizDone", { right: results.length - wrong.length, total: results.length })
+            : `Saved · ${Number(saved.score)}% readiness. It helps you prepare; it is not part of your score.`}
+        </p>
+        {wrong.length ? (
+          <ul className="brief-explanations">
+            {wrong.map((item) => {
+              const question = questions.find((entry) => entry.code === item.questionCode);
+              const answer = question?.options.find((option) => option.code === item.correctOption);
+              return (
+                <li key={item.questionCode}>
+                  <strong>{question?.prompt}</strong>
+                  <span>
+                    {t("brief.answer", { answer: answer?.label ?? "" })} {item.explanation}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (questions.length) {
+    const complete = questions.every((question) => answers[question.code]);
+    return (
+      <form
+        className="brief-quiz"
+        onSubmit={(event) => {
+          event.preventDefault();
+          save.mutate(
+            questions.map((question) => ({
+              questionCode: question.code,
+              response: answers[question.code],
+            })),
+          );
+        }}
+      >
+        {questions.map((question, index) => (
+          <fieldset key={question.code}>
+            <legend>
+              {index + 1}. {question.prompt}
+            </legend>
+            {question.options.map((option) => (
+              <label
+                key={option.code}
+                className={answers[question.code] === option.code ? "is-chosen" : undefined}
+              >
+                <input
+                  type="radio"
+                  name={question.code}
+                  value={option.code}
+                  checked={answers[question.code] === option.code}
+                  onChange={() =>
+                    setAnswers((current) => ({ ...current, [question.code]: option.code }))
+                  }
+                />
+                {option.label}
+              </label>
+            ))}
+          </fieldset>
+        ))}
+        {save.isError ? (
+          <p className="form-error" role="alert">
+            {describeApiError(save.error, "Your answers could not be saved.")}
+          </p>
+        ) : null}
+        <button className="button button-primary" disabled={!complete || save.isPending}>
+          {save.isPending ? t("brief.checking") : t("brief.checkAnswers")}
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <form
+      className="brief-quiz"
+      onSubmit={(event) => {
+        event.preventDefault();
+        save.mutate(
+          READINESS_STATEMENTS.map(([questionCode]) => ({
+            questionCode,
+            response: readiness[questionCode] === true,
+          })),
+        );
+      }}
+    >
+      {READINESS_STATEMENTS.map(([code, label]) => (
+        <label key={code} className="brief-statement">
+          <input
+            type="checkbox"
+            checked={readiness[code] === true}
+            onChange={(event) =>
+              setReadiness((current) => ({ ...current, [code]: event.target.checked }))
+            }
+          />
+          {label}
+        </label>
+      ))}
+      <button className="button button-secondary" disabled={save.isPending}>
+        {save.isPending ? "Saving…" : "Save knowledge check"}
+      </button>
+    </form>
+  );
+}
 
 export function AssignmentPage() {
   const assignmentId = Number(useParams().assignmentId);
   const navigate = useNavigate();
+  const { t } = useLocale();
   const assignment = useAssignment(assignmentId);
   const start = useStartAssignment(assignmentId);
   const knowledgeCheck = useKnowledgeCheck(assignmentId);
-  const saveKnowledgeCheck = useSaveKnowledgeCheck(assignmentId);
-  const [readiness, setReadiness] = useState<Record<string, boolean>>({});
   const [offlineStatus, setOfflineStatus] = useState("");
   const [offlineInstalled, setOfflineInstalled] = useState(false);
   const [installedVersion, setInstalledVersion] = useState<number | null>(null);
@@ -26,7 +161,12 @@ export function AssignmentPage() {
   const [storageAvailableMb, setStorageAvailableMb] = useState<number | null>(null);
 
   useEffect(() => {
-    const installed = localStorage.getItem(`opedu:installed-assignment:${assignmentId}`);
+    let installed: string | null = null;
+    try {
+      installed = localStorage.getItem(`opedu:installed-assignment:${assignmentId}`);
+    } catch {
+      installed = null;
+    }
     setOfflineInstalled(Boolean(installed));
     if (installed) {
       try {
@@ -60,19 +200,24 @@ export function AssignmentPage() {
     );
   }
 
-  const { lesson, latest_attempt: latestAttempt } = assignment.data;
-  const due = dueState(assignment.data);
-  const used = attemptsUsed(assignment.data);
+  const data = assignment.data;
+  const { lesson, latest_attempt: latestAttempt } = data;
+  const due = dueState(data);
+  const assessedHistory = (data.attempt_history ?? []).filter((attempt) => !attempt.is_practice);
+  const used = assessedHistory.length;
   const offlineStale =
-    offlineInstalled &&
-    installedVersion !== null &&
-    installedVersion !== assignment.data.scenario.version;
-  const activeAttempt = start.data || latestAttempt;
+    offlineInstalled && installedVersion !== null && installedVersion !== data.scenario.version;
+  const activeAttempt = start.data?.status === "in_progress" ? start.data : latestAttempt;
   const attemptOpen = activeAttempt?.status === "in_progress";
-  const remaining = Math.max(0, assignment.data.attempt_limit - used);
-  const opensAt = assignment.data.available_at ? new Date(assignment.data.available_at) : null;
+  const remaining = Math.max(0, data.attempt_limit - used);
+  const opensAt = data.available_at ? new Date(data.available_at) : null;
   const notOpenYet = opensAt !== null && opensAt > new Date();
-  const packageFiles = assignment.data.scenario.asset_package?.files ?? [];
+  const checkDone = Boolean(knowledgeCheck.data);
+  const bestScore = assessedHistory.reduce<number | null>(
+    (best, attempt) => (attempt.score === null ? best : Math.max(best ?? 0, Number(attempt.score))),
+    null,
+  );
+  const packageFiles = data.scenario.asset_package?.files ?? [];
   const qualityScene =
     packageFiles.find((file) =>
       [`scene-${assetQuality}`, `${assetQuality}-scene`].includes(file.role),
@@ -85,26 +230,29 @@ export function AssignmentPage() {
     "/",
     "/manifest.webmanifest",
     "/opedu-icon.svg",
-    ...downloadFiles.map((file) => ({
-      url: file.url,
-      sha256: file.sha256,
-    })),
+    ...downloadFiles.map((file) => ({ url: file.url, sha256: file.sha256 })),
   ];
+  const downloadMb = downloadFiles.reduce((total, file) => total + file.byte_size, 0) / 1_048_576;
   const markerTarget =
-    assignment.data.scenario.renderer_config?.marker_ar?.targetValue ||
+    data.scenario.renderer_config?.marker_ar?.targetValue ||
     `OPEDU-${lesson.slug}-V${lesson.content_version}`;
   const requiredTools = [
     ...new Map(
-      lesson.procedure_steps.flatMap((step) => step.tools).map((tool) => [tool.code, tool]),
+      lesson.procedure_steps.flatMap((step) => step.tools ?? []).map((tool) => [tool.code, tool]),
     ).values(),
   ];
+  const otherOpen = start.error instanceof ApiError && start.error.code === "other_attempt_open";
+
+  function begin(practice: boolean) {
+    start.mutate(practice, { onSuccess: (attempt) => navigate(`/attempts/${attempt.id}`) });
+  }
 
   return (
-    <section className="lesson-page">
+    <section className="lesson-page brief">
       <Link className="back-link" to="/learn">
-        ← My learning
+        ← {t("brief.back")}
       </Link>
-      <div className="lesson-header">
+      <header className="brief-header">
         <div>
           <div className="eyebrow">
             {lesson.trade} · {lesson.course_title}
@@ -112,146 +260,189 @@ export function AssignmentPage() {
           <h1>{lesson.title}</h1>
           <p>{lesson.summary}</p>
         </div>
-        <div className="lesson-duration">
-          <strong>{lesson.estimated_minutes}</strong>
-          <span>minutes</span>
-        </div>
-      </div>
+        <dl className="brief-facts">
+          <div>
+            <dt>{t("brief.time")}</dt>
+            <dd>{t("brief.minutes", { n: lesson.estimated_minutes })}</dd>
+          </div>
+          <div>
+            <dt>{t("brief.steps")}</dt>
+            <dd>{lesson.procedure_steps.length}</dd>
+          </div>
+          {data.due_at ? (
+            <div className={`due-${due}`}>
+              <dt>{due === "overdue" ? "Overdue" : "Due"}</dt>
+              <dd>
+                {formatDue(data.due_at)}
+                <small>{dueRelative(data.due_at)}</small>
+              </dd>
+            </div>
+          ) : null}
+          <div className={remaining === 0 && !attemptOpen ? "due-overdue" : undefined}>
+            <dt>{t("brief.attempts")}</dt>
+            <dd>
+              {t("brief.attemptsUsed", { used, limit: data.attempt_limit })}
+              <small>
+                {remaining === 0
+                  ? attemptOpen
+                    ? "This is your last attempt"
+                    : "No attempts left"
+                  : t("brief.attemptsLeft", { n: remaining })}
+              </small>
+            </dd>
+          </div>
+          {bestScore !== null ? (
+            <div>
+              <dt>{t("brief.yourBest")}</dt>
+              <dd>{Math.round(bestScore)}%</dd>
+            </div>
+          ) : null}
+        </dl>
+      </header>
 
-      <div className="lesson-terms">
-        <div className={`lesson-term due-${due}`}>
-          <dt>{due === "overdue" ? "Overdue" : "Due"}</dt>
-          <dd>
-            {formatDue(assignment.data.due_at)}
-            {dueRelative(assignment.data.due_at) ? (
-              <small>{dueRelative(assignment.data.due_at)}</small>
-            ) : null}
-          </dd>
-        </div>
-        <div className={`lesson-term${remaining === 0 && !attemptOpen ? " due-overdue" : ""}`}>
-          <dt>Attempts</dt>
-          <dd>
-            {used} of {assignment.data.attempt_limit} used
-            <small>
-              {remaining === 0
-                ? attemptOpen
-                  ? "This is your last attempt"
-                  : "No attempts left"
-                : `${remaining} left`}
-            </small>
-          </dd>
-        </div>
-      </div>
-
-      {assignment.data.instructions ? (
+      {data.instructions ? (
         <article className="lesson-panel instructions-panel">
-          <h2>Instructions from your instructor</h2>
-          <p>{assignment.data.instructions}</p>
+          <h2>{t("brief.instructions")}</h2>
+          <p>{data.instructions}</p>
         </article>
       ) : null}
 
-      <div className="lesson-content-grid">
-        <article className="lesson-panel">
-          <h2>Learning objectives</h2>
-          <ol>
-            {lesson.objectives.map((objective) => (
-              <li key={objective}>{objective}</li>
-            ))}
-          </ol>
-        </article>
-        <article className="lesson-panel safety-panel">
-          <h2>Safety before action</h2>
-          <ul>
-            {lesson.safety_notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        </article>
-        <article className="lesson-panel">
-          <h2>Prerequisites</h2>
-          {lesson.prerequisites.length ? (
+      <ol className="brief-steps">
+        <li className="brief-card">
+          <span className="brief-number" aria-hidden="true">
+            1
+          </span>
+          <div>
+            <h2>{t("brief.whatYouDo")}</h2>
             <ul>
-              {lesson.prerequisites.map((prerequisite) => (
-                <li key={prerequisite.id}>{prerequisite.title}</li>
+              {lesson.objectives.map((objective) => (
+                <li key={objective}>{objective}</li>
               ))}
             </ul>
-          ) : (
-            <p>No prior OPedu lesson is required.</p>
-          )}
-        </article>
-        <article className="lesson-panel">
-          <h2>Required training tools</h2>
-          {requiredTools.length ? (
-            <ul>
-              {requiredTools.map((tool) => (
-                <li key={tool.code}>
-                  <strong>{tool.name}</strong>
-                  {tool.description ? ` — ${tool.description}` : ""}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>The instructor will confirm the approved training rig and any physical tools.</p>
-          )}
-        </article>
-      </div>
-      <article className="competency-panel">
-        <h2>Competencies assessed</h2>
-        {lesson.competencies.map((competency) => (
-          <div className="competency-row" key={competency.id}>
-            <span>{competency.code}</span>
-            <div>
-              <strong>{competency.title}</strong>
-              <p>{competency.description}</p>
-            </div>
-            <small>{competency.mastery_threshold}% mastery</small>
+            {data.scenario.has_variants ? (
+              <p className="field-note">{t("brief.variantsNote")}</p>
+            ) : null}
+            {lesson.competencies.length ? (
+              <details>
+                <summary>{t("brief.skills")}</summary>
+                <ul className="brief-skills">
+                  {lesson.competencies.map((competency) => (
+                    <li key={competency.id}>
+                      <strong>{competency.title}</strong>
+                      <small>
+                        {competency.code} · {competency.mastery_threshold}% needed
+                      </small>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+            {lesson.prerequisites.length ? (
+              <p className="field-note">
+                Do first: {lesson.prerequisites.map((item) => item.title).join(", ")}
+              </p>
+            ) : null}
           </div>
-        ))}
-      </article>
-      <article className="knowledge-check-panel">
-        <span className="eyebrow">Pre-lesson knowledge check</span>
-        <h2>Confirm the safety reasoning before practice</h2>
-        {knowledgeCheck.data ? (
-          <p className="knowledge-check-complete" role="status">
-            Saved · {Number(knowledgeCheck.data.score)}% readiness. This check informs guidance; it
-            does not replace practical assessment.
+        </li>
+        <li className="brief-card is-safety">
+          <span className="brief-number" aria-hidden="true">
+            2
+          </span>
+          <div>
+            <h2>{t("brief.staySafe")}</h2>
+            <ul>
+              {lesson.safety_notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+            {requiredTools.length ? (
+              <p className="field-note">
+                {t("brief.youWillUse", {
+                  tools: requiredTools.map((tool) => tool.name).join(", "),
+                })}
+              </p>
+            ) : null}
+          </div>
+        </li>
+        <li className="brief-card">
+          <span className="brief-number" aria-hidden="true">
+            3
+          </span>
+          <div className="knowledge-check-panel">
+            <h2>{t("brief.quickCheck")}</h2>
+            <KnowledgeCheck assignment={data} saved={knowledgeCheck.data} />
+          </div>
+        </li>
+      </ol>
+
+      <div className="lesson-launch">
+        <div>
+          <h2>
+            {attemptOpen
+              ? activeAttempt.is_practice
+                ? "Practice run in progress"
+                : "Attempt ready"
+              : remaining === 0
+                ? "No attempts left"
+                : notOpenYet
+                  ? "Not open yet"
+                  : t("brief.readyTitle")}
+          </h2>
+          <p>
+            {attemptOpen
+              ? `Your ${activeAttempt.is_practice ? "practice run" : `attempt ${activeAttempt.id}`} is saved. You can pick up where you left off.`
+              : notOpenYet
+                ? `Your instructor opens this lesson on ${opensAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.`
+                : t("brief.readyText")}
+            {!attemptOpen && !notOpenYet && remaining === 0
+              ? ` You have used all ${data.attempt_limit} assessed attempts. You can still practise, or ask your instructor for another attempt.`
+              : ""}
           </p>
-        ) : (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              saveKnowledgeCheck.mutate(
-                ["ppe", "isolation", "meter"].map((questionCode) => ({
-                  questionCode,
-                  response: readiness[questionCode] === true,
-                })),
-              );
-            }}
-          >
-            {[
-              ["ppe", "I can identify the required personal protective equipment."],
-              ["isolation", "I know the equipment must be made safe before measurement."],
-              ["meter", "I can select the correct meter mode and range."],
-            ].map(([code, label]) => (
-              <label key={code}>
-                <input
-                  type="checkbox"
-                  checked={readiness[code] === true}
-                  onChange={(event) =>
-                    setReadiness((current) => ({ ...current, [code]: event.target.checked }))
-                  }
-                />
-                {label}
-              </label>
-            ))}
-            <button className="button button-secondary" disabled={saveKnowledgeCheck.isPending}>
-              {saveKnowledgeCheck.isPending ? "Saving…" : "Save knowledge check"}
-            </button>
-          </form>
-        )}
-      </article>
-      {/* Device administration is collapsed by default: it sits between the learner and the
-          Start button, and most learners on a prepared workshop machine never need it. */}
+          {start.isError ? (
+            <p className="form-error" role="alert">
+              {otherOpen
+                ? describeApiError(start.error, "Finish your open attempt first.")
+                : describeApiError(start.error, "The attempt could not be started. Try again.")}
+            </p>
+          ) : null}
+        </div>
+        <div className="launch-actions">
+          {attemptOpen ? (
+            <Link className="button button-primary" to={`/attempts/${activeAttempt.id}`}>
+              {activeAttempt.resume_state?.completedSteps?.length
+                ? t("brief.resumeSimulation")
+                : t("brief.openSimulation")}
+            </Link>
+          ) : notOpenYet ? null : (
+            <>
+              <button
+                className="button button-light"
+                type="button"
+                disabled={start.isPending}
+                onClick={() => begin(true)}
+              >
+                {t("brief.practise")}
+              </button>
+              {remaining > 0 ? (
+                <button
+                  className="button button-primary"
+                  type="button"
+                  onClick={() => begin(false)}
+                  disabled={start.isPending || !checkDone}
+                >
+                  {start.isPending
+                    ? t("brief.starting")
+                    : checkDone
+                      ? t("brief.startAssessed")
+                      : t("brief.checkFirst")}
+                </button>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Device preparation is collapsed: most learners on a prepared device never need it. */}
       <details className="lesson-panel offline-panel" open={offlineStale}>
         <summary>
           <span className="eyebrow">Low-connectivity preparation</span>
@@ -262,8 +453,8 @@ export function AssignmentPage() {
           </span>
         </summary>
         <p>
-          Save the app shell and available 3D assets on this device. Open the simulation once while
-          online to also store its latest steps and evidence state.
+          Save this lesson on the device so it works without a connection. Open the simulation once
+          while online as well. About {Math.max(1, Math.round(downloadMb))} MB.
         </p>
         <label>
           Offline asset quality
@@ -284,20 +475,24 @@ export function AssignmentPage() {
             try {
               const result = await downloadAssignmentAssets(lessonAssets);
               if (!result.failed.length) {
-                localStorage.setItem(
-                  `opedu:installed-assignment:${assignmentId}`,
-                  JSON.stringify({
-                    scenarioVersion: assignment.data.scenario.version,
-                    assetPackageVersion: assignment.data.scenario.asset_package?.version ?? null,
-                    installedAt: new Date().toISOString(),
-                    files: assignment.data.scenario.asset_package?.files.map((file) => ({
-                      url: file.url,
-                      sha256: file.sha256,
-                    })),
-                  }),
-                );
+                try {
+                  localStorage.setItem(
+                    `opedu:installed-assignment:${assignmentId}`,
+                    JSON.stringify({
+                      scenarioVersion: data.scenario.version,
+                      assetPackageVersion: data.scenario.asset_package?.version ?? null,
+                      installedAt: new Date().toISOString(),
+                      files: data.scenario.asset_package?.files.map((file) => ({
+                        url: file.url,
+                        sha256: file.sha256,
+                      })),
+                    }),
+                  );
+                } catch {
+                  // The files are cached either way; only the "Downloaded" label is lost.
+                }
                 setOfflineInstalled(true);
-                setInstalledVersion(assignment.data.scenario.version);
+                setInstalledVersion(data.scenario.version);
               }
               setOfflineStatus(
                 result.failed.length
@@ -317,7 +512,11 @@ export function AssignmentPage() {
             type="button"
             onClick={async () => {
               const removed = await removeAssignmentAssets(lessonAssets);
-              localStorage.removeItem(`opedu:installed-assignment:${assignmentId}`);
+              try {
+                localStorage.removeItem(`opedu:installed-assignment:${assignmentId}`);
+              } catch {
+                // Nothing stored.
+              }
               setOfflineInstalled(false);
               setInstalledVersion(null);
               setOfflineStatus(`${removed} downloaded lesson files removed from this device.`);
@@ -331,71 +530,19 @@ export function AssignmentPage() {
           href={`/markers/battery?value=${encodeURIComponent(markerTarget)}`}
           target="_blank"
         >
-          Print the approved Camera AR marker
+          Print the Camera AR marker
         </a>
         {offlineStatus ? <p role="status">{offlineStatus}</p> : null}
         {offlineStale ? (
           <p className="form-error" role="alert">
-            The downloaded lesson is stale. Re-download scenario version{" "}
-            {assignment.data.scenario.version} before beginning a new offline attempt.
+            The downloaded lesson is stale. Re-download scenario version {data.scenario.version}{" "}
+            before beginning a new offline attempt.
           </p>
         ) : null}
         {storageAvailableMb !== null ? (
           <small>{storageAvailableMb} MB storage available</small>
         ) : null}
       </details>
-      <div className="lesson-launch">
-        <div>
-          <h2>
-            {attemptOpen
-              ? "Attempt ready"
-              : remaining === 0
-                ? "No attempts left"
-                : notOpenYet
-                  ? "Not open yet"
-                  : "Ready to practise?"}
-          </h2>
-          <p>
-            {attemptOpen
-              ? `Attempt ${activeAttempt.id} is saved. You can pick up where you left off.`
-              : remaining === 0
-                ? `You have used all ${assignment.data.attempt_limit} attempts for this lesson. Ask your instructor if you need another one.`
-                : notOpenYet
-                  ? `Your instructor opens this lesson on ${opensAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.`
-                  : used > 0
-                    ? `Starting uses attempt ${used + 1} of ${assignment.data.attempt_limit}. Your earlier attempts stay in your history.`
-                    : "Starting creates an attempt that is saved as you go, so you can stop and resume."}
-          </p>
-          {start.isError ? (
-            <p className="form-error" role="alert">
-              {describeApiError(start.error, "The attempt could not be started. Try again.")}
-            </p>
-          ) : null}
-        </div>
-        {attemptOpen ? (
-          <Link className="button button-primary" to={`/attempts/${activeAttempt.id}`}>
-            {activeAttempt.resume_state?.completedSteps?.length
-              ? "Resume simulation"
-              : "Open simulation"}
-          </Link>
-        ) : remaining === 0 || notOpenYet ? null : (
-          <button
-            className="button button-primary"
-            onClick={() =>
-              start.mutate(undefined, {
-                onSuccess: (attempt) => navigate(`/attempts/${attempt.id}`),
-              })
-            }
-            disabled={start.isPending || !knowledgeCheck.data}
-          >
-            {start.isPending
-              ? "Starting…"
-              : knowledgeCheck.data
-                ? "Start learning attempt"
-                : "Complete knowledge check first"}
-          </button>
-        )}
-      </div>
     </section>
   );
 }

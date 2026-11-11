@@ -1,0 +1,114 @@
+/* Sign-up, class join and sign-in slips: these pages load with the app shell. */
+
+/* --- Access pages -------------------------------------------------------------------------- */
+.narrow-page {
+  max-width: 720px;
+}
+.code-input {
+  font-size: 1.6rem !important;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  text-align: center;
+}
+.pin-input {
+  font-size: 1.3rem !important;
+  letter-spacing: 0.4em;
+}
+.auth-card select,
+.auth-card textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-input, #fff);
+  color: var(--ink);
+  font: inherit;
+}
+.auth-card label small {
+  color: var(--muted);
+  font-weight: 500;
+}
+.auth-routes,
+.auth-points {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.auth-routes a {
+  color: inherit;
+  font-weight: 700;
+}
+.auth-routes a::after {
+  content: " →";
+}
+.auth-points li::before {
+  content: "✓ ";
+  color: var(--lime);
+}
+.information-note {
+  margin-top: 18px;
+  color: var(--muted);
+}
+.demo-banner {
+  margin: 0;
+  padding: 10px clamp(12px, 3vw, 28px);
+  background: var(--surface-warning, #fdf6dd);
+  color: var(--warning-text, #6d5200);
+  font-weight: 650;
+  text-align: center;
+}
+.demo-finish {
+  display: grid;
+  gap: 10px;
+}
+.demo-finish p {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Printable sign-in slips. */
+.slips {
+  display: grid;
+  gap: 16px;
+}
+.slips-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.slips-tools p {
+  flex: 1 1 320px;
+  margin: 0;
+}
+.slips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0;
+}
+.slip {
+  display: grid;
+  gap: 2px;
+  padding: 16px;
+  border: 1px dashed #7b8a93;
+  background: #fff;
+  color: #16332e;
+}
+.slip span {
+  color: #52615d;
+  font-size: 0.8rem;
+}
+.slip strong {
+  font-size: 1.15rem;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+.slip-pin {
+  letter-spacing: 0.25em;
+}
+.join-done .slip {
+  max-width: 340px;
+  margin: 12px 0;
+  border-style: solid;
+}

@@ -11,7 +11,9 @@ COPY requirements.lock ./
 RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.lock
 
 COPY . .
-RUN chown -R opedu:opedu /app
+# The media folder must exist in the image, owned by the app user: a fresh named volume mounted
+# there copies these permissions, so uploads can be written.
+RUN mkdir -p /app/media && chown -R opedu:opedu /app
 
 USER opedu
 EXPOSE 8000

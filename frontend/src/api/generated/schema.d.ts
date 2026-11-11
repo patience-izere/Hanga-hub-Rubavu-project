@@ -132,6 +132,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attempts/{id}/certificate/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The learner's own certificate for one attempt, with a code anyone can check. */
+        get: operations["api_v1_attempts_certificate_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attempts/{id}/complete/": {
         parameters: {
             query?: never;
@@ -238,6 +255,159 @@ export interface paths {
         get: operations["api_v1_attempts_xapi_retrieve"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/class/{code}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description A learner joins a class with the code on the board and picks their own PIN. */
+        get: operations["api_v1_auth_class_retrieve"];
+        put?: never;
+        /** @description A learner joins a class with the code on the board and picks their own PIN. */
+        post: operations["api_v1_auth_class_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/register/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Sign up without a school. The account can practise the open catalogue straight away. */
+        post: operations["api_v1_auth_register_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalogue/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Lessons anyone signed in can add to their own learning. */
+        get: operations["api_v1_catalogue_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalogue/{lesson_id}/enroll/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_v1_catalogue_enroll_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/certificates/verify/{code}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Anyone holding a certificate's code can confirm it is genuine and still stands. */
+        get: operations["api_v1_certificates_verify_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/classes/{id}/join-code/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Switch joining by code on (issuing a fresh code) or off for one class. */
+        post: operations["api_v1_classes_join_code_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/classes/{id}/learners/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Create sign-in slips for a class list: a sign-in name and a PIN for each learner. */
+        post: operations["api_v1_classes_learners_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/classes/access/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Classes the caller teaches, with the join code and who signs in with a PIN. */
+        get: operations["api_v1_classes_access_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/classes/learners/{id}/reset-pin/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Issue a new PIN to a learner who forgot theirs. Only PIN accounts can be reset this way. */
+        post: operations["api_v1_classes_learners_reset_pin_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -611,6 +781,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/demo/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description One published lesson a visitor can try without an account. Nothing is recorded. */
+        get: operations["api_v1_demo_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/instructor/assignments/": {
         parameters: {
             query?: never;
@@ -759,6 +946,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/instructor/live/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description A class working through one lesson together, for a projector.
+         *
+         *     Teams are ranked by working safely first, then by progress and care, and only last by time,
+         *     so the board rewards the habits the workshop needs rather than raw speed.
+         */
+        get: operations["api_v1_instructor_live_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/instructor/overview/": {
         parameters: {
             query?: never;
@@ -774,6 +983,23 @@ export interface paths {
          *     event made this page slower with each week of practice.
          */
         get: operations["api_v1_instructor_overview_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/open/status/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description What a signed-out visitor may do here, so the public pages offer only what works. */
+        get: operations["api_v1_open_status_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1172,6 +1398,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/schools/register/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description A school, garage or hub asks to use the platform; a platform administrator approves it. */
+        post: operations["api_v1_schools_register_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1242,6 +1485,7 @@ export interface components {
         };
         AssetPackage: {
             code: string;
+            /** Format: int64 */
             version: number;
             name: string;
             manifest?: unknown;
@@ -1254,6 +1498,7 @@ export interface components {
             readonly id: number;
             course: number;
             code: string;
+            /** Format: int64 */
             version: number;
             name: string;
             manifest?: unknown;
@@ -1271,6 +1516,7 @@ export interface components {
         AssetPackageAuthoringRequest: {
             course: number;
             code: string;
+            /** Format: int64 */
             version: number;
             name: string;
             manifest?: unknown;
@@ -1284,6 +1530,7 @@ export interface components {
         AssetPackageAuthoringStatusEnum: "draft" | "published" | "retired";
         AssetPackageRequest: {
             code: string;
+            /** Format: int64 */
             version: number;
             name: string;
             manifest?: unknown;
@@ -1326,6 +1573,7 @@ export interface components {
             resume_state?: unknown;
             renderer_mode?: components["schemas"]["RendererModeEnum"];
             learning_mode?: components["schemas"]["LearningModeEnum"];
+            is_practice?: boolean;
             capability_profile?: unknown;
             /** Format: date-time */
             started_at?: string;
@@ -1353,6 +1601,7 @@ export interface components {
             resume_state?: unknown;
             renderer_mode?: components["schemas"]["RendererModeEnum"];
             learning_mode?: components["schemas"]["LearningModeEnum"];
+            is_practice?: boolean;
             capability_profile?: unknown;
             /** Format: date-time */
             started_at?: string;
@@ -1366,8 +1615,10 @@ export interface components {
         AttemptEvent: {
             /** Format: uuid */
             readonly event_id: string;
+            /** Format: int64 */
             sequence: number;
             event_type: string;
+            /** Format: int64 */
             schema_version?: number;
             /** Format: uri */
             activity_id?: string;
@@ -1381,8 +1632,10 @@ export interface components {
             readonly received_at: string;
         };
         AttemptEventRequest: {
+            /** Format: int64 */
             sequence: number;
             event_type: string;
+            /** Format: int64 */
             schema_version?: number;
             /** Format: uri */
             activity_id?: string;
@@ -1432,6 +1685,7 @@ export interface components {
             resume_state?: unknown;
             renderer_mode?: components["schemas"]["RendererModeEnum"];
             learning_mode?: components["schemas"]["LearningModeEnum"];
+            is_practice?: boolean;
             capability_profile?: unknown;
             /** Format: date-time */
             started_at?: string;
@@ -1451,6 +1705,7 @@ export interface components {
             client_event_ids?: unknown;
             server_event_ids?: unknown;
             missing_event_ids?: unknown;
+            /** Format: int64 */
             pending_count?: number;
             passed?: boolean;
             /** Format: date-time */
@@ -1544,6 +1799,18 @@ export interface components {
         };
         /** @enum {unknown} */
         BlankEnum: "";
+        ClassBulkLearnersRequestRequest: {
+            names: string[];
+        };
+        ClassJoinCodeRequestRequest: {
+            enabled: boolean;
+        };
+        ClassJoinRequestRequest: {
+            firstName: string;
+            lastName: string;
+            pin: string;
+            phone?: string;
+        };
         CohortLearner: {
             id: number;
             name: string;
@@ -1558,6 +1825,7 @@ export interface components {
             level?: number;
             evidence_rules?: unknown;
             mastery_criteria?: unknown;
+            /** Format: int64 */
             mastery_threshold?: number;
         };
         CompetencyOption: {
@@ -1636,6 +1904,7 @@ export interface components {
         };
         GradingPolicyReference: {
             code: string;
+            /** Format: int64 */
             version: number;
             algorithm?: string;
             base_score?: number;
@@ -1646,6 +1915,7 @@ export interface components {
         };
         GradingPolicyReferenceRequest: {
             code: string;
+            /** Format: int64 */
             version: number;
             algorithm?: string;
             base_score?: number;
@@ -1709,6 +1979,7 @@ export interface components {
             score?: string | null;
             review_decision?: components["schemas"]["ReviewDecisionEnum"] | components["schemas"]["BlankEnum"];
             readonly has_published_feedback: boolean;
+            variant_code?: string;
             readonly scenario_version: number;
             readonly grading_policy_code: string;
             readonly grading_policy_version: number;
@@ -1737,6 +2008,7 @@ export interface components {
             score?: string | null;
             review_decision?: components["schemas"]["ReviewDecisionEnum"] | components["schemas"]["BlankEnum"];
             readonly has_published_feedback: boolean;
+            variant_code?: string;
             readonly scenario_version: number;
             readonly grading_policy_code: string;
             readonly grading_policy_version: number;
@@ -1885,13 +2157,24 @@ export interface components {
             /** Format: date-time */
             lastActivityAt: string | null;
         };
+        KnowledgeCheckOption: {
+            readonly code: string;
+            readonly label: string;
+        };
+        KnowledgeCheckQuestion: {
+            readonly code: string;
+            readonly prompt: string;
+            readonly options: components["schemas"]["KnowledgeCheckOption"][];
+        };
         /**
          * @description * `en` - English
          *     * `rw` - Kinyarwanda
          *     * `en-rw` - English and Kinyarwanda
+         *     * `fr` - French
+         *     * `sw` - Swahili
          * @enum {string}
          */
-        LanguageEnum: "en" | "rw" | "en-rw";
+        LanguageEnum: "en" | "rw" | "en-rw" | "fr" | "sw";
         /** @description Published feedback as the learner sees it: the instructor's private observation is left out. */
         LearnerFeedback: {
             readonly id: number;
@@ -1940,8 +2223,10 @@ export interface components {
             summary: string;
             objectives?: unknown;
             safety_notes?: unknown;
+            /** Format: int64 */
             estimated_minutes?: number;
             language?: components["schemas"]["LanguageEnum"];
+            /** Format: int64 */
             content_version?: number;
             readonly course_title: string;
             readonly trade: string;
@@ -2002,6 +2287,12 @@ export interface components {
         };
         /** @enum {unknown} */
         NullEnum: null;
+        OpenRegistrationRequestRequest: {
+            firstName: string;
+            lastName: string;
+            signInName: string;
+            password: string;
+        };
         /**
          * @description * `pass` - pass
          *     * `fail` - fail
@@ -2192,6 +2483,7 @@ export interface components {
         PatchedAssetPackageAuthoringRequest: {
             course?: number;
             code?: string;
+            /** Format: int64 */
             version?: number;
             name?: string;
             manifest?: unknown;
@@ -2247,6 +2539,7 @@ export interface components {
         };
         PatchedScenarioAuthoringRequest: {
             lesson?: number;
+            /** Format: int64 */
             version?: number;
             title?: string;
             definition?: unknown;
@@ -2419,6 +2712,7 @@ export interface components {
             kind: components["schemas"]["PilotRehearsalKindEnum"];
             outcome: components["schemas"]["PilotRehearsalOutcomeEnum"];
             facilitator: string;
+            /** Format: int64 */
             participant_count: number;
             evidence_reference: string;
             notes?: string;
@@ -2448,6 +2742,7 @@ export interface components {
             kind: components["schemas"]["PilotRehearsalKindEnum"];
             outcome: components["schemas"]["PilotRehearsalOutcomeEnum"];
             facilitator: string;
+            /** Format: int64 */
             participant_count: number;
             evidence_reference: string;
             notes?: string;
@@ -2598,6 +2893,7 @@ export interface components {
         };
         ProcedureStep: {
             readonly id: number;
+            /** Format: int64 */
             order: number;
             code: string;
             title: string;
@@ -2605,6 +2901,7 @@ export interface components {
             action_code: string;
             feedback: string;
             safety_critical?: boolean;
+            /** Format: int64 */
             points?: number;
             metadata?: unknown;
             readonly acceptable_actions: components["schemas"]["AcceptableActionSnapshot"][];
@@ -2616,6 +2913,12 @@ export interface components {
                 [key: string]: string;
             };
             readonly competency_codes: string[];
+            readonly choices: components["schemas"]["StepChoice"][];
+            readonly mistakes: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
         };
         /**
          * @description * `accessible_2d` - Accessible 2D
@@ -2685,6 +2988,7 @@ export interface components {
             readonly lessonTitle: string;
             readonly lessonStatus: string;
             readonly authorName: string;
+            /** Format: int64 */
             version: number;
             title: string;
             definition?: unknown;
@@ -2710,6 +3014,7 @@ export interface components {
         };
         ScenarioAuthoringRequest: {
             lesson: number;
+            /** Format: int64 */
             version: number;
             title: string;
             definition?: unknown;
@@ -2810,6 +3115,23 @@ export interface components {
             }[];
             recentAudit: components["schemas"]["AuditEvent"][];
         };
+        /**
+         * @description * `school` - Technical school
+         *     * `workshop` - Garage or workshop
+         *     * `hub` - Training hub
+         * @enum {string}
+         */
+        SchoolRegistrationRequestInputKindEnum: "school" | "workshop" | "hub";
+        SchoolRegistrationRequestInputRequest: {
+            organisationName: string;
+            kind?: components["schemas"]["SchoolRegistrationRequestInputKindEnum"];
+            district?: string;
+            contactName: string;
+            /** Format: email */
+            email: string;
+            phone?: string;
+            message?: string;
+        };
         SchoolSummary: {
             id: number;
             name: string;
@@ -2821,8 +3143,15 @@ export interface components {
             /** Format: email */
             email: string;
         };
+        /**
+         * @description * `ordered` - ordered
+         *     * `free` - free
+         * @enum {string}
+         */
+        SequenceEnum: "ordered" | "free";
         SimulationScenarioSummary: {
             readonly id: number;
+            /** Format: int64 */
             version: number;
             title: string;
             readonly grading_policy: components["schemas"]["GradingPolicyReference"];
@@ -2830,10 +3159,22 @@ export interface components {
             readonly renderer_config: {
                 [key: string]: unknown;
             };
+            readonly sequence: components["schemas"]["SequenceEnum"];
+            readonly scene: {
+                [key: string]: unknown;
+            } | null;
+            readonly knowledge_check: components["schemas"]["KnowledgeCheckQuestion"][];
+            readonly has_variants: boolean;
+            readonly distractors: components["schemas"]["StepChoice"][];
         };
         SimulationScenarioSummaryRequest: {
+            /** Format: int64 */
             version: number;
             title: string;
+        };
+        StepChoice: {
+            readonly action_code: string;
+            readonly label: string;
         };
         StepHintSnapshot: {
             readonly code: string;
@@ -2844,14 +3185,18 @@ export interface components {
         StepResult: {
             step_code: string;
             outcome: components["schemas"]["StepResultOutcomeEnum"];
+            /** Format: int64 */
             attempts_count?: number;
+            /** Format: int64 */
             hints_used?: number;
+            /** Format: int64 */
             duration_seconds?: number;
             /** Format: decimal */
             achieved_points: string;
             /** Format: decimal */
             available_points: string;
             tolerance_passed?: boolean | null;
+            /** Format: int64 */
             safety_violations?: number;
             evidence_sequences?: unknown;
             /** Format: date-time */
@@ -2867,14 +3212,18 @@ export interface components {
         StepResultRequest: {
             step_code: string;
             outcome: components["schemas"]["StepResultOutcomeEnum"];
+            /** Format: int64 */
             attempts_count?: number;
+            /** Format: int64 */
             hints_used?: number;
+            /** Format: int64 */
             duration_seconds?: number;
             /** Format: decimal */
             achieved_points: string;
             /** Format: decimal */
             available_points: string;
             tolerance_passed?: boolean | null;
+            /** Format: int64 */
             safety_violations?: number;
             evidence_sequences?: unknown;
             /** Format: date-time */
@@ -3135,6 +3484,29 @@ export interface operations {
             };
         };
     };
+    api_v1_attempts_certificate_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     api_v1_attempts_complete_create: {
         parameters: {
             query?: never;
@@ -3315,6 +3687,254 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttemptDetail"];
+                };
+            };
+        };
+    };
+    api_v1_auth_class_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    api_v1_auth_class_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassJoinRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ClassJoinRequestRequest"];
+                "multipart/form-data": components["schemas"]["ClassJoinRequestRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    api_v1_auth_register_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenRegistrationRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["OpenRegistrationRequestRequest"];
+                "multipart/form-data": components["schemas"]["OpenRegistrationRequestRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    api_v1_catalogue_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    api_v1_catalogue_enroll_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lesson_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    api_v1_certificates_verify_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    api_v1_classes_join_code_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassJoinCodeRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ClassJoinCodeRequestRequest"];
+                "multipart/form-data": components["schemas"]["ClassJoinCodeRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    api_v1_classes_learners_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassBulkLearnersRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ClassBulkLearnersRequestRequest"];
+                "multipart/form-data": components["schemas"]["ClassBulkLearnersRequestRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    api_v1_classes_access_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    api_v1_classes_learners_reset_pin_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -4213,6 +4833,27 @@ export interface operations {
             };
         };
     };
+    api_v1_demo_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     api_v1_instructor_assignments_retrieve: {
         parameters: {
             query?: never;
@@ -4473,6 +5114,32 @@ export interface operations {
             };
         };
     };
+    api_v1_instructor_live_retrieve: {
+        parameters: {
+            query: {
+                cohort: number;
+                lesson: number;
+                since?: string;
+                teams?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     api_v1_instructor_overview_retrieve: {
         parameters: {
             query?: never;
@@ -4488,6 +5155,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InstructorOverview"];
+                };
+            };
+        };
+    };
+    api_v1_open_status_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -5460,6 +6148,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SchoolOverview"];
+                };
+            };
+        };
+    };
+    api_v1_schools_register_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchoolRegistrationRequestInputRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["SchoolRegistrationRequestInputRequest"];
+                "multipart/form-data": components["schemas"]["SchoolRegistrationRequestInputRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

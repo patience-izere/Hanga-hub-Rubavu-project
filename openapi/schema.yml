@@ -272,6 +272,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/AttemptDetail'
           description: ''
+  /api/v1/attempts/{id}/certificate/:
+    get:
+      operationId: api_v1_attempts_certificate_retrieve
+      description: The learner's own certificate for one attempt, with a code anyone
+        can check.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/v1/attempts/{id}/complete/:
     post:
       operationId: api_v1_attempts_complete_create
@@ -474,6 +497,265 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AttemptDetail'
+          description: ''
+  /api/v1/auth/class/{code}/:
+    get:
+      operationId: api_v1_auth_class_retrieve
+      description: A learner joins a class with the code on the board and picks their
+        own PIN.
+      parameters:
+      - in: path
+        name: code
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: api_v1_auth_class_create
+      description: A learner joins a class with the code on the board and picks their
+        own PIN.
+      parameters:
+      - in: path
+        name: code
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassJoinRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClassJoinRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClassJoinRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/auth/register/:
+    post:
+      operationId: api_v1_auth_register_create
+      description: Sign up without a school. The account can practise the open catalogue
+        straight away.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenRegistrationRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OpenRegistrationRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OpenRegistrationRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/catalogue/:
+    get:
+      operationId: api_v1_catalogue_retrieve
+      description: Lessons anyone signed in can add to their own learning.
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/catalogue/{lesson_id}/enroll/:
+    post:
+      operationId: api_v1_catalogue_enroll_create
+      parameters:
+      - in: path
+        name: lesson_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/certificates/verify/{code}/:
+    get:
+      operationId: api_v1_certificates_verify_retrieve
+      description: Anyone holding a certificate's code can confirm it is genuine and
+        still stands.
+      parameters:
+      - in: path
+        name: code
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/classes/{id}/join-code/:
+    post:
+      operationId: api_v1_classes_join_code_create
+      description: Switch joining by code on (issuing a fresh code) or off for one
+        class.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassJoinCodeRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClassJoinCodeRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClassJoinCodeRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/classes/{id}/learners/:
+    post:
+      operationId: api_v1_classes_learners_create
+      description: 'Create sign-in slips for a class list: a sign-in name and a PIN
+        for each learner.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassBulkLearnersRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClassBulkLearnersRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClassBulkLearnersRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/classes/access/:
+    get:
+      operationId: api_v1_classes_access_retrieve
+      description: Classes the caller teaches, with the join code and who signs in
+        with a PIN.
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/classes/learners/{id}/reset-pin/:
+    post:
+      operationId: api_v1_classes_learners_reset_pin_create
+      description: Issue a new PIN to a learner who forgot theirs. Only PIN accounts
+        can be reset this way.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
           description: ''
   /api/v1/content/asset-packages/:
     get:
@@ -1486,6 +1768,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScenarioAuthoring'
           description: ''
+  /api/v1/demo/:
+    get:
+      operationId: api_v1_demo_retrieve
+      description: One published lesson a visitor can try without an account. Nothing
+        is recorded.
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/v1/instructor/assignments/:
     get:
       operationId: api_v1_instructor_assignments_retrieve
@@ -1773,6 +2072,45 @@ paths:
               schema:
                 $ref: '#/components/schemas/InstructorLearnerDetail'
           description: ''
+  /api/v1/instructor/live/:
+    get:
+      operationId: api_v1_instructor_live_retrieve
+      description: |-
+        A class working through one lesson together, for a projector.
+
+        Teams are ranked by working safely first, then by progress and care, and only last by time,
+        so the board rewards the habits the workshop needs rather than raw speed.
+      parameters:
+      - in: query
+        name: cohort
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: lesson
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: since
+        schema:
+          type: string
+      - in: query
+        name: teams
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/v1/instructor/overview/:
     get:
       operationId: api_v1_instructor_overview_retrieve
@@ -1792,6 +2130,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InstructorOverview'
+          description: ''
+  /api/v1/open/status/:
+    get:
+      operationId: api_v1_open_status_retrieve
+      description: What a signed-out visitor may do here, so the public pages offer
+        only what works.
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
           description: ''
   /api/v1/research/consent-policy/:
     get:
@@ -2920,6 +3275,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/SchoolOverview'
           description: ''
+  /api/v1/schools/register/:
+    post:
+      operationId: api_v1_schools_register_create
+      description: A school, garage or hub asks to use the platform; a platform administrator
+        approves it.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchoolRegistrationRequestInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SchoolRegistrationRequestInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SchoolRegistrationRequestInputRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
 components:
   schemas:
     AcceptableActionSnapshot:
@@ -3121,8 +3506,9 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         name:
           type: string
           maxLength: 180
@@ -3161,8 +3547,9 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         name:
           type: string
           maxLength: 180
@@ -3220,8 +3607,9 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         name:
           type: string
           minLength: 1
@@ -3252,8 +3640,9 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         name:
           type: string
           minLength: 1
@@ -3369,6 +3758,8 @@ components:
           $ref: '#/components/schemas/RendererModeEnum'
         learning_mode:
           $ref: '#/components/schemas/LearningModeEnum'
+        is_practice:
+          type: boolean
         capability_profile: {}
         started_at:
           type: string
@@ -3453,6 +3844,8 @@ components:
           $ref: '#/components/schemas/RendererModeEnum'
         learning_mode:
           $ref: '#/components/schemas/LearningModeEnum'
+        is_practice:
+          type: boolean
         capability_profile: {}
         started_at:
           type: string
@@ -3480,15 +3873,17 @@ components:
           readOnly: true
         sequence:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         event_type:
           type: string
           maxLength: 80
         schema_version:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         activity_id:
           type: string
           format: uri
@@ -3517,16 +3912,18 @@ components:
       properties:
         sequence:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         event_type:
           type: string
           minLength: 1
           maxLength: 80
         schema_version:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         activity_id:
           type: string
           format: uri
@@ -3619,6 +4016,8 @@ components:
           $ref: '#/components/schemas/RendererModeEnum'
         learning_mode:
           $ref: '#/components/schemas/LearningModeEnum'
+        is_practice:
+          type: boolean
         capability_profile: {}
         started_at:
           type: string
@@ -3663,8 +4062,9 @@ components:
         missing_event_ids: {}
         pending_count:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         passed:
           type: boolean
         client_created_at:
@@ -3961,6 +4361,46 @@ components:
     BlankEnum:
       enum:
       - ''
+    ClassBulkLearnersRequestRequest:
+      type: object
+      properties:
+        names:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 300
+      required:
+      - names
+    ClassJoinCodeRequestRequest:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      required:
+      - enabled
+    ClassJoinRequestRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 150
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 150
+        pin:
+          type: string
+          minLength: 1
+          maxLength: 6
+        phone:
+          type: string
+          maxLength: 20
+      required:
+      - firstName
+      - lastName
+      - pin
     CohortLearner:
       type: object
       properties:
@@ -3999,8 +4439,9 @@ components:
         mastery_criteria: {}
         mastery_threshold:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
       required:
       - code
       - id
@@ -4210,8 +4651,9 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         algorithm:
           type: string
           maxLength: 60
@@ -4246,8 +4688,9 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         algorithm:
           type: string
           minLength: 1
@@ -4418,6 +4861,9 @@ components:
         has_published_feedback:
           type: boolean
           readOnly: true
+        variant_code:
+          type: string
+          maxLength: 80
         scenario_version:
           type: integer
           readOnly: true
@@ -4507,6 +4953,9 @@ components:
         has_published_feedback:
           type: boolean
           readOnly: true
+        variant_code:
+          type: string
+          maxLength: 80
         scenario_version:
           type: integer
           readOnly: true
@@ -4950,16 +5399,50 @@ components:
       - overdueAssignments
       - safetyErrors
       - school
+    KnowledgeCheckOption:
+      type: object
+      properties:
+        code:
+          type: string
+          readOnly: true
+        label:
+          type: string
+          readOnly: true
+      required:
+      - code
+      - label
+    KnowledgeCheckQuestion:
+      type: object
+      properties:
+        code:
+          type: string
+          readOnly: true
+        prompt:
+          type: string
+          readOnly: true
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeCheckOption'
+          readOnly: true
+      required:
+      - code
+      - options
+      - prompt
     LanguageEnum:
       enum:
       - en
       - rw
       - en-rw
+      - fr
+      - sw
       type: string
       description: |-
         * `en` - English
         * `rw` - Kinyarwanda
         * `en-rw` - English and Kinyarwanda
+        * `fr` - French
+        * `sw` - Swahili
     LearnerFeedback:
       type: object
       description: 'Published feedback as the learner sees it: the instructor''s private
@@ -5080,14 +5563,16 @@ components:
         safety_notes: {}
         estimated_minutes:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         language:
           $ref: '#/components/schemas/LanguageEnum'
         content_version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         course_title:
           type: string
           readOnly: true
@@ -5260,6 +5745,30 @@ components:
     NullEnum:
       enum:
       - null
+    OpenRegistrationRequestRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 150
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 150
+        signInName:
+          type: string
+          minLength: 1
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+      required:
+      - firstName
+      - lastName
+      - password
+      - signInName
     OverallGateEnum:
       enum:
       - pass
@@ -5558,8 +6067,9 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         name:
           type: string
           minLength: 1
@@ -5699,8 +6209,9 @@ components:
           type: integer
         version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         title:
           type: string
           minLength: 1
@@ -6082,8 +6593,9 @@ components:
           maxLength: 180
         participant_count:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         evidence_reference:
           type: string
           maxLength: 500
@@ -6144,8 +6656,9 @@ components:
           maxLength: 180
         participant_count:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         evidence_reference:
           type: string
           minLength: 1
@@ -6499,8 +7012,9 @@ components:
           readOnly: true
         order:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         code:
           type: string
           maxLength: 80
@@ -6520,8 +7034,9 @@ components:
           type: boolean
         points:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         metadata: {}
         acceptable_actions:
           type: array
@@ -6558,9 +7073,21 @@ components:
           items:
             type: string
           readOnly: true
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/StepChoice'
+          readOnly: true
+        mistakes:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties: {}
+          readOnly: true
       required:
       - acceptable_actions
       - action_code
+      - choices
       - code
       - competency_codes
       - feedback
@@ -6569,6 +7096,7 @@ components:
       - hints
       - id
       - instruction
+      - mistakes
       - order
       - title
       - tolerances
@@ -6714,8 +7242,9 @@ components:
           readOnly: true
         version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         title:
           type: string
           maxLength: 180
@@ -6793,8 +7322,9 @@ components:
           type: integer
         version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         title:
           type: string
           minLength: 1
@@ -7048,6 +7578,46 @@ components:
       - recentAudit
       - schools
       - suspendedMembers
+    SchoolRegistrationRequestInputKindEnum:
+      enum:
+      - school
+      - workshop
+      - hub
+      type: string
+      description: |-
+        * `school` - Technical school
+        * `workshop` - Garage or workshop
+        * `hub` - Training hub
+    SchoolRegistrationRequestInputRequest:
+      type: object
+      properties:
+        organisationName:
+          type: string
+          minLength: 1
+          maxLength: 180
+        kind:
+          $ref: '#/components/schemas/SchoolRegistrationRequestInputKindEnum'
+        district:
+          type: string
+          maxLength: 120
+        contactName:
+          type: string
+          minLength: 1
+          maxLength: 180
+        email:
+          type: string
+          format: email
+          minLength: 1
+        phone:
+          type: string
+          maxLength: 40
+        message:
+          type: string
+          maxLength: 2000
+      required:
+      - contactName
+      - email
+      - organisationName
     SchoolSummary:
       type: object
       properties:
@@ -7075,6 +7645,14 @@ components:
       - email
       - id
       - name
+    SequenceEnum:
+      enum:
+      - ordered
+      - free
+      type: string
+      description: |-
+        * `ordered` - ordered
+        * `free` - free
     SimulationScenarioSummary:
       type: object
       properties:
@@ -7083,8 +7661,9 @@ components:
           readOnly: true
         version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         title:
           type: string
           maxLength: 180
@@ -7101,11 +7680,38 @@ components:
           type: object
           additionalProperties: {}
           readOnly: true
+        sequence:
+          allOf:
+          - $ref: '#/components/schemas/SequenceEnum'
+          readOnly: true
+        scene:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          readOnly: true
+        knowledge_check:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeCheckQuestion'
+          readOnly: true
+        has_variants:
+          type: boolean
+          readOnly: true
+        distractors:
+          type: array
+          items:
+            $ref: '#/components/schemas/StepChoice'
+          readOnly: true
       required:
       - asset_package
+      - distractors
       - grading_policy
+      - has_variants
       - id
+      - knowledge_check
       - renderer_config
+      - scene
+      - sequence
       - title
       - version
     SimulationScenarioSummaryRequest:
@@ -7113,8 +7719,9 @@ components:
       properties:
         version:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         title:
           type: string
           minLength: 1
@@ -7122,6 +7729,18 @@ components:
       required:
       - title
       - version
+    StepChoice:
+      type: object
+      properties:
+        action_code:
+          type: string
+          readOnly: true
+        label:
+          type: string
+          readOnly: true
+      required:
+      - action_code
+      - label
     StepHintSnapshot:
       type: object
       properties:
@@ -7154,16 +7773,19 @@ components:
           $ref: '#/components/schemas/StepResultOutcomeEnum'
         attempts_count:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         hints_used:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         duration_seconds:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         achieved_points:
           type: string
           format: decimal
@@ -7177,8 +7799,9 @@ components:
           nullable: true
         safety_violations:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         evidence_sequences: {}
         completed_at:
           type: string
@@ -7211,16 +7834,19 @@ components:
           $ref: '#/components/schemas/StepResultOutcomeEnum'
         attempts_count:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         hints_used:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         duration_seconds:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         achieved_points:
           type: string
           format: decimal
@@ -7234,8 +7860,9 @@ components:
           nullable: true
         safety_violations:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         evidence_sequences: {}
         completed_at:
           type: string

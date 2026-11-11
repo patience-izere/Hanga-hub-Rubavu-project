@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { ProcedureStep, TelemetryEventInput } from "../../api/learning";
+import { markerPose3d, type ArPose } from "../../ar/markerPose";
 import {
   cameraErrorMessage,
   describeCamera,
@@ -11,7 +12,35 @@ import {
   type CameraDevice,
 } from "../../ar/cameras";
 
-type BarcodeResult = { rawValue: string };
+type BarcodeResult = { rawValue: string; cornerPoints?: Array<{ x: number; y: number }> };
+
+/** Where the marker sits in the camera view, as fractions of the view and a turn in degrees. */
+export type MarkerPose = { x: number; y: number; size: number; angle: number };
+
+/**
+ * Turn a detected marker's corners into where to draw the bench.
+ *
+ * This follows the marker's position, apparent size and rotation in the image. It is not a full
+ * 3D pose, so the bench does not tilt with the marker; it stays upright and readable instead.
+ */
+export function markerPose(
+  corners: Array<{ x: number; y: number }> | undefined,
+  videoWidth: number,
+  videoHeight: number,
+): MarkerPose | null {
+  if (!corners || corners.length < 4 || !videoWidth || !videoHeight) return null;
+  const centerX = corners.reduce((total, point) => total + point.x, 0) / corners.length;
+  const centerY = corners.reduce((total, point) => total + point.y, 0) / corners.length;
+  const edge = Math.hypot(corners[1].x - corners[0].x, corners[1].y - corners[0].y);
+  const angle =
+    (Math.atan2(corners[1].y - corners[0].y, corners[1].x - corners[0].x) * 180) / Math.PI;
+  return {
+    x: centerX / videoWidth,
+    y: centerY / videoHeight,
+    size: edge / Math.min(videoWidth, videoHeight),
+    angle,
+  };
+}
 type BarcodeDetectorLike = {
   detect(source: CanvasImageSource): Promise<BarcodeResult[]>;
 };
@@ -24,6 +53,12 @@ export type CameraArViewProps = {
   onAction(action: string): void;
   onTelemetry(eventType: TelemetryEventInput["eventType"], payload?: Record<string, unknown>): void;
   expectedMarker: string;
+  /**
+   * The interactive bench, drawn over the camera view once the training target is registered.
+   * It receives the marker's 3D pose while the marker is in view, so it can stand on it and tilt
+   * with it, and `null` when it should sit flat over the view instead.
+   */
+  bench?: (pose: ArPose | null) => ReactNode;
 };
 
 export function CameraArView({
@@ -33,6 +68,7 @@ export function CameraArView({
   onAction,
   onTelemetry,
   expectedMarker,
+  bench,
 }: CameraArViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -40,6 +76,8 @@ export function CameraArView({
   const sessionStartedAtRef = useRef<number | null>(null);
   const [active, setActive] = useState(false);
   const [marker, setMarker] = useState<string | null>(null);
+  const [pose, setPose] = useState<MarkerPose | null>(null);
+  const [pose3d, setPose3d] = useState<ArPose | null>(null);
   const [manualAlignment, setManualAlignment] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workspaceConfirmed, setWorkspaceConfirmed] = useState(false);
@@ -50,6 +88,8 @@ export function CameraArView({
   const [starting, setStarting] = useState(false);
 
   const supported = mediaDevicesSupported();
+  // Following a bench on the marker needs more frequent looks than only confirming it is there.
+  const trackingInterval = bench ? 160 : 650;
 
   const refreshCameras = useCallback(async () => {
     if (!supported) {
@@ -91,6 +131,22 @@ export function CameraArView({
         const results = await detector.detect(video);
         const detectedValue = results[0]?.rawValue ?? null;
         const nextMarker = detectedValue === expectedMarker ? detectedValue : null;
+        if (nextMarker) {
+          const corners = results[0]?.cornerPoints;
+          setPose(markerPose(corners, video.videoWidth, video.videoHeight));
+          const rect = video.getBoundingClientRect();
+          setPose3d(
+            corners?.length === 4
+              ? markerPose3d({
+                  corners,
+                  video: { width: video.videoWidth, height: video.videoHeight },
+                  display: { width: rect.width, height: rect.height },
+                })
+              : null,
+          );
+        } else {
+          setPose3d(null);
+        }
         if (detectedValue && detectedValue !== expectedMarker && !markerMismatchRef.current) {
           markerMismatchRef.current = true;
           onTelemetry("ar_marker_mismatch", { detector: "barcode-qr" });
@@ -115,9 +171,9 @@ export function CameraArView({
       } catch {
         // Detection failure is a renderer condition, never learner evidence.
       }
-    }, 650);
+    }, trackingInterval);
     return () => window.clearInterval(timer);
-  }, [active, expectedMarker, onTelemetry]);
+  }, [active, expectedMarker, onTelemetry, trackingInterval]);
 
   useEffect(
     () => () => {
@@ -206,6 +262,8 @@ export function CameraArView({
     releaseStream();
     setActive(false);
     setMarker(null);
+    setPose(null);
+    setPose3d(null);
     sessionStartedAtRef.current = null;
     setManualAlignment(false);
     onTelemetry("ar_session_ended", { mode: "camera-marker" });
@@ -304,8 +362,35 @@ export function CameraArView({
       ) : (
         <>
           <div className={`ar-reticle${registered ? " is-registered" : ""}`} aria-hidden="true" />
+          {registered && bench && marker && pose3d ? (
+            <div className="ar-bench-3d">{bench(pose3d)}</div>
+          ) : registered && bench ? (
+            <div
+              className="ar-bench"
+              style={
+                marker && pose
+                  ? {
+                      left: `${pose.x * 100}%`,
+                      top: `${pose.y * 100}%`,
+                      transform: `translate(-50%, -62%) rotate(${pose.angle}deg) scale(${Math.min(
+                        1.6,
+                        Math.max(0.55, pose.size * 3.2),
+                      )})`,
+                    }
+                  : undefined
+              }
+            >
+              {bench(null)}
+            </div>
+          ) : null}
           <div className="ar-overlay" role="status" aria-live="polite">
-            <span>{registered ? "Training target registered" : "Find the training marker"}</span>
+            <span>
+              {registered
+                ? bench
+                  ? "Training target registered: touch the bench to act"
+                  : "Training target registered"
+                : "Find the training marker"}
+            </span>
             <strong>
               {independent
                 ? "Independent assessment"

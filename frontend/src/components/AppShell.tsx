@@ -6,7 +6,7 @@ import { authQueryKey, useSignOut } from "../auth/useAuth";
 import { roleCapabilities } from "../auth/useRoles";
 import { InstallAppButton } from "./InstallAppButton";
 import { useLocale } from "../i18n/LocaleProvider";
-import type { Locale } from "../i18n/messages";
+import { LOCALE_NAMES, LOCALES, type Locale } from "../i18n/messages";
 
 type AppShellProps = {
   user: User | null;
@@ -79,8 +79,11 @@ export function AppShell({ user }: AppShellProps) {
           <label className="locale-select">
             <span className="sr-only">{t("language")}</span>
             <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
-              <option value="en">EN</option>
-              <option value="rw">RW</option>
+              {LOCALES.map((code) => (
+                <option key={code} value={code} title={LOCALE_NAMES[code]}>
+                  {code.toUpperCase()}
+                </option>
+              ))}
             </select>
           </label>
         </nav>

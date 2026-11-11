@@ -58,6 +58,13 @@ def _user_payload(request: HttpRequest) -> dict:
     )
     if user.is_superuser:
         roles.insert(0, "platform_admin")
+    profile = getattr(user, "learner_profile", None)
+    research = (
+        user.is_superuser
+        or user.school_memberships.filter(
+            is_active=True, school__is_active=True, school__research_enabled=True
+        ).exists()
+    )
     return {
         "id": user.pk,
         "email": user.email,
@@ -69,9 +76,10 @@ def _user_payload(request: HttpRequest) -> dict:
         "roles": roles,
         # Collected at invitation time; the interface uses it as the initial locale so a learner
         # who chose Kinyarwanda does not have to switch on every device.
-        "preferredLanguage": getattr(
-            getattr(user, "learner_profile", None), "preferred_language", ""
-        ),
+        "preferredLanguage": getattr(profile, "preferred_language", ""),
+        "usesPin": bool(getattr(profile, "uses_pin", False)),
+        # Optional parts of the product this person's organisation has switched on.
+        "features": {"research": research},
     }
 
 
@@ -214,8 +222,23 @@ def login_api(request: HttpRequest) -> JsonResponse:
     user_model = get_user_model()
     email_user = user_model.objects.filter(email__iexact=identifier).first()
     username = email_user.get_username() if email_user is not None else identifier
+    # A six-digit PIN is far easier to guess than a password, so accounts that use one lock for
+    # longer after fewer wrong tries. An instructor can issue a new PIN, which lifts the lock.
+    pin_account = user_model.objects.filter(
+        username__iexact=username, learner_profile__uses_pin=True
+    ).first()
+    if pin_account is not None:
+        username = pin_account.get_username()
+        if throttling.count("login-pin", username) >= settings.PIN_LOGIN_FAILURE_LIMIT:
+            return throttling.too_many(
+                "Too many wrong PINs. Ask your instructor for a new PIN, or try again later.",
+                code="login_locked",
+                retry_after=settings.PIN_LOCKOUT_SECONDS,
+            )
     user = authenticate(request, username=username, password=password)
     if user is None:
+        if pin_account is not None:
+            throttling.record("login-pin", username, window=settings.PIN_LOCKOUT_SECONDS)
         disabled_user = email_user or user_model.objects.filter(username=identifier).first()
         if (
             disabled_user is not None
@@ -229,7 +252,7 @@ def login_api(request: HttpRequest) -> JsonResponse:
         throttling.record("login", address, identifier, window=window)
         throttling.record("login-account", identifier, window=window)
         throttling.record("login-ip", address, window=window)
-        return JsonResponse({"detail": "Invalid email or password."}, status=401)
+        return JsonResponse({"detail": "That sign-in name or password is not right."}, status=401)
     if not user.is_active:
         return JsonResponse({"detail": "This account is disabled."}, status=403)
     memberships = user.school_memberships.all()
@@ -249,6 +272,7 @@ def login_api(request: HttpRequest) -> JsonResponse:
 
     login(request, user)
     throttling.clear("login", address, identifier)
+    throttling.clear("login-pin", user.get_username())
     return JsonResponse({"user": _user_payload(request)})
 
 
@@ -281,7 +305,19 @@ def password_change(request: HttpRequest) -> JsonResponse:
         throttling.record("password-change", user_key, window=window)
         return JsonResponse({"detail": "The current password is incorrect."}, status=400)
     throttling.clear("password-change", user_key)
-    errors = _password_errors(new_password, user=request.user)
+    profile = getattr(request.user, "learner_profile", None)
+    if profile is not None and profile.uses_pin and new_password.isdigit():
+        # A learner who was issued a PIN may choose another PIN; anything else must be a full
+        # password, after which the account is treated as a password account.
+        from .access import pin_problem
+
+        problem = pin_problem(new_password)
+        errors = [problem] if problem else []
+    else:
+        errors = _password_errors(new_password, user=request.user)
+        if not errors and profile is not None and profile.uses_pin:
+            profile.uses_pin = False
+            profile.save(update_fields=["uses_pin", "updated_at"])
     if errors:
         return JsonResponse({"detail": " ".join(errors), "errors": errors}, status=400)
     request.user.set_password(new_password)
@@ -360,3 +396,28 @@ def password_reset_confirm(request: HttpRequest, uidb64: str, token: str) -> Jso
         target=user,
     )
     return JsonResponse({"detail": "Password reset complete."})
+
+
+@require_POST
+def preferences(request: HttpRequest) -> JsonResponse:
+    """Save the interface language, so it follows a learner to a shared or new device."""
+
+    from .models import LearnerProfile
+
+    if not request.user.is_authenticated:
+        return JsonResponse({"detail": "Authentication required."}, status=401)
+    try:
+        body = _json_body(request)
+    except ValueError as exc:
+        return JsonResponse({"detail": str(exc)}, status=400)
+    language = str(body.get("preferredLanguage") or "")
+    if language not in LearnerProfile.Language.values:
+        return JsonResponse(
+            {"preferredLanguage": [f"Choose one of: {', '.join(LearnerProfile.Language.values)}."]},
+            status=400,
+        )
+    profile, _ = LearnerProfile.objects.get_or_create(user=request.user)
+    if profile.preferred_language != language:
+        profile.preferred_language = language
+        profile.save(update_fields=["preferred_language", "updated_at"])
+    return JsonResponse({"user": _user_payload(request)})

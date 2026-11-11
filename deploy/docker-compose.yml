@@ -1,0 +1,107 @@
+# OPedu's production stack on the shared VPS: nginx (web) → Daphne (backend) → Postgres + Redis,
+# plus the scheduled-jobs worker. HTTPS is terminated by the server's shared proxy in /opt/edge,
+# which also serves other, unrelated sites; it reaches `web` over the `edge` network by the alias
+# `opedu-web`. No ports are published.
+#
+# Lives on the server in /opt/opedu next to its .env. The deploy workflow copies this file there
+# and runs deploy.sh; see deploy/README.md for the one-time server setup.
+name: opedu
+
+x-backend: &backend
+  image: ${OPEDU_BACKEND_IMAGE:-ghcr.io/patience-izere/opedu-backend}:${IMAGE_TAG:-latest}
+  restart: unless-stopped
+  env_file: .env
+  environment: &backend-environment
+    DJANGO_DEBUG: "false"
+    DATABASE_URL: postgresql://opedu:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/opedu
+    REDIS_URL: redis://redis:6379/0
+    OPEDU_REQUIRE_REDIS: "true"
+    # Uploaded lesson assets live on the opedu_media volume, which `web` serves.
+    OPEDU_REQUIRE_OBJECT_STORAGE: "false"
+    # Caddy (edge) and nginx (web) are the two proxy hops in front of Django.
+    OPEDU_TRUSTED_PROXY_COUNT: "2"
+    OPEDU_RELEASE_VERSION: ${IMAGE_TAG:-latest}
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  web:
+    image: ${OPEDU_WEB_IMAGE:-ghcr.io/patience-izere/opedu-web}:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - media:/srv/media:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      default: {}
+      edge:
+        aliases: [opedu-web]
+
+  backend:
+    <<: *backend
+    volumes:
+      - media:/app/media
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready/', timeout=3).read()"
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  scheduler:
+    <<: *backend
+    # xAPI delivery and research-data retention every 15 minutes.
+    command: python manage.py run_scheduled_jobs --interval 900
+    volumes:
+      - media:/app/media
+    healthcheck:
+      disable: true
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: opedu
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: opedu
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opedu -d opedu"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  edge:
+    external: true
+
+volumes:
+  pgdata:
+  redis:
+  media:

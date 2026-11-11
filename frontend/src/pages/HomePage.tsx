@@ -58,12 +58,23 @@ export function HomePage({ user }: { user: User | null }) {
               {user ? "Continue learning" : "Enter the platform"}
               <span aria-hidden="true">→</span>
             </Link>
-            <a className="button button-secondary" href="#platform">
-              Explore how it works
-            </a>
+            {user ? null : (
+              <Link className="button button-secondary" to="/demo">
+                Try a lesson now, no account
+              </Link>
+            )}
           </div>
           <p className="hero-note">
-            Designed for technical schools · Desktop-first · No special headset required
+            {user ? null : (
+              <>
+                <Link to="/class">Join a class with a code</Link> ·{" "}
+                <Link to="/register">Learn on your own</Link> ·{" "}
+                <Link to="/register-school">Bring OPedu to your school or garage</Link>
+                <br />
+              </>
+            )}
+            Works on a phone, a shared school computer or a laptop · Practise offline · No headset
+            needed
           </p>
         </div>
 

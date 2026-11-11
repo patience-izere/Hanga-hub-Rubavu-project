@@ -46,9 +46,29 @@ class ThreeDModel(models.Model):
 
 
 class School(models.Model):
+    class Kind(models.TextChoices):
+        SCHOOL = "school", "Technical school"
+        WORKSHOP = "workshop", "Garage or workshop"
+        HUB = "hub", "Training hub"
+
     name = models.CharField(max_length=180)
     code = models.SlugField(max_length=60, unique=True)
+    kind = models.CharField(max_length=16, choices=Kind.choices, default=Kind.SCHOOL)
     is_active = models.BooleanField(default=True)
+    is_open = models.BooleanField(
+        default=False,
+        help_text=(
+            "The platform's open class: the home of people who signed up on their own rather "
+            "than through a school. At most one organisation should have this set."
+        ),
+    )
+    research_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Show pilot governance and research surveys to this organisation. Leave off unless "
+            "it takes part in an approved study."
+        ),
+    )
     allow_self_approval = models.BooleanField(
         default=False,
         help_text=(
@@ -115,6 +135,8 @@ class LearnerProfile(models.Model):
     class Language(models.TextChoices):
         ENGLISH = "en", "English"
         KINYARWANDA = "rw", "Kinyarwanda"
+        FRENCH = "fr", "French"
+        SWAHILI = "sw", "Swahili"
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -130,6 +152,13 @@ class LearnerProfile(models.Model):
     accessibility_notes = models.TextField(
         blank=True,
         help_text="Learning accommodations only; do not store diagnoses or unrelated medical data.",
+    )
+    uses_pin = models.BooleanField(
+        default=False,
+        help_text=(
+            "The learner signs in with a sign-in name and a numeric PIN issued by their class "
+            "instead of an email address and password."
+        ),
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -179,6 +208,9 @@ class Cohort(models.Model):
     starts_on = models.DateField(null=True, blank=True)
     ends_on = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    # Shown on the board so learners without email can join the class themselves. Empty means
+    # joining by code is switched off.
+    join_code = models.CharField(max_length=12, null=True, blank=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -200,6 +232,8 @@ class Cohort(models.Model):
             raise ValidationError({"program": "The program must belong to the cohort's school."})
 
     def save(self, *args, **kwargs):
+        # Unique among classes that have one; several classes may have joining switched off.
+        self.join_code = (self.join_code or "").strip().upper() or None
         self.full_clean()
         return super().save(*args, **kwargs)
 
@@ -276,6 +310,46 @@ class SchoolInvitation(models.Model):
         return f"{self.email} · {self.school.code} · {self.role}"
 
 
+class SchoolRegistrationRequest(models.Model):
+    """An organisation asking to use the platform; a platform administrator approves it."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        DECLINED = "declined", "Declined"
+
+    organisation_name = models.CharField(max_length=180)
+    kind = models.CharField(max_length=16, choices=School.Kind.choices, default=School.Kind.SCHOOL)
+    district = models.CharField(max_length=120, blank=True)
+    contact_name = models.CharField(max_length=180)
+    email = models.EmailField()
+    phone = models.CharField(max_length=40, blank=True)
+    message = models.TextField(blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    school = models.ForeignKey(
+        School,
+        on_delete=models.SET_NULL,
+        related_name="registration_requests",
+        null=True,
+        blank=True,
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="school_registrations_reviewed",
+        null=True,
+        blank=True,
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.organisation_name} · {self.status}"
+
+
 class Course(models.Model):
     school = models.ForeignKey(
         School,
@@ -297,6 +371,13 @@ class Course(models.Model):
     trade = models.CharField(max_length=120)
     description = models.TextField(blank=True)
     is_published = models.BooleanField(default=False)
+    open_enrollment = models.BooleanField(
+        default=False,
+        help_text=(
+            "List this course's published lessons in the open catalogue, so anyone signed in can "
+            "enrol themselves. The owning organisation's instructors can see their results."
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -386,6 +467,8 @@ class Lesson(models.Model):
         ENGLISH = "en", "English"
         KINYARWANDA = "rw", "Kinyarwanda"
         BILINGUAL = "en-rw", "English and Kinyarwanda"
+        FRENCH = "fr", "French"
+        SWAHILI = "sw", "Swahili"
 
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
@@ -1163,6 +1246,11 @@ class Attempt(models.Model):
         default=LearningMode.GUIDED,
     )
     capability_profile = models.JSONField(default=dict, blank=True)
+    # Free practice: scored for the learner's own feedback, but it does not use up an attempt and
+    # is kept out of instructor evidence and competency records.
+    is_practice = models.BooleanField(default=False)
+    # Which of the scenario's equivalent fault cases this attempt was given.
+    variant_code = models.CharField(max_length=80, blank=True)
     started_at = models.DateTimeField(default=timezone.now)
     completed_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)

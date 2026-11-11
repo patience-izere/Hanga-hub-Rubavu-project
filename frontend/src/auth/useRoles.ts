@@ -25,6 +25,8 @@ export type RoleCapabilities = {
   canPublishContent: boolean;
   /** Only administrators manage school membership and invitations. */
   canAdministerSchool: boolean;
+  /** The organisation takes part in a research study, so pilot tools and surveys are shown. */
+  researchEnabled: boolean;
   /** Where this user's workspace begins; also the post-login and `/dashboard` target. */
   homePath: string;
   has(...roles: Role[]): boolean;
@@ -57,6 +59,7 @@ export function roleCapabilities(user: User | null | undefined): RoleCapabilitie
     canAuthorContent,
     canPublishContent: canAdministerSchool,
     canAdministerSchool,
+    researchEnabled: Boolean(user?.features?.research),
     homePath: homePathFor({
       isSignedIn: Boolean(user),
       canAdministerSchool,

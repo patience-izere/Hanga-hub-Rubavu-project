@@ -257,6 +257,15 @@ async function mockLearningApi(page: Page, acceptedActions: AcceptedAction[] = [
   );
 }
 
+/** The view switcher sits in a collapsed "View" panel so it does not crowd the workshop. */
+async function chooseView(page: Page, name: RegExp) {
+  const settings = page.locator(".ws-settings");
+  if (!(await settings.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await settings.locator("summary").click();
+  }
+  await page.getByRole("button", { name }).click();
+}
+
 async function openAttempt(page: Page) {
   await page.goto("/attempts/42");
   await expect(page.getByRole("heading", { name: assignment.lesson.title })).toBeVisible();
@@ -326,7 +335,7 @@ test("a downloaded lesson completes through a full outage and replays every acti
   await expect(page.getByLabel("0 of 2 steps complete")).toBeVisible({ timeout: 15_000 });
   await Promise.all([
     page.waitForResponse((response) => response.url().endsWith("/attempts/42/renderer/")),
-    page.getByRole("button", { name: /^Accessible 2D/ }).click(),
+    chooseView(page, /^Simple view/),
   ]);
 
   const rejectedBackendRequests: string[] = [];
@@ -382,7 +391,7 @@ test("mobile Camera AR survives orientation change and camera interruption witho
   await mockLearningApi(page);
   await openAttempt(page);
 
-  await page.getByRole("button", { name: /^Camera AR/ }).click();
+  await chooseView(page, /^Camera AR/);
   await page.getByRole("checkbox", { name: /I confirm the rig is de-energized/ }).check();
   await page.getByRole("button", { name: "Enable camera and enter AR" }).click();
   await expect(page.getByText("Find the training marker")).toBeVisible();
@@ -398,7 +407,7 @@ test("mobile Camera AR survives orientation change and camera interruption witho
 
   await expect(page.getByRole("alert")).toContainText("camera was interrupted");
   await expect(page.getByLabel("0 of 2 steps complete")).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Accessible 2D/ })).toBeEnabled();
+  await expect(page.getByRole("button", { name: /^Simple view/ })).toBeEnabled();
 });
 
 test("mobile camera denial exposes an equivalent fallback and retains the attempt", async ({
@@ -409,11 +418,11 @@ test("mobile camera denial exposes an equivalent fallback and retains the attemp
   await mockLearningApi(page);
   await openAttempt(page);
 
-  await page.getByRole("button", { name: /^Camera AR/ }).click();
+  await chooseView(page, /^Camera AR/);
   await page.getByRole("checkbox", { name: /I confirm the rig is de-energized/ }).check();
   await page.getByRole("button", { name: "Enable camera and enter AR" }).click();
   await expect(page.getByRole("alert")).toContainText("Camera permission was denied");
-  await page.getByRole("button", { name: /^Accessible 2D/ }).click();
+  await chooseView(page, /^Simple view/);
 
   await expect(page.getByRole("region", { name: "Accessible lesson" })).toBeVisible();
   await expect(page.getByLabel("0 of 2 steps complete")).toBeVisible();

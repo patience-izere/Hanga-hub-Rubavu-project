@@ -85,8 +85,8 @@ test("a learner can sign in, reach a protected route, and sign out", async ({ pa
 
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/login$/);
-  await page.getByLabel("Email address").fill("learner@opedu.local");
-  await page.getByLabel("Password").fill("learning-pass-123");
+  await page.getByLabel("Email, phone or sign-in name").fill("learner@opedu.local");
+  await page.getByLabel("Password or PIN").fill("learning-pass-123");
   await page.getByRole("button", { name: "Sign in" }).click();
   // `/dashboard` is an alias for each person's workspace home, which for a learner is /learn.
   await expect(page).toHaveURL(/\/learn$/);

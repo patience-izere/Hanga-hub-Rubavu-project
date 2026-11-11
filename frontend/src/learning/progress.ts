@@ -8,14 +8,19 @@ const DUE_SOON_DAYS = 7;
 /** Statuses of an attempt the learner has submitted; review only decides how it counts. */
 export const SUBMITTED_ATTEMPT_STATUSES = new Set(["completed", "requires_review"]);
 
+/** Attempts that count: practice runs are the learner's own and never use up an attempt. */
+export function assessedAttempts(assignment: Assignment) {
+  return (assignment.attempt_history ?? []).filter((attempt) => !attempt.is_practice);
+}
+
 export function isCompleted(assignment: Assignment): boolean {
-  return (assignment.attempt_history ?? []).some((attempt) =>
+  return assessedAttempts(assignment).some((attempt) =>
     SUBMITTED_ATTEMPT_STATUSES.has(attempt.status),
   );
 }
 
 export function attemptsUsed(assignment: Assignment): number {
-  return (assignment.attempt_history ?? []).length;
+  return assessedAttempts(assignment).length;
 }
 
 export function hasAttemptsLeft(assignment: Assignment): boolean {
@@ -157,4 +162,41 @@ export function competencyProfile(attempts: AttemptDetail[]): CompetencyResult[]
     }
   }
   return [...latest.values()].sort((a, b) => a.competency_code.localeCompare(b.competency_code));
+}
+
+/**
+ * Days in a row, ending today or yesterday, on which the learner practised anything.
+ *
+ * Counted on the device's calendar, so practising late one evening and early the next morning
+ * keeps the streak going.
+ */
+export function practiceStreak(dates: string[], now: Date = new Date()): number {
+  const days = new Set(
+    dates.map((value) => {
+      const date = new Date(value);
+      return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+    }),
+  );
+  const key = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  const cursor = new Date(now);
+  if (!days.has(key(cursor))) cursor.setDate(cursor.getDate() - 1);
+  let streak = 0;
+  while (days.has(key(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+/** The best score the learner has reached on each lesson, practice included. */
+export function personalBests(assignments: Assignment[]): Map<number, number> {
+  const best = new Map<number, number>();
+  for (const assignment of assignments) {
+    for (const attempt of assignment.attempt_history ?? []) {
+      if (attempt.score === null || !SUBMITTED_ATTEMPT_STATUSES.has(attempt.status)) continue;
+      const score = Number(attempt.score);
+      best.set(assignment.lesson.id, Math.max(best.get(assignment.lesson.id) ?? 0, score));
+    }
+  }
+  return best;
 }

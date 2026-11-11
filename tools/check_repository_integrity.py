@@ -32,12 +32,18 @@ CODE_SUFFIXES = {
     ".yaml",
     ".yml",
 }
-SKIPPED_PREFIXES = ("mechlab/staticfiles/",)
+# Collected Django static files are vendor code, so only the font check applies there: the
+# October 2026 re-infection hid its payload in exactly that folder as a fake font.
+VENDOR_PREFIXES = ("mechlab/staticfiles/",)
 SKIPPED_NAMES = {"package-lock.json"}
 
 # Code pushed off-screen by a long run of spaces or tabs on the same line.
 PADDED_CODE = re.compile(r"[ \t]{200,}\S")
-OBFUSCATION_MARKERS = re.compile(r"global\[['\"]!['\"]\]|\b_0x[0-9a-f]{4,}\b")
+OBFUSCATION_MARKERS = re.compile(
+    r"global\[['\"]!['\"]\]|\b_0x[0-9a-f]{4,}\b"
+    # The string-array decoder javascript-obfuscator emits: parseInt(...)/(-0x..+..)
+    r"|-parseFloat\(\w+\(0x[0-9a-f]+\)\)\s*/\s*\("
+)
 AUTO_RUN_TASK = re.compile(r"[\"']runOn[\"']\s*:\s*[\"']folderOpen[\"']")
 
 FONT_SIGNATURES = {
@@ -78,10 +84,15 @@ def text_problems(name: str, text: str) -> list[str]:
     return problems
 
 
+def scanned_as_code(path: Path) -> bool:
+    # Extensionless files are what `node init` ran in the second infection.
+    return path.suffix.lower() in CODE_SUFFIXES or path.suffix == ""
+
+
 def main() -> int:
     failures = []
     for name in tracked_files():
-        if name.startswith(SKIPPED_PREFIXES) or Path(name).name in SKIPPED_NAMES:
+        if Path(name).name in SKIPPED_NAMES:
             continue
         path = ROOT / name
         if not path.is_file():
@@ -90,7 +101,9 @@ def main() -> int:
         problem = font_problem(path, data)
         if problem:
             failures.append(f"{name}: {problem}")
-        if path.suffix.lower() in CODE_SUFFIXES and b"\0" not in data:
+        if name.startswith(VENDOR_PREFIXES):
+            continue
+        if scanned_as_code(path) and b"\0" not in data:
             text = data.decode("utf-8", errors="replace")
             failures.extend(f"{name}: {problem}" for problem in text_problems(name, text))
 

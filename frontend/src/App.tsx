@@ -22,6 +22,9 @@ import { UpdatesPage } from "./pages/UpdatesPage";
 import { ContactPage } from "./pages/ContactPage";
 import { PrivacyPage, TermsPage } from "./pages/LegalPages";
 import { TrainingMarkerPage } from "./pages/TrainingMarkerPage";
+import { ClassJoinPage } from "./pages/ClassJoinPage";
+import { RegisterPage } from "./pages/RegisterPage";
+import { RegisterSchoolPage } from "./pages/RegisterSchoolPage";
 
 /**
  * Workspace pages load on demand, so each person downloads only the screens their role uses.
@@ -44,6 +47,17 @@ const LearnerDashboardPage = lazyPage(
 const LearnerProgressPage = lazyPage(
   () => import("./pages/LearnerProgressPage"),
   "LearnerProgressPage",
+);
+const CataloguePage = lazyPage(() => import("./pages/CataloguePage"), "CataloguePage");
+const CertificatePage = lazyPage(() => import("./pages/CertificatePage"), "CertificatePage");
+const VerifyCertificatePage = lazyPage(
+  () => import("./pages/CertificatePage"),
+  "VerifyCertificatePage",
+);
+const ClassAccessPage = lazyPage(() => import("./pages/ClassAccessPage"), "ClassAccessPage");
+const LiveBoardPage = lazyPage(() => import("./pages/LiveBoardPage"), "LiveBoardPage");
+const DemoPage = lazy(() =>
+  import("./pages/DemoPage").then((module) => ({ default: module.DemoPage })),
 );
 const AttemptResultPage = lazyPage(() => import("./pages/AttemptResultPage"), "AttemptResultPage");
 const AssignmentPage = lazyPage(() => import("./pages/AssignmentPage"), "AssignmentPage");
@@ -182,6 +196,26 @@ export function App() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/markers/battery" element={<TrainingMarkerPage />} />
+        <Route path="/class" element={<ClassJoinPage user={user} />} />
+        <Route path="/class/:code" element={<ClassJoinPage user={user} />} />
+        <Route path="/register" element={<RegisterPage user={user} />} />
+        <Route path="/register-school" element={<RegisterSchoolPage />} />
+        <Route
+          path="/demo"
+          element={
+            <Loading label="Loading the demonstration workshop…">
+              <DemoPage />
+            </Loading>
+          }
+        />
+        <Route
+          path="/verify/:code"
+          element={
+            <Loading label="Checking…">
+              <VerifyCertificatePage />
+            </Loading>
+          }
+        />
       </Route>
 
       {/* Workspace — the signed-in surface, one route per role responsibility. */}
@@ -200,6 +234,22 @@ export function App() {
           element={
             <RequireRole user={user}>
               <LearnerProgressPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/learn/catalogue"
+          element={
+            <RequireRole user={user}>
+              <CataloguePage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/learn/attempts/:attemptId/certificate"
+          element={
+            <RequireRole user={user}>
+              <CertificatePage />
             </RequireRole>
           }
         />
@@ -260,6 +310,22 @@ export function App() {
           element={
             <RequireRole user={user} capability="canReviewEvidence">
               <InstructorAssignPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/teach/classes"
+          element={
+            <RequireRole user={user} capability="canReviewEvidence">
+              <ClassAccessPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/teach/live"
+          element={
+            <RequireRole user={user} capability="canReviewEvidence">
+              <LiveBoardPage />
             </RequireRole>
           }
         />

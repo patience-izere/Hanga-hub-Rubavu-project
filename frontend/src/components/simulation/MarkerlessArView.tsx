@@ -29,9 +29,24 @@ type XrNavigator = Navigator & {
 type MarkerlessArViewProps = {
   currentStep: ProcedureStep | null;
   onTelemetry(eventType: TelemetryEventInput["eventType"], payload?: Record<string, unknown>): void;
+  /**
+   * The actions for this moment of the procedure. They sit inside the AR overlay, so the learner
+   * can carry the whole procedure through without leaving room AR.
+   */
+  options?: Array<{ action_code: string; label: string }>;
+  disabled?: boolean;
+  feedback?: string;
+  onAction?(action: string): void;
 };
 
-export function MarkerlessArView({ currentStep, onTelemetry }: MarkerlessArViewProps) {
+export function MarkerlessArView({
+  currentStep,
+  onTelemetry,
+  options = [],
+  disabled = false,
+  feedback = "",
+  onAction,
+}: MarkerlessArViewProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<ArSession | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -158,8 +173,31 @@ export function MarkerlessArView({ currentStep, onTelemetry }: MarkerlessArViewP
   return (
     <div ref={overlayRef} className="markerless-ar" role="region" aria-label="Markerless WebXR AR">
       <span className="eyebrow">WebXR surface placement</span>
-      <h2>{currentStep?.title ?? "Procedure complete"}</h2>
+      <h2>
+        {currentStep?.title ?? (options.length ? "Choose the next action" : "Procedure complete")}
+      </h2>
+      {currentStep ? <p>{currentStep.instruction}</p> : null}
       <p>{message}</p>
+      {feedback ? (
+        <p className="markerless-feedback" role="status">
+          {feedback}
+        </p>
+      ) : null}
+      {onAction && options.length ? (
+        <div className="markerless-actions">
+          {options.map((option) => (
+            <button
+              key={option.action_code}
+              className="button button-primary"
+              type="button"
+              disabled={disabled}
+              onClick={() => onAction(option.action_code)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {!active ? (
         <button className="button button-primary" type="button" onClick={enterMarkerlessAr}>
           Enter markerless AR
