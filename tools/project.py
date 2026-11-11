@@ -74,7 +74,23 @@ def main() -> None:
         schema_path = ROOT / "openapi" / "schema.yml"
         schema_path.parent.mkdir(exist_ok=True)
         schema_output = Path("..") / "openapi" / "schema.yml"
-        backend("spectacular", "--file", str(schema_output), "--validate", "--fail-on-warn")
+        # Integer limits in the schema come from the database backend (SQLite reports 64-bit
+        # ranges, PostgreSQL 16/32-bit), and CI compares against a PostgreSQL build. Generating
+        # the schema reads only the backend's settings, so no database has to be running.
+        env = django_env()
+        env["DJANGO_USE_SQLITE"] = "false"
+        env.setdefault("DATABASE_URL", "postgresql://opedu:schema-only@127.0.0.1:5432/opedu")
+        run(
+            sys.executable,
+            "manage.py",
+            "spectacular",
+            "--file",
+            str(schema_output),
+            "--validate",
+            "--fail-on-warn",
+            cwd=BACKEND,
+            env=env,
+        )
         npm("run", "api:types")
     elif task == "check":
         run(sys.executable, "tools/check_repository_integrity.py")

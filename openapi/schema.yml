@@ -3506,9 +3506,8 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         name:
           type: string
           maxLength: 180
@@ -3547,9 +3546,8 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         name:
           type: string
           maxLength: 180
@@ -3607,9 +3605,8 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         name:
           type: string
           minLength: 1
@@ -3640,9 +3637,8 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         name:
           type: string
           minLength: 1
@@ -3873,17 +3869,15 @@ components:
           readOnly: true
         sequence:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         event_type:
           type: string
           maxLength: 80
         schema_version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         activity_id:
           type: string
           format: uri
@@ -3912,18 +3906,16 @@ components:
       properties:
         sequence:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         event_type:
           type: string
           minLength: 1
           maxLength: 80
         schema_version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         activity_id:
           type: string
           format: uri
@@ -4062,9 +4054,8 @@ components:
         missing_event_ids: {}
         pending_count:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         passed:
           type: boolean
         client_created_at:
@@ -4439,9 +4430,8 @@ components:
         mastery_criteria: {}
         mastery_threshold:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
       required:
       - code
       - id
@@ -4651,9 +4641,8 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         algorithm:
           type: string
           maxLength: 60
@@ -4688,9 +4677,8 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         algorithm:
           type: string
           minLength: 1
@@ -5563,16 +5551,14 @@ components:
         safety_notes: {}
         estimated_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         language:
           $ref: '#/components/schemas/LanguageEnum'
         content_version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         course_title:
           type: string
           readOnly: true
@@ -6067,9 +6053,8 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         name:
           type: string
           minLength: 1
@@ -6209,9 +6194,8 @@ components:
           type: integer
         version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         title:
           type: string
           minLength: 1
@@ -6593,9 +6577,8 @@ components:
           maxLength: 180
         participant_count:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         evidence_reference:
           type: string
           maxLength: 500
@@ -6656,9 +6639,8 @@ components:
           maxLength: 180
         participant_count:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         evidence_reference:
           type: string
           minLength: 1
@@ -7012,9 +6994,8 @@ components:
           readOnly: true
         order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         code:
           type: string
           maxLength: 80
@@ -7034,9 +7015,8 @@ components:
           type: boolean
         points:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         metadata: {}
         acceptable_actions:
           type: array
@@ -7242,9 +7222,8 @@ components:
           readOnly: true
         version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         title:
           type: string
           maxLength: 180
@@ -7322,9 +7301,8 @@ components:
           type: integer
         version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         title:
           type: string
           minLength: 1
@@ -7661,9 +7639,8 @@ components:
           readOnly: true
         version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         title:
           type: string
           maxLength: 180
@@ -7719,9 +7696,8 @@ components:
       properties:
         version:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 1
-          format: int64
         title:
           type: string
           minLength: 1
@@ -7773,19 +7749,16 @@ components:
           $ref: '#/components/schemas/StepResultOutcomeEnum'
         attempts_count:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         hints_used:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         duration_seconds:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         achieved_points:
           type: string
           format: decimal
@@ -7799,9 +7772,8 @@ components:
           nullable: true
         safety_violations:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         evidence_sequences: {}
         completed_at:
           type: string
@@ -7834,19 +7806,16 @@ components:
           $ref: '#/components/schemas/StepResultOutcomeEnum'
         attempts_count:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         hints_used:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         duration_seconds:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         achieved_points:
           type: string
           format: decimal
@@ -7860,9 +7829,8 @@ components:
           nullable: true
         safety_violations:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         evidence_sequences: {}
         completed_at:
           type: string

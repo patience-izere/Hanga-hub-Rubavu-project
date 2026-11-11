@@ -1485,7 +1485,6 @@ export interface components {
         };
         AssetPackage: {
             code: string;
-            /** Format: int64 */
             version: number;
             name: string;
             manifest?: unknown;
@@ -1498,7 +1497,6 @@ export interface components {
             readonly id: number;
             course: number;
             code: string;
-            /** Format: int64 */
             version: number;
             name: string;
             manifest?: unknown;
@@ -1516,7 +1514,6 @@ export interface components {
         AssetPackageAuthoringRequest: {
             course: number;
             code: string;
-            /** Format: int64 */
             version: number;
             name: string;
             manifest?: unknown;
@@ -1530,7 +1527,6 @@ export interface components {
         AssetPackageAuthoringStatusEnum: "draft" | "published" | "retired";
         AssetPackageRequest: {
             code: string;
-            /** Format: int64 */
             version: number;
             name: string;
             manifest?: unknown;
@@ -1615,10 +1611,8 @@ export interface components {
         AttemptEvent: {
             /** Format: uuid */
             readonly event_id: string;
-            /** Format: int64 */
             sequence: number;
             event_type: string;
-            /** Format: int64 */
             schema_version?: number;
             /** Format: uri */
             activity_id?: string;
@@ -1632,10 +1626,8 @@ export interface components {
             readonly received_at: string;
         };
         AttemptEventRequest: {
-            /** Format: int64 */
             sequence: number;
             event_type: string;
-            /** Format: int64 */
             schema_version?: number;
             /** Format: uri */
             activity_id?: string;
@@ -1705,7 +1697,6 @@ export interface components {
             client_event_ids?: unknown;
             server_event_ids?: unknown;
             missing_event_ids?: unknown;
-            /** Format: int64 */
             pending_count?: number;
             passed?: boolean;
             /** Format: date-time */
@@ -1825,7 +1816,6 @@ export interface components {
             level?: number;
             evidence_rules?: unknown;
             mastery_criteria?: unknown;
-            /** Format: int64 */
             mastery_threshold?: number;
         };
         CompetencyOption: {
@@ -1904,7 +1894,6 @@ export interface components {
         };
         GradingPolicyReference: {
             code: string;
-            /** Format: int64 */
             version: number;
             algorithm?: string;
             base_score?: number;
@@ -1915,7 +1904,6 @@ export interface components {
         };
         GradingPolicyReferenceRequest: {
             code: string;
-            /** Format: int64 */
             version: number;
             algorithm?: string;
             base_score?: number;
@@ -2223,10 +2211,8 @@ export interface components {
             summary: string;
             objectives?: unknown;
             safety_notes?: unknown;
-            /** Format: int64 */
             estimated_minutes?: number;
             language?: components["schemas"]["LanguageEnum"];
-            /** Format: int64 */
             content_version?: number;
             readonly course_title: string;
             readonly trade: string;
@@ -2483,7 +2469,6 @@ export interface components {
         PatchedAssetPackageAuthoringRequest: {
             course?: number;
             code?: string;
-            /** Format: int64 */
             version?: number;
             name?: string;
             manifest?: unknown;
@@ -2539,7 +2524,6 @@ export interface components {
         };
         PatchedScenarioAuthoringRequest: {
             lesson?: number;
-            /** Format: int64 */
             version?: number;
             title?: string;
             definition?: unknown;
@@ -2712,7 +2696,6 @@ export interface components {
             kind: components["schemas"]["PilotRehearsalKindEnum"];
             outcome: components["schemas"]["PilotRehearsalOutcomeEnum"];
             facilitator: string;
-            /** Format: int64 */
             participant_count: number;
             evidence_reference: string;
             notes?: string;
@@ -2742,7 +2725,6 @@ export interface components {
             kind: components["schemas"]["PilotRehearsalKindEnum"];
             outcome: components["schemas"]["PilotRehearsalOutcomeEnum"];
             facilitator: string;
-            /** Format: int64 */
             participant_count: number;
             evidence_reference: string;
             notes?: string;
@@ -2893,7 +2875,6 @@ export interface components {
         };
         ProcedureStep: {
             readonly id: number;
-            /** Format: int64 */
             order: number;
             code: string;
             title: string;
@@ -2901,7 +2882,6 @@ export interface components {
             action_code: string;
             feedback: string;
             safety_critical?: boolean;
-            /** Format: int64 */
             points?: number;
             metadata?: unknown;
             readonly acceptable_actions: components["schemas"]["AcceptableActionSnapshot"][];
@@ -2988,7 +2968,6 @@ export interface components {
             readonly lessonTitle: string;
             readonly lessonStatus: string;
             readonly authorName: string;
-            /** Format: int64 */
             version: number;
             title: string;
             definition?: unknown;
@@ -3014,7 +2993,6 @@ export interface components {
         };
         ScenarioAuthoringRequest: {
             lesson: number;
-            /** Format: int64 */
             version: number;
             title: string;
             definition?: unknown;
@@ -3151,7 +3129,6 @@ export interface components {
         SequenceEnum: "ordered" | "free";
         SimulationScenarioSummary: {
             readonly id: number;
-            /** Format: int64 */
             version: number;
             title: string;
             readonly grading_policy: components["schemas"]["GradingPolicyReference"];
@@ -3168,7 +3145,6 @@ export interface components {
             readonly distractors: components["schemas"]["StepChoice"][];
         };
         SimulationScenarioSummaryRequest: {
-            /** Format: int64 */
             version: number;
             title: string;
         };
@@ -3185,18 +3161,14 @@ export interface components {
         StepResult: {
             step_code: string;
             outcome: components["schemas"]["StepResultOutcomeEnum"];
-            /** Format: int64 */
             attempts_count?: number;
-            /** Format: int64 */
             hints_used?: number;
-            /** Format: int64 */
             duration_seconds?: number;
             /** Format: decimal */
             achieved_points: string;
             /** Format: decimal */
             available_points: string;
             tolerance_passed?: boolean | null;
-            /** Format: int64 */
             safety_violations?: number;
             evidence_sequences?: unknown;
             /** Format: date-time */
@@ -3212,18 +3184,14 @@ export interface components {
         StepResultRequest: {
             step_code: string;
             outcome: components["schemas"]["StepResultOutcomeEnum"];
-            /** Format: int64 */
             attempts_count?: number;
-            /** Format: int64 */
             hints_used?: number;
-            /** Format: int64 */
             duration_seconds?: number;
             /** Format: decimal */
             achieved_points: string;
             /** Format: decimal */
             available_points: string;
             tolerance_passed?: boolean | null;
-            /** Format: int64 */
             safety_violations?: number;
             evidence_sequences?: unknown;
             /** Format: date-time */
