@@ -146,18 +146,44 @@ jobs:
           KNOWN_HOSTS: ${{ secrets.OPEDU_SSH_KNOWN_HOSTS }}
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/opedu_deploy
+          # Pasting a key into the secrets page can add Windows line endings or stray spaces.
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' | sed 's/[[:space:]]*$//' > ~/.ssh/opedu_deploy
           chmod 600 ~/.ssh/opedu_deploy
-          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          if ! ssh-keygen -y -f ~/.ssh/opedu_deploy > /dev/null 2>&1; then
+            echo "::error::OPEDU_SSH_KEY is not a usable private key. Paste the whole private key file, from '-----BEGIN OPENSSH PRIVATE KEY-----' to '-----END OPENSSH PRIVATE KEY-----', keeping its line breaks (not the .pub file)."
+            exit 1
+          fi
+          # Public information: compare it with the key in the deploy user's authorized_keys.
+          echo "Deploy key fingerprint: $(ssh-keygen -lf ~/.ssh/opedu_deploy | cut -d' ' -f2)"
+          printf '%s\n' "$KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
+          # Key only: never fall back to a password, and fail fast instead of prompting.
+          cat > ~/.ssh/config <<'CONFIG'
+          Host *
+            IdentityFile ~/.ssh/opedu_deploy
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            ConnectTimeout 20
+          CONFIG
+          chmod 600 ~/.ssh/config
+
+      - name: Check the server accepts the deploy key
+        env:
+          HOST: ${{ secrets.OPEDU_SSH_HOST }}
+          USER: ${{ secrets.OPEDU_SSH_USER }}
+        run: |
+          if ! ssh "$USER@$HOST" true; then
+            echo "::error::The server refused the deploy key. Add the public key to /home/$USER/.ssh/authorized_keys on the server (see deploy/README.md), and check OPEDU_SSH_USER and OPEDU_SSH_HOST."
+            exit 1
+          fi
 
       - name: Copy the deployment files
         env:
           HOST: ${{ secrets.OPEDU_SSH_HOST }}
           USER: ${{ secrets.OPEDU_SSH_USER }}
         run: |
-          scp -i ~/.ssh/opedu_deploy -o StrictHostKeyChecking=yes \
-            deploy/docker-compose.yml deploy/deploy.sh deploy/site.caddy deploy/.env.example \
+          scp deploy/docker-compose.yml deploy/deploy.sh deploy/site.caddy deploy/.env.example \
             "$USER@$HOST:$DEPLOY_PATH/"
 
       - name: Deploy
@@ -170,8 +196,7 @@ jobs:
         run: |
           # The job's own token logs the server in to pull the images, and expires with the job;
           # the server keeps no registry credentials afterwards.
-          printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/opedu_deploy -o StrictHostKeyChecking=yes \
-            "$USER@$HOST" "set -e
+          printf '%s' "$REGISTRY_TOKEN" | ssh "$USER@$HOST" "set -e
               docker login $REGISTRY -u '$REGISTRY_USER' --password-stdin
               trap 'docker logout $REGISTRY >/dev/null' EXIT
               IMAGE_TAG='$TAG' sh $DEPLOY_PATH/deploy.sh"
@@ -188,4 +213,4 @@ jobs:
 
       - name: Remove the SSH key
         if: always()
-        run: rm -f ~/.ssh/opedu_deploy
+        run: rm -f ~/.ssh/opedu_deploy ~/.ssh/config
