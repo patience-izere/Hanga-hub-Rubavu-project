@@ -33,7 +33,13 @@ if [ ! -d "$EDGE_DIR/sites" ]; then
   echo "warning: $EDGE_DIR/sites not found; the site is not published over HTTPS." >&2
 else
   SERVER_IPS="$(hostname -I 2>/dev/null || true) $(curl -fsS -4 --max-time 5 https://api.ipify.org 2>/dev/null || true)"
-  DOMAIN_IP="$(getent ahostsv4 "$DOMAIN" | awk 'NR==1 {print $1}')"
+  # Ask public DNS first: the server's own resolver caches a "no such name" answer for up to
+  # an hour, so a record added just before deploying would look missing.
+  DOMAIN_IP="$(curl -fsS --max-time 10 "https://dns.google/resolve?name=$DOMAIN&type=A" 2>/dev/null \
+    | python3 -c 'import json, sys; print(next((a["data"] for a in json.load(sys.stdin).get("Answer", []) if a.get("type") == 1), ""))' 2>/dev/null || true)"
+  if [ -z "$DOMAIN_IP" ]; then
+    DOMAIN_IP="$(getent ahostsv4 "$DOMAIN" | awk 'NR==1 {print $1}')"
+  fi
   if [ -n "$DOMAIN_IP" ] && echo " $SERVER_IPS " | grep -q " $DOMAIN_IP "; then
     sed "s/{\$DOMAIN}/$DOMAIN/g" site.caddy > "$EDGE_DIR/sites/opedu.caddy.tmp"
     mv "$EDGE_DIR/sites/opedu.caddy.tmp" "$EDGE_DIR/sites/opedu.caddy"
