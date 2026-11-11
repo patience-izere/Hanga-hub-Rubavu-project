@@ -462,3 +462,37 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+
+/* ---- Brand wordmark: one version per theme ---- */
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+}
+.brand-logo img {
+  display: block;
+  width: auto;
+  height: 100%;
+}
+.brand-logo-dark,
+:root[data-theme="dark"] .brand-logo-light {
+  display: none !important;
+}
+:root[data-theme="dark"] .brand-logo-dark {
+  display: block !important;
+}
+.footer-brand .brand-logo {
+  margin-bottom: 6px;
+}
+
+/* Dark theme: the home hero kept its light gradient, leaving pale text on a pale background. */
+:root[data-theme="dark"] .home-page .hero,
+:root[data-theme="dark"] .hero {
+  background:
+    radial-gradient(circle at 88% 18%, rgba(199, 229, 107, 0.3) 0 9%, transparent 9.3%),
+    linear-gradient(115deg, var(--sand) 0 54%, var(--surface-tint) 54% 100%);
+}
+@media (max-width: 1100px) {
+  :root[data-theme="dark"] .home-page .hero {
+    background: linear-gradient(150deg, var(--sand) 0 62%, var(--surface-tint) 62%);
+  }
+}

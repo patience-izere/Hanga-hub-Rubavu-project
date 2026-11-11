@@ -230,7 +230,7 @@ export function AssignmentPage() {
   const lessonAssets = [
     "/",
     "/manifest.webmanifest",
-    "/opedu-icon.svg",
+    "/icon-192.png",
     ...downloadFiles.map((file) => ({ url: file.url, sha256: file.sha256 })),
   ];
   const downloadMb = downloadFiles.reduce((total, file) => total + file.byte_size, 0) / 1_048_576;

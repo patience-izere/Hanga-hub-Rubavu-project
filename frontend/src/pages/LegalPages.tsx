@@ -42,6 +42,14 @@ export function PrivacyPage() {
         page; the responses are deleted while a non-identifying withdrawal receipt is retained.
         Withdrawal does not change marks or access to required learning.
       </p>
+      <h2>Website analytics</h2>
+      <p>
+        On opedu.izere.work we use Google Analytics, through Google Tag Manager, to count visits and
+        see which pages help people, so we can improve them. It records things such as pages viewed,
+        device type, approximate region and how people arrived, using cookies. It does not receive
+        your lesson results, answers or account details. You can block it with your browser&apos;s
+        privacy settings or an ad blocker without affecting how OPedu works.
+      </p>
       <h2>Retention and incidents</h2>
       <p>
         Research responses are removed when their configured retention period expires. The final
