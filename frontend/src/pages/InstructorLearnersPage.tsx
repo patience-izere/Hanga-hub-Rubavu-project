@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { InstructorRosterEntry } from "../api/instructor";
+import { Pagination, usePage } from "../components/ui/Pagination";
 import { QueryBoundary } from "../components/ui/QueryBoundary";
 import { useInstructorRoster } from "../learning/useInstructor";
 
@@ -32,6 +33,46 @@ function relativeDay(value: string | null): string {
   return new Date(value).toLocaleDateString();
 }
 
+function csvCell(value: string | number): string {
+  let text = String(value);
+  // Spreadsheet software runs cells starting with these as formulas.
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/** The roster as it is filtered and sorted on screen, as a CSV file. */
+function downloadRoster(learners: InstructorRosterEntry[]) {
+  const header = [
+    "name",
+    "email",
+    "classes",
+    "assignments",
+    "completed",
+    "overdue",
+    "attempts",
+    "safety_errors",
+    "last_active",
+  ];
+  const rows = learners.map((learner) => [
+    learner.name,
+    learner.email,
+    learner.cohorts.join("; "),
+    learner.assignments,
+    learner.completedAssignments,
+    learner.overdueAssignments,
+    learner.attempts,
+    learner.safetyErrors,
+    learner.lastActivityAt ?? "",
+  ]);
+  const text = "\ufeff" + [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "opedu-learners.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 /**
  * The learner-centric view of the school.
  *
@@ -56,6 +97,8 @@ export function InstructorLearnersPage() {
       : learners;
     return [...filtered].sort((a, b) => compare(a, b, sort));
   }, [learners, search, sort]);
+  // Only one page is drawn: ten thousand rows took seconds and hundreds of megabytes.
+  const paged = usePage(visible);
 
   return (
     <section className="dashboard roster-page">
@@ -76,8 +119,13 @@ export function InstructorLearnersPage() {
         empty={{
           title: "No learners yet",
           description:
-            "Learners appear here once a school administrator activates their membership.",
+            "Learners appear here once they join your school: by invitation, or by joining a class with its code.",
           symbol: "⚙",
+          action: (
+            <Link className="button button-primary" to="/teach/classes">
+              Set up class sign-in
+            </Link>
+          ),
         }}
       >
         {() => (
@@ -102,6 +150,13 @@ export function InstructorLearnersPage() {
                   ))}
                 </select>
               </label>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => downloadRoster(visible)}
+              >
+                Download CSV
+              </button>
               <span className="roster-count">
                 {visible.length} of {learners.length} learner(s)
               </span>
@@ -111,7 +166,7 @@ export function InstructorLearnersPage() {
               <p className="field-note">No learner matches that search.</p>
             ) : (
               <ul className="roster-list">
-                {visible.map((learner) => {
+                {paged.slice.map((learner) => {
                   const needsAttention = learner.safetyErrors > 0 || learner.overdueAssignments > 0;
                   return (
                     <li key={learner.id} className={needsAttention ? "needs-attention" : undefined}>
@@ -163,6 +218,15 @@ export function InstructorLearnersPage() {
                 })}
               </ul>
             )}
+            <Pagination
+              page={paged.page}
+              total={paged.total}
+              onPage={(next) => {
+                paged.setPage(next);
+                window.scrollTo({ top: 0, behavior: "instant" });
+              }}
+              label="learners"
+            />
           </>
         )}
       </QueryBoundary>

@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import {
@@ -13,9 +13,12 @@ import { clearLocalLearningData, listOutboxItems } from "../../offline/outbox";
 import { authQueryKey, useSignOut } from "../../auth/useAuth";
 import { roleCapabilities } from "../../auth/useRoles";
 import { useLocale } from "../../i18n/LocaleProvider";
-import { LOCALE_NAMES, LOCALES, type Locale } from "../../i18n/messages";
+import { OfflineBanner } from "../OfflineBanner";
+import { useDialogFocus } from "../ui/Dialog";
 import { InstallAppButton } from "../InstallAppButton";
-import { workspaceSections } from "./workspaceNav";
+import { LanguageSelect, ThemeSelect } from "../ShellControls";
+import { workspaceSections, type WorkspaceSection } from "./workspaceNav";
+import "../../styles/workspace-shell.css";
 
 const ROLE_LABELS: Record<string, string> = {
   platform_admin: "Platform administrator",
@@ -24,6 +27,17 @@ const ROLE_LABELS: Record<string, string> = {
   content_author: "Content author",
   learner: "Learner",
 };
+
+const COLLAPSED_KEY = "opedu:collapsed-nav";
+
+function readCollapsedSections(): Set<string> {
+  try {
+    const stored = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "[]") as unknown;
+    return new Set(Array.isArray(stored) ? stored.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
 
 /**
  * The signed-in shell.
@@ -36,14 +50,44 @@ export function WorkspaceShell({ user }: { user: User }) {
   const location = useLocation();
   const queryClient = useQueryClient();
   const logout = useSignOut();
-  const { locale, setLocale, t, coverage, draft } = useLocale();
+  const { locale, t, coverage, draft } = useLocale();
   const roles = roleCapabilities(user);
   const sections = workspaceSections(roles);
-  const displayName = user.firstName || user.email;
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+  const displayName = fullName || user.email || user.username;
+  const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsedSections);
+
+  function sectionIsCurrent(section: WorkspaceSection) {
+    return section.links.some(
+      (link) =>
+        location.pathname === link.to ||
+        (!link.end && location.pathname.startsWith(`${link.to}/`)) ||
+        (link.alsoActiveFor ?? []).some((prefix) => location.pathname.startsWith(prefix)),
+    );
+  }
+
+  function toggleSection(heading: string) {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(heading)) next.delete(heading);
+      else next.add(heading);
+      try {
+        localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]));
+      } catch {
+        // Remembered for this page only.
+      }
+      return next;
+    });
+  }
   const primaryRole = ROLE_LABELS[user.roles[0]] ?? "Member";
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [unsyncedCount, setUnsyncedCount] = useState<number | null>(null);
+  const unsyncedDialog = useRef<HTMLDivElement>(null);
+  useDialogFocus(unsyncedDialog, () => setUnsyncedCount(null), {
+    trap: false,
+    active: unsyncedCount !== null,
+  });
   const [signOutError, setSignOutError] = useState("");
 
   // A link in the phone menu should take you there and get the menu out of the way.
@@ -96,31 +140,20 @@ export function WorkspaceShell({ user }: { user: User }) {
           </span>
           <span>
             <strong>OPedu</strong>
-            <small>{user.organization || "Open class"}</small>
+            {user.organization ? <small>{user.organization}</small> : null}
           </span>
         </Link>
         <div className="workspace-header-actions">
           <InstallAppButton />
-          <label className="locale-select">
-            <span className="sr-only">{t("language")}</span>
-            <select
-              value={locale}
-              onChange={(event) => {
-                const next = event.target.value as Locale;
-                setLocale(next);
-                // Kept on the account too, so it follows the learner to a shared or new device.
-                void savePreferredLanguage(next)
-                  .then((saved) => queryClient.setQueryData(authQueryKey, saved))
-                  .catch(() => undefined);
-              }}
-            >
-              {LOCALES.map((code) => (
-                <option key={code} value={code} title={LOCALE_NAMES[code]}>
-                  {code.toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </label>
+          <LanguageSelect
+            onChange={(next) => {
+              // Kept on the account too, so it follows the learner to a shared or new device.
+              void savePreferredLanguage(next)
+                .then((saved) => queryClient.setQueryData(authQueryKey, saved))
+                .catch(() => undefined);
+            }}
+          />
+          <ThemeSelect />
           {locale !== "en" ? (
             // Say plainly what is translated, rather than leaving a learner to discover it.
             <span className="locale-coverage" role="status">
@@ -143,13 +176,19 @@ export function WorkspaceShell({ user }: { user: User }) {
             aria-controls="workspace-nav"
             onClick={() => setMenuOpen((open) => !open)}
           >
-            {menuOpen ? "Close" : "Menu"}
+            {menuOpen ? t("shell.closeMenu") : t("shell.menu")}
           </button>
         </div>
       </header>
 
+      <OfflineBanner />
       {unsyncedCount !== null ? (
-        <div className="workspace-alert" role="alertdialog" aria-labelledby="unsynced-title">
+        <div
+          ref={unsyncedDialog}
+          className="workspace-alert"
+          role="alertdialog"
+          aria-labelledby="unsynced-title"
+        >
           <p id="unsynced-title">
             <strong>
               {unsyncedCount === 1
@@ -194,35 +233,51 @@ export function WorkspaceShell({ user }: { user: User }) {
               {displayName.slice(0, 1).toUpperCase()}
             </span>
             <div>
-              <strong>{displayName}</strong>
+              <strong title={displayName}>{displayName}</strong>
               <small>{primaryRole}</small>
             </div>
           </div>
-          {sections.map((section) => (
-            <div className="workspace-nav-section" key={section.heading}>
-              <h2>{t(section.heading)}</h2>
-              <ul>
-                {section.links.map((link) => (
-                  <li key={link.to}>
-                    <NavLink
-                      to={link.to}
-                      end={link.end}
-                      className={({ isActive }) =>
-                        isActive ||
-                        (link.alsoActiveFor ?? []).some((prefix) =>
-                          location.pathname.startsWith(prefix),
-                        )
-                          ? "is-active"
-                          : undefined
-                      }
-                    >
-                      {t(link.label)}
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {sections.map((section) => {
+            const sectionId = `nav-section-${section.heading.replace(/\W+/g, "-")}`;
+            // The section holding the current page always stays open.
+            const open = sectionIsCurrent(section) || !collapsed.has(section.heading);
+            return (
+              <div className="workspace-nav-section" key={section.heading}>
+                <h2>
+                  <button
+                    type="button"
+                    className="workspace-nav-heading"
+                    aria-expanded={open}
+                    aria-controls={sectionId}
+                    onClick={() => toggleSection(section.heading)}
+                  >
+                    {t(section.heading)}
+                    <span aria-hidden="true">{open ? "−" : "+"}</span>
+                  </button>
+                </h2>
+                <ul id={sectionId} hidden={!open}>
+                  {section.links.map((link) => (
+                    <li key={link.to}>
+                      <NavLink
+                        to={link.to}
+                        end={link.end}
+                        className={({ isActive }) =>
+                          isActive ||
+                          (link.alsoActiveFor ?? []).some((prefix) =>
+                            location.pathname.startsWith(prefix),
+                          )
+                            ? "is-active"
+                            : undefined
+                        }
+                      >
+                        {t(link.label)}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
           <Link className="workspace-nav-exit" to="/">
             {t("nav.publicSite")}
           </Link>

@@ -17,6 +17,7 @@ import {
   useTransitionAuthoringLesson,
   useUpdateAuthoringLesson,
 } from "../learning/useContentAuthoring";
+import { Breadcrumbs } from "../components/ui/Breadcrumbs";
 
 const EMPTY_LESSON: LessonInput = {
   course: 0,
@@ -151,9 +152,12 @@ export function LessonEditorPage() {
 
   return (
     <section className="dashboard studio-page">
-      <Link className="studio-back-link" to="/authoring">
-        ← All lessons
-      </Link>
+      <Breadcrumbs
+        items={[
+          { label: "Module Studio", to: "/authoring" },
+          { label: isNew ? "New lesson" : (lesson.data?.title ?? "Lesson") },
+        ]}
+      />
       <div className="dashboard-heading">
         <div>
           <div className="eyebrow">

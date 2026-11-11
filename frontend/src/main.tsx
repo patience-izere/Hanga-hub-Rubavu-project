@@ -12,6 +12,7 @@ import { installGlobalErrorMonitoring } from "./monitoring/clientErrors";
 import "./styles/fonts.css";
 import "./styles.css";
 import "./styles/access.css";
+import "./styles/refresh.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

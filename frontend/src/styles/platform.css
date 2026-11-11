@@ -1,0 +1,44 @@
+/* Platform organisations page and shared data tables. */
+/* ---- Platform organisations page ---- */
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.checkbox-row {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  font-weight: 600;
+}
+.checkbox-row input {
+  width: 20px;
+  height: 20px;
+}
+.registration-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.registration-list li {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.registration-list small {
+  display: block;
+  color: var(--muted);
+}
+.registration-list li.is-handled {
+  background: var(--surface-tint, #eef1ea);
+}
+.contact-message-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import type { InstructorAttemptEvidence } from "../api/instructor";
 import { AttemptEvidenceTable } from "../components/instructor/AttemptEvidenceTable";
+import { CompletionChart } from "../components/instructor/CompletionChart";
 import { MetricGrid, MetricTile } from "../components/ui/MetricTile";
 import { QueryBoundary } from "../components/ui/QueryBoundary";
 import { useInstructorOverview } from "../learning/useInstructor";
@@ -121,6 +122,7 @@ export function InstructorDashboardPage() {
                   alert={data.metrics.safetyErrors > 0}
                 />
               </MetricGrid>
+              <CompletionChart />
 
               {attention.length > 0 ? (
                 <section className="attention-band" aria-labelledby="attention-title">

@@ -1,12 +1,22 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import type { User } from "../api/client";
 import { authQueryKey, useSignOut } from "../auth/useAuth";
 import { roleCapabilities } from "../auth/useRoles";
+import { OfflineBanner } from "./OfflineBanner";
 import { InstallAppButton } from "./InstallAppButton";
 import { useLocale } from "../i18n/LocaleProvider";
-import { LOCALE_NAMES, LOCALES, type Locale } from "../i18n/messages";
+import { LanguageSelect, ThemeSelect } from "./ShellControls";
+
+const PUBLIC_LINKS = [
+  { to: "/about", label: "about" },
+  { to: "/features", label: "features" },
+  { to: "/updates", label: "updates" },
+  { to: "/contact", label: "contact" },
+  { to: "/support", label: "support" },
+] as const;
 
 type AppShellProps = {
   user: User | null;
@@ -20,9 +30,14 @@ export function AppShell({ user }: AppShellProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const logout = useSignOut();
-  const { locale, setLocale, t } = useLocale();
+  const location = useLocation();
+  const { t } = useLocale();
   const roles = roleCapabilities(user);
   const workspaceLabel = roles.canReviewEvidence ? t("instructor") : t("learning");
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Following a link closes the phone menu.
+  useEffect(() => setMenuOpen(false), [location.pathname]);
 
   async function handleLogout() {
     await logout.mutateAsync();
@@ -42,25 +57,28 @@ export function AppShell({ user }: AppShellProps) {
           </span>
           <span>
             <strong>OPedu</strong>
-            <small>Open class</small>
+            {user?.organization ? <small>{user.organization}</small> : null}
           </span>
         </Link>
-        <nav aria-label="Primary navigation">
-          <Link className="public-nav-link" to="/about">
-            {t("about")}
-          </Link>
-          <Link className="public-nav-link" to="/features">
-            {t("features")}
-          </Link>
-          <Link className="public-nav-link nav-secondary" to="/updates">
-            {t("updates")}
-          </Link>
-          <Link className="public-nav-link nav-secondary" to="/contact">
-            {t("contact")}
-          </Link>
-          <Link className="public-nav-link nav-secondary" to="/support">
-            {t("support")}
-          </Link>
+        <button
+          type="button"
+          className="public-menu-toggle"
+          aria-expanded={menuOpen}
+          aria-controls="public-nav"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          {menuOpen ? t("shell.closeMenu") : t("shell.menu")}
+        </button>
+        <nav
+          id="public-nav"
+          className={menuOpen ? "public-nav is-open" : "public-nav"}
+          aria-label="Primary navigation"
+        >
+          {PUBLIC_LINKS.map((link) => (
+            <NavLink key={link.to} className="public-nav-link" to={link.to}>
+              {t(link.label)}
+            </NavLink>
+          ))}
           {user ? (
             <Link className="nav-cta" to={roles.homePath}>
               {workspaceLabel}
@@ -72,22 +90,17 @@ export function AppShell({ user }: AppShellProps) {
               {logout.isPending ? t("shell.signingOut") : t("signOut")}
             </button>
           ) : (
-            <Link className="nav-cta" to="/login">
+            <NavLink className="nav-cta" to="/login">
               {t("signIn")}
-            </Link>
+            </NavLink>
           )}
-          <label className="locale-select">
-            <span className="sr-only">{t("language")}</span>
-            <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
-              {LOCALES.map((code) => (
-                <option key={code} value={code} title={LOCALE_NAMES[code]}>
-                  {code.toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="shell-preferences">
+            <LanguageSelect />
+            <ThemeSelect />
+          </div>
         </nav>
       </header>
+      <OfflineBanner />
       <main id="main-content" tabIndex={-1}>
         <Outlet />
       </main>
@@ -122,7 +135,7 @@ export function AppShell({ user }: AppShellProps) {
           </div>
         </div>
         <div className="footer-bottom">
-          <p>Competency-based technical learning from Rubavu, Rwanda.</p>
+          <p>Competency-based technical learning from Kigali, Rwanda.</p>
           <p>Digital guidance never replaces qualified workshop supervision.</p>
         </div>
       </footer>

@@ -289,8 +289,8 @@ export function ResearchSurveyPage() {
         </button>
         {consentPolicy?.status === "draft" ? (
           <p className="form-error" role="alert">
-            Pilot research collection is disabled until the institution approves this consent
-            policy.
+            This survey opens once your school approves its consent form. Nothing for you to do now:
+            your instructor will tell you when it is ready.
           </p>
         ) : null}
         {status === "saved" && (

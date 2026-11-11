@@ -3,18 +3,19 @@ import hashlib
 import io
 import json
 import uuid
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Count, Max, Q
+from django.db.models.functions import TruncDate
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from drf_spectacular.utils import extend_schema
-from rest_framework import status, viewsets
+from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -455,6 +456,88 @@ def _with_evidence_counts(attempts):
             "feedback", filter=Q(feedback__is_published=True), distinct=True
         ),
     )
+
+
+class InstructorActivityView(APIView):
+    """Attempts started and finished per day, for the Teaching overview chart.
+
+    ?from= and ?to= are dates (YYYY-MM-DD, inclusive); the default is the last 30 days. A range
+    is limited to a year so the answer stays small.
+    """
+
+    permission_classes = [IsInstructorOrSchoolAdmin]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("from", str, required=False),
+            OpenApiParameter("to", str, required=False),
+        ],
+        responses=inline_serializer(
+            "InstructorActivity",
+            {
+                "from": serializers.DateField(),
+                "to": serializers.DateField(),
+                "days": inline_serializer(
+                    "InstructorActivityDay",
+                    {
+                        "date": serializers.DateField(),
+                        "started": serializers.IntegerField(),
+                        "completed": serializers.IntegerField(),
+                    },
+                    many=True,
+                ),
+            },
+        ),
+    )
+    def get(self, request):
+        school_ids = _instructor_school_ids(request.user)
+        if not school_ids and not request.user.is_superuser:
+            raise PermissionDenied("An active instructor or school administrator role is required.")
+        today = timezone.localdate()
+        try:
+            end = date.fromisoformat(request.query_params.get("to") or today.isoformat())
+            start = date.fromisoformat(
+                request.query_params.get("from") or (end - timedelta(days=29)).isoformat()
+            )
+        except ValueError:
+            return Response(
+                {"detail": "Use dates written as YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if start > end:
+            start, end = end, start
+        if (end - start).days > 366:
+            start = end - timedelta(days=366)
+        scope = Attempt.objects.filter(
+            assignment__lesson__course__school_id__in=school_ids, is_practice=False
+        )
+        started = dict(
+            scope.filter(started_at__date__gte=start, started_at__date__lte=end)
+            .annotate(day=TruncDate("started_at"))
+            .values_list("day")
+            .annotate(total=Count("id"))
+        )
+        completed = dict(
+            scope.filter(
+                status__in=SUBMITTED_STATUSES,
+                completed_at__date__gte=start,
+                completed_at__date__lte=end,
+            )
+            .annotate(day=TruncDate("completed_at"))
+            .values_list("day")
+            .annotate(total=Count("id"))
+        )
+        days = []
+        current = start
+        while current <= end:
+            days.append(
+                {
+                    "date": current.isoformat(),
+                    "started": started.get(current, 0),
+                    "completed": completed.get(current, 0),
+                }
+            )
+            current += timedelta(days=1)
+        return Response({"from": start.isoformat(), "to": end.isoformat(), "days": days})
 
 
 class InstructorOverviewView(APIView):

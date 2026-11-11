@@ -1,10 +1,104 @@
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 
+import { describeApiError } from "../api/client";
+import { EmptyState } from "../components/ui/EmptyState";
 import {
   useAuthoredAssetPackages,
+  useAuthoringCourses,
+  useCreateAuthoredAssetPackage,
   usePublishAuthoredAssetPackage,
   useUploadAuthoredAsset,
 } from "../learning/useContentAuthoring";
+
+function slug(value: string) {
+  return (
+    value
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "assets"
+  );
+}
+
+/** Starts an empty draft package so files can be uploaded into it. */
+function NewPackageForm({ onCreated }: { onCreated: (id: number) => void }) {
+  const courses = useAuthoringCourses();
+  const packages = useAuthoredAssetPackages();
+  const create = useCreateAuthoredAssetPackage();
+  const [courseId, setCourseId] = useState<number | "">("");
+  const [name, setName] = useState("");
+
+  const course = courseId === "" ? courses.data?.[0] : courses.data?.find((c) => c.id === courseId);
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!course || create.isPending) return;
+    const code = slug(name);
+    // A new version of an existing package, or version 1 of a new one.
+    const version =
+      Math.max(
+        0,
+        ...(packages.data ?? [])
+          .filter((item) => item.course === course.id && item.code === code)
+          .map((item) => item.version),
+      ) + 1;
+    create.mutate(
+      { course: course.id, code, version, name: name.trim() },
+      {
+        onSuccess: (created) => {
+          setName("");
+          onCreated(created.id);
+        },
+      },
+    );
+  }
+
+  if (courses.data && courses.data.length === 0) {
+    return (
+      <p className="field-note">
+        Create a course in the Module Studio first; asset packages belong to a course.
+      </p>
+    );
+  }
+
+  return (
+    <form className="new-package-form" onSubmit={submit}>
+      <h2>New asset package</h2>
+      <label>
+        Course
+        <select
+          value={course?.id ?? ""}
+          onChange={(event) => setCourseId(Number(event.target.value))}
+        >
+          {courses.data?.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.title}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Package name
+        <input
+          required
+          maxLength={180}
+          value={name}
+          placeholder="e.g. Brake workshop models"
+          onChange={(event) => setName(event.target.value)}
+        />
+      </label>
+      {create.isError ? (
+        <p className="form-error" role="alert">
+          {describeApiError(create.error, "The package could not be created.")}
+        </p>
+      ) : null}
+      <button className="button button-primary" disabled={create.isPending || !course}>
+        {create.isPending ? "Creating…" : "Create draft package"}
+      </button>
+    </form>
+  );
+}
 
 /**
  * Asset package management, split out of the scenario editor.
@@ -40,12 +134,15 @@ export function AuthoringAssetsPage({ canPublish }: { canPublish: boolean }) {
         </div>
       </div>
 
+      <section className="lesson-panel">
+        <NewPackageForm onCreated={setSelectedPackageId} />
+      </section>
+
       <section className="lesson-panel" aria-labelledby="asset-pipeline-title">
-        <span className="eyebrow">Governed immersive assets</span>
-        <h2 id="asset-pipeline-title">Validated glTF and media packages</h2>
-        <p>
-          Uploads are checked for type, declared MIME, size, glTF 2.0 structure, checksum,
-          attribution, and generated performance metadata before an administrator can publish.
+        <h2 id="asset-pipeline-title">Upload files</h2>
+        <p className="field-note">
+          Accepted: glTF or GLB models, KTX2 textures, PNG, JPEG or WebP images, MP4 or WebM video
+          and VTT captions. Up to 25 MB per file. Files can be added only to a draft package.
         </p>
         <label>
           Asset package
@@ -55,7 +152,8 @@ export function AuthoringAssetsPage({ canPublish }: { canPublish: boolean }) {
           >
             {assetPackages.data?.map((item) => (
               <option value={item.id} key={item.id}>
-                {item.name} · v{item.version} · {item.status}
+                {item.name} · v{item.version} ·{" "}
+                {item.status === "draft" ? "draft, can add files" : item.status}
               </option>
             ))}
           </select>
@@ -75,11 +173,17 @@ export function AuthoringAssetsPage({ canPublish }: { canPublish: boolean }) {
                 </li>
               ))}
             </ul>
+            {selectedPackage.status !== "draft" ? (
+              <p className="field-note">
+                This package is {selectedPackage.status}, so its files cannot change. Create a new
+                draft package above to upload files.
+              </p>
+            ) : null}
             {selectedPackage.status === "draft" ? (
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
-                  if (!assetFile) return;
+                  if (!assetFile || uploadAsset.isPending) return;
                   uploadAsset.mutate({
                     packageId: selectedPackage.id,
                     file: assetFile,
@@ -164,13 +268,23 @@ export function AuthoringAssetsPage({ canPublish }: { canPublish: boolean }) {
             ) : null}
             {uploadAsset.isError || publishAsset.isError ? (
               <p className="form-error" role="alert">
-                The asset package failed validation. Review its manifest, license, file metadata,
-                and primary-scene role.
+                {describeApiError(
+                  uploadAsset.error ?? publishAsset.error,
+                  "The asset package failed validation. Review its manifest, license, file metadata, and primary-scene role.",
+                )}
+              </p>
+            ) : null}
+            {uploadAsset.isSuccess ? (
+              <p className="form-success" role="status">
+                File validated and added.
               </p>
             ) : null}
           </>
         ) : (
-          <p>No asset package is available for this school yet.</p>
+          <EmptyState
+            title="No asset packages yet"
+            description="Create a draft package above, then upload its models and media here."
+          />
         )}
       </section>
     </section>

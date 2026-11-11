@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 
+import { useRoles } from "@/auth/useRoles";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { MetricGrid, MetricTile } from "@/components/ui/MetricTile";
 import { QueryBoundary } from "@/components/ui/QueryBoundary";
 import { useSchoolOverview } from "@/school/useSchoolAdmin";
@@ -22,6 +24,7 @@ const ROLE_ORDER = ["learner", "instructor", "content_author", "admin"];
  */
 export function SchoolOverviewPage() {
   const overview = useSchoolOverview();
+  const roles = useRoles();
 
   return (
     <section className="dashboard school-overview">
@@ -38,90 +41,110 @@ export function SchoolOverviewPage() {
         loading="Loading school summary…"
         error="The school summary could not be loaded."
       >
-        {(data) => (
-          <>
-            <MetricGrid>
-              {ROLE_ORDER.filter((role) => data.membersByRole[role]).map((role) => (
-                <MetricTile
-                  key={role}
-                  label={ROLE_LABELS[role] ?? role}
-                  value={data.membersByRole[role]}
-                />
-              ))}
-              <MetricTile
-                label="Pending invitations"
-                value={data.pendingInvitations}
-                detail={data.expiredInvitations ? `${data.expiredInvitations} expired` : undefined}
-              />
-              <MetricTile
-                label="Suspended members"
-                value={data.suspendedMembers}
-                alert={data.suspendedMembers > 0}
-              />
-            </MetricGrid>
-
-            <div className="admin-quick-links">
-              <Link className="button button-secondary" to="/school/people">
-                Manage people
-              </Link>
-              <Link className="button button-secondary" to="/school/invitations">
-                Review invitations
-              </Link>
-              <Link className="button button-secondary" to="/school/classes">
-                Manage classes
-              </Link>
-              <Link className="button button-secondary" to="/school/audit">
-                Open the audit log
-              </Link>
-            </div>
-
-            <h2 className="section-title">Classes</h2>
-            {data.cohorts.length === 0 ? (
-              <p className="field-note">
-                No active classes. <Link to="/school/classes">Create a class</Link> so instructors
-                can assign a lesson to all its learners at once.
-              </p>
-            ) : (
-              <ul className="cohort-list">
-                {data.cohorts.map((cohort) => (
-                  <li key={cohort.id}>
-                    <div>
-                      <strong>{cohort.name}</strong>
-                      <small>
-                        {cohort.code} · {cohort.school}
-                      </small>
-                    </div>
-                    <span>{cohort.learnerCount} active learner(s)</span>
-                  </li>
+        {(data) =>
+          data.schools.length === 0 ? (
+            <EmptyState
+              title="No school set up yet"
+              description={
+                roles.isPlatformAdmin
+                  ? "Classes, courses and invitations belong to a school. Add the first organisation, then invite its staff and learners."
+                  : "Your account is not an administrator of an active school. Ask a platform administrator to add you."
+              }
+              action={
+                roles.isPlatformAdmin ? (
+                  <Link className="button button-primary" to="/platform/schools">
+                    Add an organisation
+                  </Link>
+                ) : null
+              }
+            />
+          ) : (
+            <>
+              <MetricGrid>
+                {ROLE_ORDER.filter((role) => data.membersByRole[role]).map((role) => (
+                  <MetricTile
+                    key={role}
+                    label={ROLE_LABELS[role] ?? role}
+                    value={data.membersByRole[role]}
+                  />
                 ))}
-              </ul>
-            )}
+                <MetricTile
+                  label="Pending invitations"
+                  value={data.pendingInvitations}
+                  detail={
+                    data.expiredInvitations ? `${data.expiredInvitations} expired` : undefined
+                  }
+                />
+                <MetricTile
+                  label="Suspended members"
+                  value={data.suspendedMembers}
+                  alert={data.suspendedMembers > 0}
+                />
+              </MetricGrid>
 
-            <h2 className="section-title">Recent activity</h2>
-            {data.recentAudit.length === 0 ? (
-              <p className="field-note">Nothing has been recorded for this school yet.</p>
-            ) : (
-              <>
-                <ul className="audit-list compact">
-                  {data.recentAudit.map((event) => (
-                    <li key={event.id}>
+              <div className="admin-quick-links">
+                <Link className="button button-secondary" to="/school/people">
+                  Manage people
+                </Link>
+                <Link className="button button-secondary" to="/school/invitations">
+                  Review invitations
+                </Link>
+                <Link className="button button-secondary" to="/school/classes">
+                  Manage classes
+                </Link>
+                <Link className="button button-secondary" to="/school/audit">
+                  Open the audit log
+                </Link>
+              </div>
+
+              <h2 className="section-title">Classes</h2>
+              {data.cohorts.length === 0 ? (
+                <p className="field-note">
+                  No active classes. <Link to="/school/classes">Create a class</Link> so instructors
+                  can assign a lesson to all its learners at once.
+                </p>
+              ) : (
+                <ul className="cohort-list">
+                  {data.cohorts.map((cohort) => (
+                    <li key={cohort.id}>
                       <div>
-                        <strong>{auditLabel(event.eventType)}</strong>
-                        <small>{event.actorName}</small>
+                        <strong>{cohort.name}</strong>
+                        <small>
+                          {cohort.code} · {cohort.school}
+                        </small>
                       </div>
-                      <time dateTime={event.occurredAt}>
-                        {new Date(event.occurredAt).toLocaleString()}
-                      </time>
+                      <span>{cohort.learnerCount} active learner(s)</span>
                     </li>
                   ))}
                 </ul>
-                <Link className="table-link" to="/school/audit">
-                  See the full audit log
-                </Link>
-              </>
-            )}
-          </>
-        )}
+              )}
+
+              <h2 className="section-title">Recent activity</h2>
+              {data.recentAudit.length === 0 ? (
+                <p className="field-note">Nothing has been recorded for this school yet.</p>
+              ) : (
+                <>
+                  <ul className="audit-list compact">
+                    {data.recentAudit.map((event) => (
+                      <li key={event.id}>
+                        <div>
+                          <strong>{auditLabel(event.eventType)}</strong>
+                          <small>{event.actorName}</small>
+                        </div>
+                        <time dateTime={event.occurredAt}>
+                          {new Date(event.occurredAt).toLocaleString()}
+                        </time>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link className="table-link" to="/school/audit">
+                    See the full audit log
+                  </Link>
+                </>
+              )}
+            </>
+          )
+        }
       </QueryBoundary>
     </section>
   );

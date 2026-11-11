@@ -160,7 +160,7 @@ async function mockLearningApi(page: Page, acceptedActions: AcceptedAction[] = [
           username: "learner@opedu.local",
           firstName: "Offline",
           lastName: "Learner",
-          organization: "Rubavu Demo Technical School",
+          organization: "Kigali Demo Technical School",
           isStaff: false,
           roles: ["learner"],
         },

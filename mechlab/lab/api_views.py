@@ -16,16 +16,18 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from . import throttling
 from .audit import record_audit_event
-from .notifications import send_email_safely
+from .models import School
+from .notifications import email_is_configured, send_email_safely
 
 health_logger = logging.getLogger("opedu.health")
 client_error_logger = logging.getLogger("opedu.client_errors")
@@ -59,12 +61,14 @@ def _user_payload(request: HttpRequest) -> dict:
     if user.is_superuser:
         roles.insert(0, "platform_admin")
     profile = getattr(user, "learner_profile", None)
-    research = (
-        user.is_superuser
-        or user.school_memberships.filter(
+    # Research tools appear only while a study is running: for a platform administrator, when any
+    # school takes part; for everyone else, when their own school does.
+    if user.is_superuser:
+        research = School.objects.filter(is_active=True, research_enabled=True).exists()
+    else:
+        research = user.school_memberships.filter(
             is_active=True, school__is_active=True, school__research_enabled=True
         ).exists()
-    )
     return {
         "id": user.pk,
         "email": user.email,
@@ -79,7 +83,7 @@ def _user_payload(request: HttpRequest) -> dict:
         "preferredLanguage": getattr(profile, "preferred_language", ""),
         "usesPin": bool(getattr(profile, "uses_pin", False)),
         # Optional parts of the product this person's organisation has switched on.
-        "features": {"research": research},
+        "features": {"research": research, "email": email_is_configured()},
     }
 
 
@@ -189,8 +193,10 @@ def csrf(request: HttpRequest) -> JsonResponse:
 
 @require_GET
 def me(request: HttpRequest) -> JsonResponse:
+    # Being signed out is a normal answer to "who am I?", not an error: a 401 here filled every
+    # visitor's console with a failed request and hid real failures.
     if not request.user.is_authenticated:
-        return JsonResponse({"detail": "Authentication required."}, status=401)
+        return JsonResponse({"user": None})
     return JsonResponse({"user": _user_payload(request)})
 
 
@@ -366,23 +372,42 @@ def password_reset_request(request: HttpRequest) -> JsonResponse:
             f"Use this link to reset your OPedu password: {reset_url}",
             [user.email],
         )
+    if not email_is_configured():
+        # Said the same way for every address, so it still reveals nothing about accounts.
+        return JsonResponse(
+            {
+                "detail": "Email is not set up on OPedu yet, so no reset link can be sent. Ask "
+                "your instructor or school administrator to reset your password.",
+                "emailConfigured": False,
+            }
+        )
     return JsonResponse(
         {
-            "detail": "If an active account matches that email, password reset instructions were sent."
+            "detail": "If an active account matches that email, password reset instructions "
+            "were sent.",
+            "emailConfigured": True,
         }
     )
 
 
-@require_POST
+@require_http_methods(["GET", "POST"])
 def password_reset_confirm(request: HttpRequest, uidb64: str, token: str) -> JsonResponse:
+    """GET checks the link when the page opens; POST sets the new password."""
+
+    invalid = JsonResponse(
+        {"detail": "This reset link is invalid or expired.", "code": "reset_link_invalid"},
+        status=400,
+    )
     try:
-        body = _json_body(request)
+        body = _json_body(request) if request.method == "POST" else {}
         user_id = urlsafe_base64_decode(uidb64).decode()
         user = get_user_model().objects.get(pk=user_id, is_active=True)
     except (ValueError, TypeError, OverflowError, get_user_model().DoesNotExist):
-        return JsonResponse({"detail": "This reset link is invalid or expired."}, status=400)
+        return invalid
     if not default_token_generator.check_token(user, token):
-        return JsonResponse({"detail": "This reset link is invalid or expired."}, status=400)
+        return invalid
+    if request.method == "GET":
+        return JsonResponse({"valid": True})
     new_password = str(body.get("newPassword") or "")
     errors = _password_errors(new_password, user=user)
     if errors:
@@ -396,6 +421,69 @@ def password_reset_confirm(request: HttpRequest, uidb64: str, token: str) -> Jso
         target=user,
     )
     return JsonResponse({"detail": "Password reset complete."})
+
+
+@require_POST
+def profile(request: HttpRequest) -> JsonResponse:
+    """Change your own name and email. A new email needs the current password."""
+
+    if not request.user.is_authenticated:
+        return JsonResponse({"detail": "Authentication required."}, status=401)
+    try:
+        body = _json_body(request)
+    except ValueError as exc:
+        return JsonResponse({"detail": str(exc)}, status=400)
+    user = request.user
+    first_name = " ".join(str(body.get("firstName", user.first_name) or "").split())
+    last_name = " ".join(str(body.get("lastName", user.last_name) or "").split())
+    email = str(body.get("email", user.email) or "").strip().casefold()
+    errors: dict[str, list[str]] = {}
+    if len(first_name) > 150:
+        errors["firstName"] = ["Use at most 150 characters."]
+    if len(last_name) > 150:
+        errors["lastName"] = ["Use at most 150 characters."]
+    email_changed = email != (user.email or "").casefold()
+    if email_changed:
+        if email:
+            try:
+                validate_email(email)
+            except ValidationError:
+                errors["email"] = ["Enter a valid email address."]
+            else:
+                if (
+                    get_user_model()
+                    .objects.filter(email__iexact=email)
+                    .exclude(pk=user.pk)
+                    .exists()
+                ):
+                    errors["email"] = ["Another account already uses this email address."]
+        if not user.has_usable_password() or not user.check_password(
+            str(body.get("currentPassword") or "")
+        ):
+            errors["currentPassword"] = ["Enter your current password to change your email."]
+    if errors:
+        first = next(iter(errors.values()))[0]
+        return JsonResponse({"detail": first, **errors}, status=400)
+    changed = []
+    if first_name != user.first_name:
+        user.first_name = first_name
+        changed.append("first_name")
+    if last_name != user.last_name:
+        user.last_name = last_name
+        changed.append("last_name")
+    if email_changed:
+        user.email = email
+        changed.append("email")
+    if changed:
+        user.save(update_fields=changed)
+        record_audit_event(
+            event_type="account.profile_updated",
+            actor=user,
+            school=_primary_school(user),
+            target=user,
+            payload={"fields": changed},
+        )
+    return JsonResponse({"user": _user_payload(request)})
 
 
 @require_POST

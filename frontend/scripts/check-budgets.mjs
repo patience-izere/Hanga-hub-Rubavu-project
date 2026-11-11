@@ -11,7 +11,8 @@ async function collect(directory) {
     const path = join(directory, name);
     const details = await stat(path);
     if (details.isDirectory()) await collect(path);
-    else files.push({ path, bytes: details.size });
+    // The link-preview image is fetched by WhatsApp and social sites, never by the app itself.
+    else if (!/^og-image\./.test(name)) files.push({ path, bytes: details.size });
   }
 }
 

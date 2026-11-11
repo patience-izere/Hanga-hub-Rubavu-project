@@ -1,0 +1,71 @@
+/* ---- Teaching overview chart (D-6) ---- */
+.completion-chart {
+  margin: 20px 0;
+}
+.completion-chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.completion-chart-head h2 {
+  margin: 0;
+}
+.completion-chart-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+}
+.completion-chart-filters label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.completion-chart-total {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 14px 0 8px;
+  color: var(--muted);
+}
+.completion-chart-total strong {
+  color: var(--ink);
+}
+.completion-chart-tip {
+  color: var(--ink);
+  font-weight: 600;
+}
+.completion-chart-plot svg {
+  display: block;
+  width: 100%;
+  height: 180px;
+}
+.completion-bar {
+  fill: var(--green-650);
+}
+.completion-bar.is-active {
+  fill: var(--green-800);
+}
+.completion-chart-axis {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.completion-chart-scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 12px;
+}
+.completion-chart-table {
+  margin-top: 12px;
+}
+.completion-chart-table summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 700;
+}

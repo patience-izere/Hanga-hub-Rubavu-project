@@ -12,7 +12,7 @@ export type User = {
   /** Signs in with a class-issued sign-in name and PIN rather than an email and password. */
   usesPin?: boolean;
   /** Optional parts of the product this person's organisation has switched on. */
-  features?: { research?: boolean };
+  features?: { research?: boolean; email?: boolean };
 };
 
 type ApiErrorBody = {
@@ -80,7 +80,31 @@ function cookie(name: string): string | undefined {
     ?.slice(name.length + 1);
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+/**
+ * Changes already on their way to the server. An identical second request (a double click on
+ * Save, a button pressed twice before it disabled) shares the first one's answer instead of
+ * creating the record twice.
+ */
+const inFlightChanges = new Map<string, Promise<unknown>>();
+
+export function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const method = (init.method ?? "GET").toUpperCase();
+  if (
+    method === "GET" ||
+    method === "HEAD" ||
+    !(init.body === undefined || typeof init.body === "string")
+  ) {
+    return sendRequest<T>(path, init);
+  }
+  const key = `${method} ${path} ${init.body ?? ""}`;
+  const pending = inFlightChanges.get(key);
+  if (pending) return pending as Promise<T>;
+  const request = sendRequest<T>(path, init).finally(() => inFlightChanges.delete(key));
+  inFlightChanges.set(key, request);
+  return request;
+}
+
+async function sendRequest<T>(path: string, init: RequestInit): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   if (init.body && !(init.body instanceof FormData)) {
@@ -166,14 +190,34 @@ export async function ensureCsrf(): Promise<void> {
   await apiFetch<{ detail: string }>("/api/v1/auth/csrf/");
 }
 
+/**
+ * The server says nobody is signed in. If this device remembered someone, their session ended
+ * without them signing out, so the sign-in page tells them why they are there.
+ */
+function signedOutByServer() {
+  if (cachedUser()) {
+    try {
+      sessionStorage.setItem("opedu:session-expired", "true");
+    } catch {
+      // The message is a courtesy; sign-in still works without it.
+    }
+  }
+  forgetCachedUser();
+}
+
 export async function currentUser(): Promise<User | null> {
   try {
-    const response = await apiFetch<{ user: User }>("/api/v1/auth/me/");
-    rememberUser(response.user);
-    return response.user;
+    const response = await apiFetch<{ user: User | null }>("/api/v1/auth/me/");
+    if (response.user) {
+      rememberUser(response.user);
+      return response.user;
+    }
+    signedOutByServer();
+    return null;
   } catch (error) {
+    // Older servers answered "not signed in" with 401.
     if (error instanceof ApiError && error.status === 401) {
-      forgetCachedUser();
+      signedOutByServer();
       return null;
     }
     if (isNetworkError(error)) {
@@ -230,6 +274,33 @@ export async function requestPasswordReset(email: string): Promise<string> {
     body: JSON.stringify({ email }),
   });
   return response.detail;
+}
+
+/** Whether a reset link still works, checked when the page opens rather than after typing. */
+export async function checkPasswordResetLink(uid: string, token: string): Promise<boolean> {
+  try {
+    await apiFetch<{ valid: boolean }>(`/api/v1/auth/password/reset/${uid}/${token}/`);
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 400) return false;
+    throw error;
+  }
+}
+
+/** Saves your own name and email; a new email needs the current password. */
+export async function saveProfile(values: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  currentPassword?: string;
+}): Promise<User> {
+  await ensureCsrf();
+  const response = await apiFetch<{ user: User }>("/api/v1/auth/profile/", {
+    method: "POST",
+    body: JSON.stringify(values),
+  });
+  rememberUser(response.user);
+  return response.user;
 }
 
 export async function confirmPasswordReset(

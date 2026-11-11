@@ -16,7 +16,7 @@ async function authenticated(page: Page, roles: string[]) {
           username: "admin@opedu.local",
           firstName: "Demo",
           lastName: "Administrator",
-          organization: "Rubavu Demo Technical School",
+          organization: "Kigali Demo Technical School",
           isStaff: true,
           roles,
         },
@@ -56,7 +56,7 @@ test("a learner can sign in, reach a protected route, and sign out", async ({ pa
     username: "learner@opedu.local",
     firstName: "Demo",
     lastName: "Learner",
-    organization: "Rubavu Demo Technical School",
+    organization: "Kigali Demo Technical School",
     isStaff: false,
     roles: ["learner"],
   };
@@ -86,7 +86,7 @@ test("a learner can sign in, reach a protected route, and sign out", async ({ pa
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/login$/);
   await page.getByLabel("Email, phone or sign-in name").fill("learner@opedu.local");
-  await page.getByLabel("Password or PIN").fill("learning-pass-123");
+  await page.getByRole("textbox", { name: "Password or PIN" }).fill("learning-pass-123");
   await page.getByRole("button", { name: "Sign in" }).click();
   // `/dashboard` is an alias for each person's workspace home, which for a learner is /learn.
   await expect(page).toHaveURL(/\/learn$/);
@@ -117,7 +117,7 @@ test("school administrators can open membership management", async ({ page }) =>
   await page.route("**/api/v1/school/overview/", (route) =>
     route.fulfill(
       json({
-        schools: [{ id: 1, name: "Rubavu Demo Technical School", code: "rubavu-demo" }],
+        schools: [{ id: 1, name: "Kigali Demo Technical School", code: "kigali-demo" }],
         membersByRole: { admin: 1 },
         pendingInvitations: 0,
         expiredInvitations: 0,
@@ -127,7 +127,9 @@ test("school administrators can open membership management", async ({ page }) =>
       }),
     ),
   );
-  await page.route("**/api/v1/school/members/", (route) => route.fulfill(json([])));
+  await page.route("**/api/v1/school/members/**", (route) =>
+    route.fulfill(json({ count: 0, next: null, previous: null, results: [] })),
+  );
   await page.route("**/api/v1/school/invitations/", (route) => route.fulfill(json([])));
   // An administrator's workspace home is the school; membership tools are in its navigation.
   await page.goto("/dashboard");
@@ -148,10 +150,10 @@ test("school administrators can open the frozen pilot evidence workflow", async 
     route.fulfill(json({ count: 0, next: null, previous: null, results: [] })),
   );
   await page.goto("/research/pilots");
-  await expect(
-    page.getByRole("heading", { name: "Technical-school pilot control room" }),
-  ).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("Create a draft pilot protocol")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Pilot studies", exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.locator("summary", { hasText: "Set up a new pilot study" })).toBeVisible();
 });
 
 test("learners cannot open the school administration route", async ({ page }) => {
@@ -193,6 +195,15 @@ test("an instructor sees a safe error when cross-school evidence is forbidden", 
             safety_errors: 0,
           },
         ],
+      }),
+    ),
+  );
+  await page.route("**/api/v1/instructor/activity/**", (route) =>
+    route.fulfill(
+      json({
+        from: "2026-11-05",
+        to: "2026-11-11",
+        days: [{ date: "2026-11-11", started: 1, completed: 0 }],
       }),
     ),
   );

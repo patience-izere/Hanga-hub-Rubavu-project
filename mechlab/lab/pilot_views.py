@@ -153,7 +153,9 @@ class PilotStudyViewSet(viewsets.ModelViewSet):
     def configuration_options(self, request):
         # Named so it does not shadow APIView.options, the HTTP OPTIONS handler.
         school_ids = _pilot_school_ids(request.user)
-        if not school_ids:
+        # A platform administrator may look before any school exists: an empty set of options,
+        # not a refusal.
+        if not school_ids and not request.user.is_superuser:
             raise PermissionDenied("Pilot configuration is restricted to school staff.")
         schools = School.objects.filter(id__in=school_ids).order_by("name")
         cohorts = self._cohorts_for_schools(school_ids)

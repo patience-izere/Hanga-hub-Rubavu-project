@@ -38,6 +38,45 @@ test("public pages keep readable text contrast in dark mode", async ({ page }) =
   }
 });
 
+test("public pages keep readable text contrast in the light theme", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  for (const path of [
+    "/",
+    "/about",
+    "/features",
+    "/contact",
+    "/login",
+    "/register",
+    "/register-school",
+    "/class",
+  ]) {
+    await page.goto(path);
+    await expect(page.locator("main")).toBeVisible();
+    const results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+    expect(
+      results.violations.flatMap((violation) =>
+        violation.nodes.map((node) => `${path} ${node.target.join(" ")}`),
+      ),
+    ).toEqual([]);
+  }
+});
+
+test("a chosen dark theme overrides a light device and stays readable", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/");
+  // On a phone the switch sits in the menu.
+  await expect(page.locator("main")).toBeVisible();
+  if ((page.viewportSize()?.width ?? 1280) <= 960) {
+    await page.getByRole("button", { name: "Menu" }).click();
+  }
+  await page.getByLabel("Colour theme").selectOption("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.goto("/about");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  const results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+  expect(results.violations).toEqual([]);
+});
+
 test("the public learning hero remains visually stable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Desktop baseline has the canonical snapshot.");
   await page.goto("/about");

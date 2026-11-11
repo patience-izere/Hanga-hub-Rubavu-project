@@ -13,6 +13,7 @@ import { downloadAssignmentAssets, removeAssignmentAssets } from "../offline/out
 import { dueRelative, dueState, formatDue } from "../learning/progress";
 import { useLocale } from "../i18n/LocaleProvider";
 import "../styles/engagement.css";
+import { Breadcrumbs } from "../components/ui/Breadcrumbs";
 
 /** Lessons authored before quizzes existed keep the self-declared readiness check. */
 const READINESS_STATEMENTS: Array<[string, string]> = [
@@ -249,9 +250,12 @@ export function AssignmentPage() {
 
   return (
     <section className="lesson-page brief">
-      <Link className="back-link" to="/learn">
-        ← {t("brief.back")}
-      </Link>
+      <Breadcrumbs
+        items={[
+          { label: t("nav.myLessons"), to: "/learn" },
+          { label: assignment.data?.lesson.title ?? t("brief.back") },
+        ]}
+      />
       <header className="brief-header">
         <div>
           <div className="eyebrow">

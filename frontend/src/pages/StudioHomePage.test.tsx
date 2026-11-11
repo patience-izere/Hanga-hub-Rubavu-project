@@ -10,7 +10,7 @@ afterEach(() => vi.unstubAllGlobals());
 const course = {
   id: 3,
   school: 1,
-  schoolName: "Rubavu Demo Technical School",
+  schoolName: "Kigali Demo Technical School",
   title: "Solar installation",
   slug: "solar",
   trade: "Electrical",

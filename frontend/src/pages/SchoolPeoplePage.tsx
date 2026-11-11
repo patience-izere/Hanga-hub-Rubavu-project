@@ -1,7 +1,12 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { describeApiError } from "@/api/client";
 import type { SchoolMember } from "@/api/school";
+import { Link } from "react-router-dom";
+
+import { Dialog } from "@/components/ui/Dialog";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Pagination, PAGE_SIZE, useDebounced } from "@/components/ui/Pagination";
 import { QueryBoundary } from "@/components/ui/QueryBoundary";
 import {
   useSchoolMembers,
@@ -25,29 +30,19 @@ const ROLE_CONSEQUENCES: Record<SchoolMember["role"], string> = {
 };
 
 export function SchoolPeoplePage() {
-  const members = useSchoolMembers();
+  const [search, setSearch] = useState("");
+  const [role, setRole] = useState<"" | SchoolMember["role"]>("");
+  const [page, setPage] = useState(1);
+  const searchTerm = useDebounced(search.trim());
+  const members = useSchoolMembers({ page, search: searchTerm, role });
   const activation = useSetSchoolMemberActive();
   const roleChange = useUpdateSchoolMember();
   const [pendingRole, setPendingRole] = useState<{
     member: SchoolMember;
     role: SchoolMember["role"];
   } | null>(null);
-  const [search, setSearch] = useState("");
-  const [role, setRole] = useState<"" | SchoolMember["role"]>("");
   const [confirming, setConfirming] = useState<SchoolMember | null>(null);
-
-  const all = useMemo(() => members.data ?? [], [members.data]);
-  const visible = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return all.filter((member) => {
-      if (role && member.role !== role) return false;
-      if (!term) return true;
-      return (
-        member.user.name.toLowerCase().includes(term) ||
-        member.user.email.toLowerCase().includes(term)
-      );
-    });
-  }, [all, search, role]);
+  const filtered = Boolean(searchTerm || role);
 
   function apply(member: SchoolMember, isActive: boolean) {
     activation.mutate({ id: member.id, isActive });
@@ -79,12 +74,8 @@ export function SchoolPeoplePage() {
         query={members}
         loading="Loading members…"
         error="Members could not be loaded."
-        empty={{
-          title: "No members yet",
-          description: "Invite instructors, learners and content authors to populate the school.",
-        }}
       >
-        {() => (
+        {(data) => (
           <>
             <div className="roster-controls">
               <label>
@@ -93,14 +84,20 @@ export function SchoolPeoplePage() {
                   type="search"
                   placeholder="Search by name or email"
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
                 />
               </label>
               <label>
                 Role
                 <select
                   value={role}
-                  onChange={(event) => setRole(event.target.value as typeof role)}
+                  onChange={(event) => {
+                    setRole(event.target.value as typeof role);
+                    setPage(1);
+                  }}
                 >
                   <option value="">All roles</option>
                   {Object.entries(ROLE_LABELS).map(([value, label]) => (
@@ -110,16 +107,39 @@ export function SchoolPeoplePage() {
                   ))}
                 </select>
               </label>
-              <span className="roster-count">
-                {visible.length} of {all.length} member(s)
+              <a
+                className="button button-secondary"
+                href={`/api/v1/school/members/export/?${new URLSearchParams({
+                  ...(searchTerm ? { search: searchTerm } : {}),
+                  ...(role ? { role } : {}),
+                })}`}
+                download
+              >
+                Download CSV
+              </a>
+              <span className="roster-count" aria-live="polite">
+                {data.count.toLocaleString()} {filtered ? "matching " : ""}
+                {data.count === 1 ? "member" : "members"}
               </span>
             </div>
 
-            {visible.length === 0 ? (
-              <p className="field-note">No member matches that search.</p>
+            {data.results.length === 0 ? (
+              filtered ? (
+                <p className="field-note">No member matches that search.</p>
+              ) : (
+                <EmptyState
+                  title="No members yet"
+                  description="Invite instructors, learners and content authors from Invitations, or create a class with sign-in slips."
+                  action={
+                    <Link className="button button-primary" to="/school/invitations">
+                      Invite people
+                    </Link>
+                  }
+                />
+              )
             ) : (
               <div className="member-grid">
-                {visible.map((member) => (
+                {data.results.map((member) => (
                   <article key={member.id} className={member.is_active ? "" : "is-suspended"}>
                     <div>
                       <strong>{member.user.name}</strong>
@@ -163,78 +183,72 @@ export function SchoolPeoplePage() {
                 ))}
               </div>
             )}
+            <Pagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={data.count}
+              onPage={(next) => {
+                setPage(next);
+                window.scrollTo({ top: 0, behavior: "instant" });
+              }}
+              label="members"
+            />
           </>
         )}
       </QueryBoundary>
 
       {pendingRole ? (
-        <div className="modal-backdrop" role="presentation" onClick={() => setPendingRole(null)}>
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="role-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="role-title">
-              Make {pendingRole.member.user.name} {ROLE_LABELS[pendingRole.role].toLowerCase()}?
-            </h2>
-            <p>{ROLE_CONSEQUENCES[pendingRole.role]}</p>
-            {pendingRole.member.role === "learner" ? (
-              <p>
-                They leave their classes. Their attempts and results are kept and stay visible to
-                instructors.
-              </p>
-            ) : null}
-            <div className="modal-actions">
-              <button className="button button-secondary" onClick={() => setPendingRole(null)}>
-                Cancel
-              </button>
-              <button
-                className="button button-primary"
-                disabled={roleChange.isPending}
-                onClick={() =>
-                  roleChange.mutate(
-                    { id: pendingRole.member.id, role: pendingRole.role },
-                    { onSettled: () => setPendingRole(null) },
-                  )
-                }
-              >
-                {roleChange.isPending ? "Saving…" : "Change role"}
-              </button>
-            </div>
+        <Dialog labelledBy="role-title" onClose={() => setPendingRole(null)}>
+          <h2 id="role-title">
+            Make {pendingRole.member.user.name} {ROLE_LABELS[pendingRole.role].toLowerCase()}?
+          </h2>
+          <p>{ROLE_CONSEQUENCES[pendingRole.role]}</p>
+          {pendingRole.member.role === "learner" ? (
+            <p>
+              They leave their classes. Their attempts and results are kept and stay visible to
+              instructors.
+            </p>
+          ) : null}
+          <div className="modal-actions">
+            <button className="button button-secondary" onClick={() => setPendingRole(null)}>
+              Cancel
+            </button>
+            <button
+              className="button button-primary"
+              disabled={roleChange.isPending}
+              onClick={() =>
+                roleChange.mutate(
+                  { id: pendingRole.member.id, role: pendingRole.role },
+                  { onSettled: () => setPendingRole(null) },
+                )
+              }
+            >
+              {roleChange.isPending ? "Saving…" : "Change role"}
+            </button>
           </div>
-        </div>
+        </Dialog>
       ) : null}
 
       {confirming ? (
-        <div className="modal-backdrop" role="presentation" onClick={() => setConfirming(null)}>
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="suspend-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="suspend-title">Suspend {confirming.user.name}?</h2>
-            <p>
-              They lose access to this school immediately. Their attempts, evidence and results are
-              retained, and you can reactivate them at any time.
-            </p>
-            <div className="modal-actions">
-              <button className="button button-secondary" onClick={() => setConfirming(null)}>
-                Cancel
-              </button>
-              <button
-                className="button button-primary"
-                onClick={() => apply(confirming, false)}
-                disabled={activation.isPending}
-              >
-                {activation.isPending ? "Suspending…" : "Suspend access"}
-              </button>
-            </div>
+        <Dialog labelledBy="suspend-title" onClose={() => setConfirming(null)}>
+          <h2 id="suspend-title">Suspend {confirming.user.name}?</h2>
+          <p>
+            They lose access to this school immediately. Their attempts, evidence and results are
+            retained, and you can reactivate them at any time.
+          </p>
+          <div className="modal-actions">
+            <button className="button button-secondary" onClick={() => setConfirming(null)}>
+              Cancel
+            </button>
+            <button
+              className="button button-primary"
+              onClick={() => apply(confirming, false)}
+              disabled={activation.isPending}
+            >
+              {activation.isPending ? "Suspending…" : "Suspend access"}
+            </button>
           </div>
-        </div>
+        </Dialog>
       ) : null}
     </section>
   );

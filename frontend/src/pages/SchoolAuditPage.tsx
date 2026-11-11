@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { auditQuery } from "@/api/school";
 import { QueryBoundary } from "@/components/ui/QueryBoundary";
 import { auditLabel } from "@/school/auditLabels";
 import { useSchoolAudit } from "@/school/useSchoolAdmin";
@@ -23,7 +24,16 @@ function payloadSummary(payload: Record<string, unknown>): string {
  */
 export function SchoolAuditPage() {
   const [eventType, setEventType] = useState("");
-  const audit = useSchoolAudit(eventType);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const filters = {
+    eventType: eventType || undefined,
+    from: from || undefined,
+    to: to || undefined,
+  };
+  const audit = useSchoolAudit(filters);
+  const exportQuery = auditQuery(filters).toString();
+  const filtered = Boolean(eventType || from || to);
 
   return (
     <section className="dashboard audit-page">
@@ -60,6 +70,44 @@ export function SchoolAuditPage() {
                     ))}
                   </select>
                 </label>
+                <label>
+                  From
+                  <input
+                    type="date"
+                    value={from}
+                    max={to || undefined}
+                    onChange={(event) => setFrom(event.target.value)}
+                  />
+                </label>
+                <label>
+                  To
+                  <input
+                    type="date"
+                    value={to}
+                    min={from || undefined}
+                    onChange={(event) => setTo(event.target.value)}
+                  />
+                </label>
+                {filtered ? (
+                  <button
+                    type="button"
+                    className="button-link"
+                    onClick={() => {
+                      setEventType("");
+                      setFrom("");
+                      setTo("");
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                ) : null}
+                <a
+                  className="button button-secondary"
+                  href={`/api/v1/school/audit/export/${exportQuery ? `?${exportQuery}` : ""}`}
+                  download
+                >
+                  Download CSV
+                </a>
                 <span className="audit-count">
                   {events.length} {events.length === 1 ? "entry" : "entries"}
                   {audit.hasNextPage ? " shown" : ""}
@@ -68,8 +116,8 @@ export function SchoolAuditPage() {
 
               {events.length === 0 ? (
                 <p className="field-note">
-                  {eventType
-                    ? "No entries of that type yet."
+                  {filtered
+                    ? "No entries match these filters."
                     : "Nothing has been recorded for this school yet."}
                 </p>
               ) : (

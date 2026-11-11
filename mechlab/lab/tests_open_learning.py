@@ -38,7 +38,7 @@ class SeededTestCase(TestCase):
         call_command("seed_demo", "--password", PASSWORD, stdout=StringIO())
         cls.learner = User.objects.get(username="learner@opedu.local")
         cls.instructor = User.objects.get(username="instructor@opedu.local")
-        cls.school = School.objects.get(code="rubavu-demo-tss")
+        cls.school = School.objects.get(code="kigali-demo-tss")
         cls.cohort = Cohort.objects.get(school=cls.school, code="auto-2026")
 
     def setUp(self):
@@ -501,7 +501,7 @@ class OpenLearningTests(SeededTestCase):
                 "kind": "workshop",
                 "contactName": "Marie Ingabire",
                 "email": "Marie@garage.example",
-                "district": "Rubavu",
+                "district": "Kigali",
             },
             content_type="application/json",
         )

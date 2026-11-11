@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { describeApiError } from "../api/client";
@@ -14,6 +14,7 @@ import {
   type EditableDefinition,
 } from "../components/authoring/InteractionEditors";
 import { LocalPractice } from "../components/simulation/LocalPractice";
+import { useDialogFocus } from "../components/ui/Dialog";
 import { resolvedSteps, variantsOf } from "../procedure/variants";
 import "../styles/authoring.css";
 import { useCurrentUser } from "../auth/useAuth";
@@ -28,6 +29,7 @@ import {
   useTransitionAuthoredScenario,
   useUpdateAuthoredScenario,
 } from "../learning/useContentAuthoring";
+import { Breadcrumbs } from "../components/ui/Breadcrumbs";
 
 type Hint = { code: string; order?: number; text: string; points_penalty: number };
 type Action = { action_code: string; label: string; is_primary: boolean; tolerance?: unknown };
@@ -357,12 +359,16 @@ function PracticePreview({
   const [variant, setVariant] = useState(variants[0]?.code ?? "");
   const [run, setRun] = useState(0);
   const steps = resolvedSteps(definition, variant);
+  const overlay = useRef<HTMLDivElement>(null);
+  useDialogFocus(overlay, onClose);
   return (
     <div
+      ref={overlay}
       className="studio-preview-overlay"
       role="dialog"
       aria-modal="true"
       aria-label="Try the practical"
+      tabIndex={-1}
     >
       <div className="studio-preview-bar">
         <strong>Preview: nothing is recorded</strong>
@@ -534,12 +540,15 @@ export function ContentAuthoringPage({ canPublish }: { canPublish: boolean }) {
 
   return (
     <section className="dashboard studio-page">
-      <Link
-        className="studio-back-link"
-        to={lesson.data ? `/authoring/lessons/${lesson.data.id}` : "/authoring"}
-      >
-        ← {lesson.data ? lesson.data.title : "All lessons"}
-      </Link>
+      <Breadcrumbs
+        items={[
+          { label: "Module Studio", to: "/authoring" },
+          ...(lesson.data
+            ? [{ label: lesson.data.title, to: `/authoring/lessons/${lesson.data.id}` }]
+            : []),
+          { label: `Practical, version ${data.version}` },
+        ]}
+      />
       <div className="dashboard-heading">
         <div>
           <div className="eyebrow">Practical scenario · version {data.version}</div>

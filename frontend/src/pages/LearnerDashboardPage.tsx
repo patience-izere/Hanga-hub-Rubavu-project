@@ -96,8 +96,13 @@ export function LearnerDashboardPage() {
         empty={{
           title: "No lessons yet",
           description:
-            "Your instructor's lessons appear here. You can also add lessons yourself from Find more lessons.",
+            "Lessons your instructor assigns appear here. You can also pick a lesson yourself.",
           symbol: "⚙",
+          action: (
+            <Link className="button button-primary" to="/learn/catalogue">
+              Find a lesson
+            </Link>
+          ),
         }}
       >
         {(items) => {

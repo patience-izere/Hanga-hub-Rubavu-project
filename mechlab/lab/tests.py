@@ -208,7 +208,7 @@ class ApiAuthenticationTests(TestCase):
             first_name="API",
             last_name="Learner",
         )
-        self.school = School.objects.create(name="Rubavu TSS", code="rubavu-auth")
+        self.school = School.objects.create(name="Kigali TSS", code="kigali-auth")
         SchoolMembership.objects.create(
             school=self.school,
             user=self.user,
@@ -262,9 +262,10 @@ class ApiAuthenticationTests(TestCase):
         )
         self.assertEqual(rejected.status_code, 400)
 
-    def test_me_requires_authentication(self):
+    def test_me_answers_signed_out_visitors_without_an_error(self):
         response = self.client.get(reverse("api-auth-me"))
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["user"])
 
     def test_me_reports_the_platform_administrator_role(self):
         self.user.is_staff = True
@@ -295,7 +296,7 @@ class ApiAuthenticationTests(TestCase):
         )
         self.assertEqual(accepted.status_code, 200)
         self.assertEqual(accepted.json()["user"]["email"], self.email)
-        self.assertEqual(accepted.json()["user"]["organization"], "Rubavu TSS")
+        self.assertEqual(accepted.json()["user"]["organization"], "Kigali TSS")
 
         me = self.client.get(reverse("api-auth-me"))
         self.assertEqual(me.status_code, 200)
@@ -1156,7 +1157,7 @@ class LearningApiTests(TestCase):
         self.learner = User.objects.create_user("learner@example.com", password="password-123")
         self.other_learner = User.objects.create_user("other@example.com", password="password-123")
         self.school_admin = User.objects.create_user("admin@example.com", password="password-123")
-        self.school = School.objects.create(name="Rubavu Test School", code="rubavu-test")
+        self.school = School.objects.create(name="Kigali Test School", code="kigali-test")
         SchoolMembership.objects.create(
             school=self.school,
             user=self.instructor,
@@ -2332,7 +2333,7 @@ class LearningApiTests(TestCase):
 class PilotWorkflowTests(TestCase):
     def setUp(self):
         call_command("seed_demo", stdout=StringIO())
-        self.school = School.objects.get(code="rubavu-demo-tss")
+        self.school = School.objects.get(code="kigali-demo-tss")
         self.admin = User.objects.get(username="admin@opedu.local")
         self.instructor = User.objects.get(username="instructor@opedu.local")
         self.learner = User.objects.get(username="learner@opedu.local")
@@ -2428,7 +2429,7 @@ class PilotWorkflowTests(TestCase):
                     "status": "approved",
                     "approver_name": f"Approved {domain}",
                     "approver_role": f"{domain} owner",
-                    "organization": "Rubavu Demo TSS",
+                    "organization": "Kigali Demo TSS",
                     "evidence_reference": f"controlled://approvals/{domain}/v1",
                     "scope": "Battery pilot v1 only.",
                     "decision_at": decided_at,
@@ -2749,7 +2750,7 @@ class TenantIsolationTests(TestCase):
         self.assertTrue(superuser.is_active)
         self.assertTrue(self.learner.is_active)
         # The suspended learner's existing session ends and sign-in explains why.
-        self.assertEqual(learner_client.get("/api/v1/auth/me/").status_code, 401)
+        self.assertIsNone(learner_client.get("/api/v1/auth/me/").json()["user"])
         login = Client().post(
             "/api/v1/auth/login/",
             {"email": "learner@example.com", "password": "password-123"},
@@ -3846,7 +3847,7 @@ class SchoolAdministrationTests(TestCase):
 
     def setUp(self):
         cache.clear()
-        self.school = School.objects.create(name="Rubavu Admin School", code="rubavu-admin")
+        self.school = School.objects.create(name="Kigali Admin School", code="kigali-admin")
         self.admin = User.objects.create_user("admin@school.test", "admin@school.test", "pw-123")
         self.colleague = User.objects.create_user("staff@school.test", "staff@school.test", "pw-1")
         self.learner = User.objects.create_user("learner@school.test", "learner@school.test", "pw")

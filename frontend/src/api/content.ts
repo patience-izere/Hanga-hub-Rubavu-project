@@ -103,6 +103,19 @@ export async function transitionAuthoredScenario(
   });
 }
 
+/** A new, empty draft package for a course: the place uploads go before publishing. */
+export function createAuthoredAssetPackage(input: {
+  course: number;
+  code: string;
+  version: number;
+  name: string;
+}): Promise<AuthoredAssetPackage> {
+  return send<AuthoredAssetPackage>("/api/v1/content/asset-packages/", "POST", {
+    ...input,
+    manifest: {},
+  });
+}
+
 export async function listAuthoredAssetPackages() {
   const response = await apiFetch<AssetPackagePage>(
     "/api/v1/content/asset-packages/?ordering=-updated_at&page_size=200",

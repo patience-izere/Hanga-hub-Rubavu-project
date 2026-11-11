@@ -6,6 +6,7 @@ import { describeApiError, type User } from "../api/client";
 import { joinClass, previewClass } from "../api/open";
 import { authQueryKey } from "../auth/useAuth";
 import { useLocale } from "../i18n/LocaleProvider";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 /**
  * Joining a class with the code an instructor shows on the board.
@@ -183,10 +184,10 @@ export function ClassJoinPage({ user }: { user: User | null }) {
             onChange={(event) => setPhone(event.target.value)}
           />
           <label htmlFor="pin">{t("join.choosePin")}</label>
-          <input
+          <PasswordInput
+            noun="PIN"
             id="pin"
             className="pin-input"
-            type="password"
             inputMode="numeric"
             pattern="[0-9]{6}"
             maxLength={6}
@@ -196,10 +197,10 @@ export function ClassJoinPage({ user }: { user: User | null }) {
             required
           />
           <label htmlFor="pin-again">{t("join.pinAgain")}</label>
-          <input
+          <PasswordInput
+            noun="PIN"
             id="pin-again"
             className="pin-input"
-            type="password"
             inputMode="numeric"
             pattern="[0-9]{6}"
             maxLength={6}

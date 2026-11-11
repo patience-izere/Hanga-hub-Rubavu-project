@@ -36,8 +36,13 @@ export function LearnerProgressPage() {
         error="Your attempts could not be loaded."
         empty={{
           title: "No attempts yet",
-          description: "Open a lesson to make your first attempt.",
+          description: "Your scores and certificates appear here after your first attempt.",
           symbol: "⚙",
+          action: (
+            <Link className="button button-primary" to="/learn">
+              Go to my lessons
+            </Link>
+          ),
         }}
       >
         {(items) => {

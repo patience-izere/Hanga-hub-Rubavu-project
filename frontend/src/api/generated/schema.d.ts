@@ -414,6 +414,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contact/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Public: send an enquiry. Platform administrators: read them. */
+        get: operations["api_v1_contact_list"];
+        put?: never;
+        /** @description Public: send an enquiry. Platform administrators: read them. */
+        post: operations["api_v1_contact_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contact/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description Mark an enquiry as handled, or not. */
+        patch: operations["api_v1_contact_partial_update"];
+        trace?: never;
+    };
     "/api/v1/content/asset-packages/": {
         parameters: {
             query?: never;
@@ -798,6 +833,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/instructor/activity/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Attempts started and finished per day, for the Teaching overview chart.
+         *
+         *     ?from= and ?to= are dates (YYYY-MM-DD, inclusive); the default is the last 30 days. A range
+         *     is limited to a year so the answer stays small.
+         */
+        get: operations["api_v1_instructor_activity_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/instructor/assignments/": {
         parameters: {
             query?: never;
@@ -1002,6 +1059,41 @@ export interface paths {
         get: operations["api_v1_open_status_retrieve"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/registrations/{id}/{decision}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Approve a registration (creating the organisation and inviting its contact) or decline. */
+        post: operations["api_v1_platform_registrations_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/schools/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List organisations and pending requests, or create an organisation. */
+        get: operations["api_v1_platform_schools_retrieve"];
+        put?: never;
+        /** @description List organisations and pending requests, or create an organisation. */
+        post: operations["api_v1_platform_schools_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1258,6 +1350,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/school/audit/export/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The audit trail as CSV, with the same filters as the page. */
+        get: operations["api_v1_school_audit_export_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/school/cohorts/": {
         parameters: {
             query?: never;
@@ -1379,6 +1488,23 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["api_v1_school_members_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/school/members/export/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Everyone in the administered schools as CSV, with the People page's filters. */
+        get: operations["api_v1_school_members_export_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/school/overview/": {
@@ -1857,6 +1983,27 @@ export interface components {
             mastery_state: components["schemas"]["MasteryStateEnum"];
             evidence?: unknown;
         };
+        ContactMessage: {
+            readonly id: number;
+            name: string;
+            /** Format: email */
+            email: string;
+            organisation?: string;
+            topic?: components["schemas"]["TopicEnum"];
+            readonly topicLabel: string;
+            message: string;
+            readonly handled: boolean;
+            /** Format: date-time */
+            readonly createdAt: string;
+        };
+        ContactMessageRequest: {
+            name: string;
+            /** Format: email */
+            email: string;
+            organisation?: string;
+            topic?: components["schemas"]["TopicEnum"];
+            message: string;
+        };
         ContentHistoryEntry: {
             id: number;
             eventType: string;
@@ -1927,6 +2074,19 @@ export interface components {
          * @enum {string}
          */
         HazardSnapshotSeverityEnum: "low" | "medium" | "high" | "critical";
+        InstructorActivity: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            days: components["schemas"]["InstructorActivityDay"][];
+        };
+        InstructorActivityDay: {
+            /** Format: date */
+            date: string;
+            started: number;
+            completed: number;
+        };
         InstructorAssignmentCreateRequest: {
             scenarioId: number;
             learnerIds?: number[];
@@ -2280,6 +2440,13 @@ export interface components {
             password: string;
         };
         /**
+         * @description * `school` - Technical school
+         *     * `workshop` - Garage or workshop
+         *     * `hub` - Training hub
+         * @enum {string}
+         */
+        OrganisationKindEnum: "school" | "workshop" | "hub";
+        /**
          * @description * `pass` - pass
          *     * `fail` - fail
          *     * `insufficient` - insufficient
@@ -2490,6 +2657,9 @@ export interface components {
             estimatedMinutes?: number;
             language?: components["schemas"]["LanguageEnum"];
             competencies?: number[];
+        };
+        PatchedContactHandledInputRequest: {
+            handled?: boolean;
         };
         /** @description Change one learner's assignment: extend the deadline or allow more attempts. */
         PatchedInstructorAssignmentUpdateRequest: {
@@ -2873,6 +3043,25 @@ export interface components {
         PilotTransitionRequest: {
             action: components["schemas"]["PilotTransitionActionEnum"];
         };
+        PlatformOverview: {
+            schools: components["schemas"]["PlatformSchool"][];
+            requests: components["schemas"]["RegistrationRequest"][];
+            emailConfigured: boolean;
+        };
+        PlatformSchool: {
+            readonly id: number;
+            name: string;
+            code: string;
+            kind?: components["schemas"]["OrganisationKindEnum"];
+            readonly kindLabel: string;
+            readonly isActive: boolean;
+            readonly isOpen: boolean;
+            readonly researchEnabled: boolean;
+            readonly memberCount: number;
+            readonly adminCount: number;
+            /** Format: date-time */
+            readonly createdAt: string;
+        };
         ProcedureStep: {
             readonly id: number;
             order: number;
@@ -2900,6 +3089,34 @@ export interface components {
                 };
             };
         };
+        RegistrationDecisionResult: {
+            request: components["schemas"]["RegistrationRequest"];
+            school?: components["schemas"]["PlatformSchool"] | null;
+            acceptUrl?: string;
+            emailSent?: boolean;
+        };
+        RegistrationRequest: {
+            readonly id: number;
+            organisationName: string;
+            kind?: components["schemas"]["OrganisationKindEnum"];
+            kindLabel: string;
+            district?: string;
+            contactName: string;
+            /** Format: email */
+            email: string;
+            phone?: string;
+            message?: string;
+            status?: components["schemas"]["RegistrationStatusEnum"];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /**
+         * @description * `pending` - Pending
+         *     * `approved` - Approved
+         *     * `declined` - Declined
+         * @enum {string}
+         */
+        RegistrationStatusEnum: "pending" | "approved" | "declined";
         /**
          * @description * `accessible_2d` - Accessible 2D
          *     * `desktop_3d` - Desktop 3D
@@ -3024,6 +3241,12 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
+        SchoolCreateInputRequest: {
+            name: string;
+            kind?: components["schemas"]["OrganisationKindEnum"];
+            /** @default true */
+            joinAsAdministrator: boolean;
+        };
         SchoolInvitation: {
             readonly id: number;
             readonly school: components["schemas"]["SchoolSummary"];
@@ -3093,16 +3316,9 @@ export interface components {
             }[];
             recentAudit: components["schemas"]["AuditEvent"][];
         };
-        /**
-         * @description * `school` - Technical school
-         *     * `workshop` - Garage or workshop
-         *     * `hub` - Training hub
-         * @enum {string}
-         */
-        SchoolRegistrationRequestInputKindEnum: "school" | "workshop" | "hub";
         SchoolRegistrationRequestInputRequest: {
             organisationName: string;
-            kind?: components["schemas"]["SchoolRegistrationRequestInputKindEnum"];
+            kind?: components["schemas"]["OrganisationKindEnum"];
             district?: string;
             contactName: string;
             /** Format: email */
@@ -3209,6 +3425,15 @@ export interface components {
             readonly name: string;
             readonly description: string;
         };
+        /**
+         * @description * `school_pilot` - School pilot
+         *     * `technical_validation` - Technical validation
+         *     * `curriculum` - Curriculum collaboration
+         *     * `partnership` - Platform partnership
+         *     * `general` - General enquiry
+         * @enum {string}
+         */
+        TopicEnum: "school_pilot" | "technical_validation" | "curriculum" | "partnership" | "general";
     };
     responses: never;
     parameters: never;
@@ -3903,6 +4128,79 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    api_v1_contact_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactMessage"][];
+                };
+            };
+        };
+    };
+    api_v1_contact_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactMessageRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ContactMessageRequest"];
+                "multipart/form-data": components["schemas"]["ContactMessageRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    api_v1_contact_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedContactHandledInputRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedContactHandledInputRequest"];
+                "multipart/form-data": components["schemas"]["PatchedContactHandledInputRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactMessage"];
                 };
             };
         };
@@ -4822,6 +5120,28 @@ export interface operations {
             };
         };
     };
+    api_v1_instructor_activity_retrieve: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructorActivity"];
+                };
+            };
+        };
+    };
     api_v1_instructor_assignments_retrieve: {
         parameters: {
             query?: never;
@@ -5144,6 +5464,72 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    api_v1_platform_registrations_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                decision: string;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationDecisionResult"];
+                };
+            };
+        };
+    };
+    api_v1_platform_schools_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformOverview"];
+                };
+            };
+        };
+    };
+    api_v1_platform_schools_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchoolCreateInputRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["SchoolCreateInputRequest"];
+                "multipart/form-data": components["schemas"]["SchoolCreateInputRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformSchool"];
                 };
             };
         };
@@ -5872,6 +6258,25 @@ export interface operations {
             };
         };
     };
+    api_v1_school_audit_export_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+        };
+    };
     api_v1_school_cohorts_retrieve: {
         parameters: {
             query?: never;
@@ -6057,7 +6462,15 @@ export interface operations {
     };
     api_v1_school_members_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Page number; omit for all. */
+                page?: number;
+                /** @description At most 200. */
+                page_size?: number;
+                role?: string;
+                /** @description Name or email. */
+                search?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6097,6 +6510,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SchoolMember"];
+                };
+            };
+        };
+    };
+    api_v1_school_members_export_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
                 };
             };
         };
