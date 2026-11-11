@@ -5,6 +5,8 @@ import type { MessageKey } from "./messages";
  * it is relied on. Lesson content is not translated here; it is authored per language.
  */
 export const sw: Partial<Record<MessageKey, string>> = {
+  home: "Nyumbani",
+  courses: "Kozi",
   "shell.menu": "Menyu",
   "shell.closeMenu": "Funga",
   "theme.label": "Mandhari ya rangi",
@@ -203,7 +205,7 @@ export const sw: Partial<Record<MessageKey, string>> = {
   "result.result": "matokeo",
   "result.practiseAgain": "Fanya mazoezi tena",
   "result.tryAssessed": "Jaribu jaribio jingine linalopimwa",
-  "result.certificate": "Angalia na shiriki cheti chako",
+  "result.certificate": "Angalia na shiriki rekodi yako ya mazoezi",
   "result.stepByStep": "Hatua kwa hatua",
   "result.rightFirst": "Sahihi mara ya kwanza",
   "result.backToLearning": "Rudi kwenye masomo yangu",

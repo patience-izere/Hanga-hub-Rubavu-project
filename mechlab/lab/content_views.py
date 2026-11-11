@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Max, ProtectedError, Q
 from django.utils import timezone
 from django.utils.text import slugify
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -34,11 +34,13 @@ from .content_serializers import (
 from .models import (
     AssetFile,
     AssetPackage,
+    Assignment,
     AuditEvent,
     Competency,
     Course,
     GradingPolicy,
     Lesson,
+    Module,
     School,
     SchoolMembership,
     SimulationScenario,
@@ -68,6 +70,21 @@ def _may_edit_draft(user, author_id, school):
         author_id in {None, user.pk}
         or user.is_superuser
         or has_active_school_role(user, [SchoolMembership.Role.ADMIN], school=school)
+    )
+
+
+def _may_manage_course(user, course):
+    """Platform administrators, and administrators of the course's school."""
+
+    return user.is_superuser or has_active_school_role(
+        user, [SchoolMembership.Role.ADMIN], school=course.school
+    )
+
+
+def _admins_only():
+    return Response(
+        {"detail": "Only a school administrator can do this."},
+        status=status.HTTP_403_FORBIDDEN,
     )
 
 
@@ -760,7 +777,7 @@ class AuthoringCourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.none()
     serializer_class = AuthoringCourseSerializer
     permission_classes = [IsContentAuthorOrSchoolAdmin]
-    http_method_names = ["get", "post", "patch", "head", "options"]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
     pagination_class = None
     ordering = ["title"]
 
@@ -796,7 +813,153 @@ class AuthoringCourseViewSet(viewsets.ModelViewSet):
             serializer.validated_data["school"] != serializer.instance.school
         ):
             raise PermissionDenied("A course cannot move to another school.")
-        serializer.save()
+        course = serializer.save()
+        record_audit_event(
+            event_type="content.course_updated",
+            actor=self.request.user,
+            school=course.school,
+            target=course,
+            payload={"fields": sorted(self.request.data.keys())},
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        course = self.get_object()
+        if not _may_manage_course(request.user, course):
+            return _admins_only()
+        if Assignment.objects.filter(lesson__course=course).exists():
+            return Response(
+                {
+                    "detail": "Learners have work in this course, so it cannot be deleted. "
+                    "Unpublish it instead: it disappears from catalogues and the evidence is kept."
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        if course.asset_packages.exclude(status=AssetPackage.Status.DRAFT).exists():
+            return Response(
+                {
+                    "detail": "This course has published asset packages, which are kept for the "
+                    "record. Unpublish the course instead."
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        record_audit_event(
+            event_type="content.course_deleted",
+            actor=request.user,
+            school=course.school,
+            target=course.school,
+            payload={"courseId": course.pk, "title": course.title},
+        )
+        with transaction.atomic():
+            for package in course.asset_packages.all():
+                for asset in package.files.all():
+                    if not asset.path.startswith(("/", "http://", "https://")):
+                        default_storage.delete(asset.path)
+                package.delete()
+            course.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @extend_schema(request=ModuleOptionSerializer, responses=ModuleOptionSerializer)
+    @action(detail=True, methods=["patch", "delete"], url_path=r"modules/(?P<module_id>\d+)")
+    def module_detail(self, request, pk=None, module_id=None):
+        """Rename or describe a module, move it up or down, or delete it when it is empty."""
+
+        course = self.get_object()
+        module = course.modules.filter(pk=module_id).first()
+        if module is None:
+            return Response({"detail": "Module not found."}, status=status.HTTP_404_NOT_FOUND)
+        if request.method == "DELETE":
+            if module.lessons.exists():
+                return Response(
+                    {"detail": "Move or delete this module's lessons first."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            record_audit_event(
+                event_type="content.module_deleted",
+                actor=request.user,
+                school=course.school,
+                target=course,
+                payload={"moduleId": module.pk, "title": module.title},
+            )
+            module.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        serializer = ModuleOptionSerializer(module, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        move = request.data.get("move")
+        with transaction.atomic():
+            serializer.save()
+            if move in {"up", "down"}:
+                ordered = list(course.modules.order_by("order", "pk"))
+                index = ordered.index(module)
+                swap = index - 1 if move == "up" else index + 1
+                if 0 <= swap < len(ordered):
+                    ordered[index], ordered[swap] = ordered[swap], ordered[index]
+                    # Two passes so the unique (course, order) constraint never sees a clash.
+                    for position, item in enumerate(ordered, start=1):
+                        Module.objects.filter(pk=item.pk).update(order=1000 + position)
+                    for position, item in enumerate(ordered, start=1):
+                        Module.objects.filter(pk=item.pk).update(order=position)
+            record_audit_event(
+                event_type="content.module_updated",
+                actor=request.user,
+                school=course.school,
+                target=module,
+                payload={"fields": sorted(request.data.keys())},
+            )
+        module.refresh_from_db()
+        return Response(ModuleOptionSerializer(module).data)
+
+    @extend_schema(request=CompetencyOptionSerializer, responses=CompetencyOptionSerializer)
+    @action(
+        detail=True, methods=["patch", "delete"], url_path=r"competencies/(?P<competency_id>\d+)"
+    )
+    def competency_detail(self, request, pk=None, competency_id=None):
+        """Edit a competency, or delete it while no learner has evidence against it."""
+
+        course = self.get_object()
+        competency = course.competencies.filter(pk=competency_id).first()
+        if competency is None:
+            return Response({"detail": "Competency not found."}, status=status.HTTP_404_NOT_FOUND)
+        if request.method == "DELETE":
+            if Assignment.objects.filter(lesson__competencies=competency).exists():
+                return Response(
+                    {
+                        "detail": "Learners have been assessed against this competency, so it is "
+                        "kept for their records. Edit its wording instead."
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            record_audit_event(
+                event_type="content.competency_deleted",
+                actor=request.user,
+                school=course.school,
+                target=course,
+                payload={"competencyId": competency.pk, "code": competency.code},
+            )
+            try:
+                competency.delete()
+            except ProtectedError:
+                return Response(
+                    {"detail": "This competency is referenced by recorded results and is kept."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        serializer = CompetencyOptionSerializer(competency, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        code = serializer.validated_data.get("code", competency.code).strip().upper()
+        if course.competencies.filter(code=code).exclude(pk=competency.pk).exists():
+            return Response(
+                {"detail": f"This course already has a competency coded {code}."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        serializer.save(code=code)
+        record_audit_event(
+            event_type="content.competency_updated",
+            actor=request.user,
+            school=course.school,
+            target=competency,
+            payload={"fields": sorted(request.data.keys())},
+        )
+        return Response(serializer.data)
 
     @extend_schema(request=CompetencyOptionSerializer, responses=CompetencyOptionSerializer)
     @action(detail=True, methods=["post"])
@@ -886,11 +1049,22 @@ class AuthoringLessonViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         lesson = self.get_object()
         if lesson.status != Lesson.Status.DRAFT:
-            return Response(
-                {"detail": "Only a draft lesson can be edited. Ask a reviewer to return it."},
-                status=status.HTTP_409_CONFLICT,
-            )
-        if not _may_edit_draft(request.user, lesson.authored_by_id, lesson.course.school):
+            # Administrators may correct a lesson in any status. Its practical keeps its own
+            # versions, so what learners already practised is unchanged.
+            if not _may_manage_course(request.user, lesson.course):
+                return Response(
+                    {
+                        "detail": "Only a draft lesson can be edited by its author. A school "
+                        "administrator can edit it in any status."
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if "course" in request.data and int(request.data["course"]) != lesson.course_id:
+                return Response(
+                    {"course": ["A lesson that has left draft cannot move to another course."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        elif not _may_edit_draft(request.user, lesson.authored_by_id, lesson.course.school):
             return _not_your_draft()
         response = super().update(request, *args, **kwargs)
         record_audit_event(
@@ -898,18 +1072,35 @@ class AuthoringLessonViewSet(viewsets.ModelViewSet):
             actor=request.user,
             school=lesson.course.school,
             target=lesson,
-            payload={"fields": sorted(request.data.keys())},
+            payload={"fields": sorted(request.data.keys()), "status": lesson.status},
         )
         return response
 
+    def perform_update(self, serializer):
+        # update() has already checked that only an administrator edits a lesson past draft.
+        serializer.instance.administrator_edit = serializer.instance.status != Lesson.Status.DRAFT
+        serializer.save()
+
     def destroy(self, request, *args, **kwargs):
         lesson = self.get_object()
-        if lesson.status != Lesson.Status.DRAFT or lesson.scenarios.exists():
+        if lesson.status != Lesson.Status.DRAFT and not _may_manage_course(
+            request.user, lesson.course
+        ):
             return Response(
-                {"detail": "Only a draft lesson without scenarios can be deleted."},
+                {"detail": "Only a school administrator can delete a lesson that left draft."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if Assignment.objects.filter(lesson=lesson).exists():
+            return Response(
+                {
+                    "detail": "Learners have work on this lesson, so it cannot be deleted. Retire "
+                    "it instead: it stops being offered and the evidence is kept."
+                },
                 status=status.HTTP_409_CONFLICT,
             )
-        if not _may_edit_draft(request.user, lesson.authored_by_id, lesson.course.school):
+        if lesson.status == Lesson.Status.DRAFT and not _may_edit_draft(
+            request.user, lesson.authored_by_id, lesson.course.school
+        ):
             return _not_your_draft()
         record_audit_event(
             event_type="content.lesson_deleted",

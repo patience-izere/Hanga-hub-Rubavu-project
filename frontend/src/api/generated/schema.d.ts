@@ -442,7 +442,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** @description Mark an enquiry as handled, or not. */
+        delete: operations["api_v1_contact_destroy"];
         options?: never;
         head?: never;
         /** @description Mark an enquiry as handled, or not. */
@@ -574,7 +575,8 @@ export interface paths {
         get: operations["api_v1_content_courses_retrieve"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** @description Courses, with their modules and competencies, that an author can build lessons in. */
+        delete: operations["api_v1_content_courses_destroy"];
         options?: never;
         head?: never;
         /** @description Courses, with their modules and competencies, that an author can build lessons in. */
@@ -598,6 +600,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/content/courses/{id}/competencies/{competency_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Edit a competency, or delete it while no learner has evidence against it. */
+        delete: operations["api_v1_content_courses_competencies_destroy"];
+        options?: never;
+        head?: never;
+        /** @description Edit a competency, or delete it while no learner has evidence against it. */
+        patch: operations["api_v1_content_courses_competencies_partial_update"];
+        trace?: never;
+    };
     "/api/v1/content/courses/{id}/modules/": {
         parameters: {
             query?: never;
@@ -613,6 +633,24 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content/courses/{id}/modules/{module_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Rename or describe a module, move it up or down, or delete it when it is empty. */
+        delete: operations["api_v1_content_courses_modules_destroy"];
+        options?: never;
+        head?: never;
+        /** @description Rename or describe a module, move it up or down, or delete it when it is empty. */
+        patch: operations["api_v1_content_courses_modules_partial_update"];
         trace?: never;
     };
     "/api/v1/content/grading-policies/": {
@@ -816,6 +854,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/courses/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Every published course, with who can take it. Anyone may look. */
+        get: operations["public_courses_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{slug}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description One course's full description, modules and lessons. */
+        get: operations["public_course_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{slug}/lessons/{lesson_id}/practice/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description A lesson from a public course, practised on the device. Nothing is recorded. */
+        get: operations["public_lesson_practice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/demo/": {
         parameters: {
             query?: never;
@@ -881,7 +970,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** @description Cancel an assignment the learner has not started. Started work is never deleted. */
+        delete: operations["api_v1_instructor_assignments_destroy"];
         options?: never;
         head?: never;
         /** @description Extend a deadline, open the lesson earlier or later, or allow more attempts. */
@@ -1098,6 +1188,24 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/schools/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Rename an organisation, change its type, switch it off and on, or delete it when empty. */
+        delete: operations["api_v1_platform_schools_destroy"];
+        options?: never;
+        head?: never;
+        /** @description Rename an organisation, change its type, switch it off and on, or delete it when empty. */
+        patch: operations["api_v1_platform_schools_partial_update"];
         trace?: never;
     };
     "/api/v1/research/consent-policy/": {
@@ -1403,7 +1511,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** @description Delete a class that never had learners; one with history is archived instead. */
+        delete: operations["api_v1_school_cohorts_destroy"];
         options?: never;
         head?: never;
         patch: operations["api_v1_school_cohorts_partial_update"];
@@ -1551,6 +1660,13 @@ export interface components {
             readonly is_primary: boolean;
             readonly tolerance: components["schemas"]["StepToleranceSnapshot"] | null;
         };
+        /**
+         * @description * `public` - Public: anyone, no account, progress not saved
+         *     * `account` - Free account: sign in, progress saved
+         *     * `members` - School members only
+         * @enum {string}
+         */
+        AccessEnum: "public" | "account" | "members";
         AdaptiveRecommendation: {
             readonly id: number;
             rule_version?: string;
@@ -1865,7 +1981,32 @@ export interface components {
             title: string;
             readonly slug: string;
             trade: string;
+            /** @description One or two sentences shown on the course card. */
+            summary?: string;
             description?: string;
+            /**
+             * @description Who can open this course's lessons.
+             *
+             *     * `public` - Public: anyone, no account, progress not saved
+             *     * `account` - Free account: sign in, progress saved
+             *     * `members` - School members only
+             */
+            access?: components["schemas"]["AccessEnum"];
+            readonly accessLabel: string;
+            level?: components["schemas"]["LevelEnum"];
+            ageGroup?: string;
+            durationHours?: number | null;
+            language?: string;
+            delivery?: components["schemas"]["DeliveryEnum"];
+            /** @description What a learner will be able to do afterwards. */
+            outcomes?: unknown;
+            /** @description Devices, tools or conditions a learner needs. */
+            requirements?: unknown;
+            /** @description Knowledge or courses to have before starting. */
+            prerequisites?: unknown;
+            /** @description Optional: how a partner institution recognises completion. OPedu itself issues no certificates. */
+            recognition?: string;
+            isPublished?: boolean;
             readonly modules: components["schemas"]["ModuleOption"][];
             readonly competencies: components["schemas"]["CompetencyOption"][];
             readonly lessonCount: number;
@@ -1875,7 +2016,31 @@ export interface components {
             school?: number | null;
             title: string;
             trade: string;
+            /** @description One or two sentences shown on the course card. */
+            summary?: string;
             description?: string;
+            /**
+             * @description Who can open this course's lessons.
+             *
+             *     * `public` - Public: anyone, no account, progress not saved
+             *     * `account` - Free account: sign in, progress saved
+             *     * `members` - School members only
+             */
+            access?: components["schemas"]["AccessEnum"];
+            level?: components["schemas"]["LevelEnum"];
+            ageGroup?: string;
+            durationHours?: number | null;
+            language?: string;
+            delivery?: components["schemas"]["DeliveryEnum"];
+            /** @description What a learner will be able to do afterwards. */
+            outcomes?: unknown;
+            /** @description Devices, tools or conditions a learner needs. */
+            requirements?: unknown;
+            /** @description Knowledge or courses to have before starting. */
+            prerequisites?: unknown;
+            /** @description Optional: how a partner institution recognises completion. OPedu itself issues no certificates. */
+            recognition?: string;
+            isPublished?: boolean;
         };
         AuthoringLesson: {
             readonly id: number;
@@ -2014,6 +2179,12 @@ export interface components {
             /** Format: date-time */
             occurredAt: string;
         };
+        /**
+         * @description * `virtual` - Virtual practice only
+         *     * `blended` - Virtual practice, then a supervised physical workshop
+         * @enum {string}
+         */
+        DeliveryEnum: "virtual" | "blended";
         Detail: {
             detail: string;
         };
@@ -2413,6 +2584,13 @@ export interface components {
             readonly prerequisiteIds: number[];
         };
         /**
+         * @description * `beginner` - Beginner
+         *     * `intermediate` - Intermediate
+         *     * `advanced` - Advanced
+         * @enum {string}
+         */
+        LevelEnum: "beginner" | "intermediate" | "advanced";
+        /**
          * @description * `not_demonstrated` - Not demonstrated
          *     * `developing` - Developing
          *     * `mastered` - Mastered
@@ -2426,6 +2604,7 @@ export interface components {
             title: string;
             description?: string;
             readonly order: number;
+            readonly lessonCount: number;
         };
         ModuleOptionRequest: {
             title: string;
@@ -2645,7 +2824,31 @@ export interface components {
             school?: number | null;
             title?: string;
             trade?: string;
+            /** @description One or two sentences shown on the course card. */
+            summary?: string;
             description?: string;
+            /**
+             * @description Who can open this course's lessons.
+             *
+             *     * `public` - Public: anyone, no account, progress not saved
+             *     * `account` - Free account: sign in, progress saved
+             *     * `members` - School members only
+             */
+            access?: components["schemas"]["AccessEnum"];
+            level?: components["schemas"]["LevelEnum"];
+            ageGroup?: string;
+            durationHours?: number | null;
+            language?: string;
+            delivery?: components["schemas"]["DeliveryEnum"];
+            /** @description What a learner will be able to do afterwards. */
+            outcomes?: unknown;
+            /** @description Devices, tools or conditions a learner needs. */
+            requirements?: unknown;
+            /** @description Knowledge or courses to have before starting. */
+            prerequisites?: unknown;
+            /** @description Optional: how a partner institution recognises completion. OPedu itself issues no certificates. */
+            recognition?: string;
+            isPublished?: boolean;
         };
         PatchedAuthoringLessonRequest: {
             course?: number;
@@ -2657,6 +2860,12 @@ export interface components {
             estimatedMinutes?: number;
             language?: components["schemas"]["LanguageEnum"];
             competencies?: number[];
+        };
+        PatchedCompetencyOptionRequest: {
+            code?: string;
+            title?: string;
+            description?: string;
+            masteryThreshold?: number;
         };
         PatchedContactHandledInputRequest: {
             handled?: boolean;
@@ -2674,6 +2883,10 @@ export interface components {
             observation?: string;
             feedback?: string;
             is_published?: boolean;
+        };
+        PatchedModuleOptionRequest: {
+            title?: string;
+            description?: string;
         };
         PatchedPilotStudyRequest: {
             school?: number;
@@ -2709,6 +2922,12 @@ export interface components {
         PatchedSchoolMemberUpdateRequest: {
             isActive?: boolean;
             role?: components["schemas"]["RoleEnum"];
+        };
+        PatchedSchoolUpdateInputRequest: {
+            name?: string;
+            kind?: components["schemas"]["OrganisationKindEnum"];
+            isActive?: boolean;
+            researchEnabled?: boolean;
         };
         PilotApproval: {
             readonly id: number;
@@ -4178,6 +4397,26 @@ export interface operations {
             };
         };
     };
+    api_v1_contact_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     api_v1_contact_partial_update: {
         parameters: {
             query?: never;
@@ -4534,6 +4773,27 @@ export interface operations {
             };
         };
     };
+    api_v1_content_courses_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     api_v1_content_courses_partial_update: {
         parameters: {
             query?: never;
@@ -4590,6 +4850,57 @@ export interface operations {
             };
         };
     };
+    api_v1_content_courses_competencies_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                competency_id: string;
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_v1_content_courses_competencies_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                competency_id: string;
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedCompetencyOptionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedCompetencyOptionRequest"];
+                "multipart/form-data": components["schemas"]["PatchedCompetencyOptionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompetencyOption"];
+                };
+            };
+        };
+    };
     api_v1_content_courses_modules_create: {
         parameters: {
             query?: never;
@@ -4605,6 +4916,57 @@ export interface operations {
                 "application/json": components["schemas"]["ModuleOptionRequest"];
                 "application/x-www-form-urlencoded": components["schemas"]["ModuleOptionRequest"];
                 "multipart/form-data": components["schemas"]["ModuleOptionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleOption"];
+                };
+            };
+        };
+    };
+    api_v1_content_courses_modules_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_v1_content_courses_modules_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedModuleOptionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedModuleOptionRequest"];
+                "multipart/form-data": components["schemas"]["PatchedModuleOptionRequest"];
             };
         };
         responses: {
@@ -5099,6 +5461,74 @@ export interface operations {
             };
         };
     };
+    public_courses_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    public_course_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    public_lesson_practice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lesson_id: number;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     api_v1_demo_retrieve: {
         parameters: {
             query?: never;
@@ -5183,6 +5613,26 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["InstructorAssignmentCreateResponse"];
                 };
+            };
+        };
+    };
+    api_v1_instructor_assignments_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -5525,6 +5975,53 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformSchool"];
+                };
+            };
+        };
+    };
+    api_v1_platform_schools_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_v1_platform_schools_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedSchoolUpdateInputRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedSchoolUpdateInputRequest"];
+                "multipart/form-data": components["schemas"]["PatchedSchoolUpdateInputRequest"];
+            };
+        };
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6318,6 +6815,26 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SchoolCohort"];
                 };
+            };
+        };
+    };
+    api_v1_school_cohorts_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -10,6 +10,7 @@ from lab.demo_content import (
     AUTO_COMPETENCIES,
     AUTO_LESSONS,
     BATTERY_LESSON,
+    BUILTIN_COURSE_DETAILS,
     ELECTRICAL_COURSE,
     HAZARD_LESSON,
     SAFETY_COURSE,
@@ -205,7 +206,7 @@ class Command(BaseCommand):
                 "description": "Safe, structured introduction to automotive electrical diagnosis.",
                 "is_published": True,
                 # Listed in the open catalogue so anyone can try the demonstration lessons.
-                "open_enrollment": True,
+                "access": Course.Access.PUBLIC,
             },
         )
         module, _ = Module.objects.update_or_create(
@@ -585,7 +586,7 @@ class Command(BaseCommand):
                 "trade": SAFETY_COURSE["trade"],
                 "description": SAFETY_COURSE["description"],
                 "is_published": True,
-                "open_enrollment": True,
+                "access": Course.Access.PUBLIC,
             },
         )
         safety_module, _ = Module.objects.update_or_create(
@@ -636,6 +637,11 @@ class Command(BaseCommand):
             instructor=instructor,
         )
 
+        # Catalogue details for the public Courses page, kept once a course has been edited.
+        for course_record in Course.objects.filter(slug__in=BUILTIN_COURSE_DETAILS, summary=""):
+            for field, value in BUILTIN_COURSE_DETAILS[course_record.slug].items():
+                setattr(course_record, field, value)
+            course_record.save()
         return assignment
 
     def _publish_scenario(self, lesson, spec, *, grading_policy, asset_package, author):
@@ -764,7 +770,7 @@ class Command(BaseCommand):
                 "trade": spec["trade"],
                 "description": spec["description"],
                 "is_published": True,
-                "open_enrollment": True,
+                "access": Course.Access.ACCOUNT,
             },
         )
         module, _ = Module.objects.update_or_create(

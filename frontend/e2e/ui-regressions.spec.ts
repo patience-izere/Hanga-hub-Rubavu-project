@@ -117,3 +117,142 @@ test("being signed out does not log a failed request (Q-1)", async ({ page }) =>
   await expect(page.locator("main")).toBeVisible();
   expect(failures).toEqual([]);
 });
+
+const courseList = {
+  courses: [
+    {
+      slug: "auto",
+      title: "Automotive Electrical Foundations",
+      trade: "Automobile Technology",
+      summary: "Inspect and test a battery.",
+      access: "public",
+      accessLabel: "Public",
+      level: "beginner",
+      levelLabel: "Beginner",
+      ageGroup: "15 and over",
+      durationHours: 3,
+      language: "English",
+      delivery: "blended",
+      deliveryLabel: "Virtual practice, then a supervised physical workshop",
+      provider: "OPedu Open Class",
+      lessonCount: 1,
+      minutes: 25,
+    },
+    {
+      slug: "school-only",
+      title: "Advanced Diagnostics",
+      trade: "Automobile Technology",
+      summary: "For enrolled learners.",
+      access: "members",
+      accessLabel: "Members",
+      level: "advanced",
+      levelLabel: "Advanced",
+      ageGroup: "",
+      durationHours: null,
+      language: "English",
+      delivery: "virtual",
+      deliveryLabel: "Virtual practice only",
+      provider: "Kigali TSS",
+      lessonCount: 2,
+      minutes: 40,
+    },
+  ],
+};
+
+test("the Courses page shows who can take each course", async ({ page }) => {
+  await page.route("**/api/v1/courses/", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(courseList),
+    }),
+  );
+  await page.goto("/");
+  await page
+    .getByRole("navigation", { name: "Primary navigation" })
+    .getByRole("link", { name: "Courses" })
+    .click();
+  await expect(page).toHaveURL(/\/courses$/);
+  const cards = page.locator(".course-card");
+  await expect(cards).toHaveCount(2);
+  await expect(cards.first()).toContainText("Open to everyone");
+  await expect(cards.nth(1)).toContainText("School members");
+  await page.getByLabel("Who can take it").selectOption("members");
+  await expect(cards).toHaveCount(1);
+});
+
+test("a public course detail offers to try a lesson without an account", async ({ page }) => {
+  await page.route("**/api/v1/courses/auto/", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...courseList.courses[0],
+        description: "Battery safety.",
+        outcomes: ["Measure battery voltage"],
+        requirements: ["A phone"],
+        prerequisites: ["None"],
+        recognition: "",
+        lessons: [
+          {
+            id: 7,
+            title: "Battery Inspection",
+            summary: "Inspect a battery.",
+            minutes: 25,
+            module: "Battery",
+            language: "English",
+            canTry: true,
+            canEnrol: true,
+          },
+        ],
+      }),
+    }),
+  );
+  await page.goto("/courses/auto");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Automotive Electrical Foundations",
+  );
+  await expect(
+    page.getByText("Ages", { exact: false }).or(page.getByText("15 and over")),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Try it now" })).toHaveAttribute(
+    "href",
+    "/courses/auto/lessons/7/try",
+  );
+  await expect(page.getByText("OPedu does not issue certificates")).toBeVisible();
+});
+
+test("the footer has social profiles, WhatsApp, contacts and the disclaimer", async ({ page }) => {
+  await page.goto("/");
+  const footer = page.locator("footer");
+  for (const network of ["LinkedIn", "X", "Facebook", "Instagram", "YouTube"]) {
+    await expect(
+      footer
+        .getByRole("img", { name: new RegExp(network) })
+        .or(footer.getByRole("link", { name: new RegExp(network) })),
+    ).toHaveCount(1);
+  }
+  await expect(footer.getByRole("link", { name: "Talk to us on WhatsApp" })).toHaveAttribute(
+    "href",
+    "https://wa.me/250789405950",
+  );
+  await expect(footer.getByRole("link", { name: "izere02pacy@gmail.com" })).toBeVisible();
+  await expect(footer.getByRole("link", { name: /Tel\./ })).toHaveAttribute(
+    "href",
+    "tel:+250789405950",
+  );
+  await footer.getByRole("link", { name: "Disclaimer" }).click();
+  await expect(page.getByRole("heading", { name: "OPedu is not a college" })).toBeVisible();
+  await expect(
+    page.getByText("does not issue certificates", { exact: false }).first(),
+  ).toBeVisible();
+});
+
+test("the Home link returns to the home page", async ({ page }) => {
+  await page.goto("/about");
+  await page
+    .getByRole("navigation", { name: "Primary navigation" })
+    .getByRole("link", { name: "Home" })
+    .click();
+  await expect(page).toHaveURL(/\/$/);
+});

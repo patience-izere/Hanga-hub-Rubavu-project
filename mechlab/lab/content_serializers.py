@@ -28,10 +28,21 @@ class CompetencyOptionSerializer(serializers.ModelSerializer):
 
 
 class ModuleOptionSerializer(serializers.ModelSerializer):
+    lessonCount = serializers.IntegerField(source="lessons.count", read_only=True)
+
     class Meta:
         model = Module
-        fields = ["id", "code", "title", "description", "order"]
+        fields = ["id", "code", "title", "description", "order", "lessonCount"]
         read_only_fields = ["id", "code", "order"]
+
+
+def _text_list(value, field):
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise serializers.ValidationError(f"Send {field} as a list of short texts.")
+    cleaned = [" ".join(item.split()) for item in value if item.strip()]
+    if len(cleaned) > 20 or any(len(item) > 300 for item in cleaned):
+        raise serializers.ValidationError("Use at most 20 items of up to 300 characters each.")
+    return cleaned
 
 
 class AuthoringCourseSerializer(serializers.ModelSerializer):
@@ -39,6 +50,14 @@ class AuthoringCourseSerializer(serializers.ModelSerializer):
     modules = ModuleOptionSerializer(many=True, read_only=True)
     competencies = CompetencyOptionSerializer(many=True, read_only=True)
     lessonCount = serializers.IntegerField(source="lessons.count", read_only=True)
+    isPublished = serializers.BooleanField(source="is_published", required=False)
+    ageGroup = serializers.CharField(
+        source="age_group", required=False, allow_blank=True, max_length=60
+    )
+    durationHours = serializers.IntegerField(
+        source="duration_hours", required=False, allow_null=True, min_value=1, max_value=1000
+    )
+    accessLabel = serializers.CharField(source="get_access_display", read_only=True)
 
     class Meta:
         model = Course
@@ -49,12 +68,34 @@ class AuthoringCourseSerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "trade",
+            "summary",
             "description",
+            "access",
+            "accessLabel",
+            "level",
+            "ageGroup",
+            "durationHours",
+            "language",
+            "delivery",
+            "outcomes",
+            "requirements",
+            "prerequisites",
+            "recognition",
+            "isPublished",
             "modules",
             "competencies",
             "lessonCount",
         ]
         read_only_fields = ["id", "slug"]
+
+    def validate_outcomes(self, value):
+        return _text_list(value, "outcomes")
+
+    def validate_requirements(self, value):
+        return _text_list(value, "requirements")
+
+    def validate_prerequisites(self, value):
+        return _text_list(value, "prerequisites")
 
 
 class GradingPolicyOptionSerializer(serializers.ModelSerializer):

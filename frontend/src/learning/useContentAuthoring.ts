@@ -13,6 +13,17 @@ import {
   listAuthoredScenarios,
   listAuthoredAssetPackages,
   createAuthoredAssetPackage,
+  deleteAuthoredAssetPackage,
+  removeAuthoredAssetFile,
+  deleteAuthoringCourse,
+  deleteAuthoringLesson,
+  deleteCourseCompetency,
+  deleteCourseModule,
+  updateAuthoredAssetPackage,
+  updateAuthoringCourse,
+  updateCourseCompetency,
+  updateCourseModule,
+  type CourseInput,
   listAuthoringCourses,
   listAuthoringLessons,
   listGradingPolicies,
@@ -74,6 +85,79 @@ export function useAuthoringCourses() {
 
 export function useCreateAuthoringCourse() {
   return useRefreshAfter(createAuthoringCourse);
+}
+
+export function useUpdateAuthoringCourse() {
+  return useRefreshAfter(({ id, ...input }: { id: number } & Partial<CourseInput>) =>
+    updateAuthoringCourse(id, input),
+  );
+}
+
+export function useDeleteAuthoringCourse() {
+  return useRefreshAfter(deleteAuthoringCourse);
+}
+
+export function useUpdateCourseModule() {
+  return useRefreshAfter(
+    ({
+      courseId,
+      moduleId,
+      ...input
+    }: {
+      courseId: number;
+      moduleId: number;
+      title?: string;
+      description?: string;
+      move?: "up" | "down";
+    }) => updateCourseModule(courseId, moduleId, input),
+  );
+}
+
+export function useDeleteCourseModule() {
+  return useRefreshAfter(({ courseId, moduleId }: { courseId: number; moduleId: number }) =>
+    deleteCourseModule(courseId, moduleId),
+  );
+}
+
+export function useUpdateCourseCompetency() {
+  return useRefreshAfter(
+    ({
+      courseId,
+      competencyId,
+      ...input
+    }: {
+      courseId: number;
+      competencyId: number;
+      code?: string;
+      title?: string;
+    }) => updateCourseCompetency(courseId, competencyId, input),
+  );
+}
+
+export function useDeleteCourseCompetency() {
+  return useRefreshAfter(({ courseId, competencyId }: { courseId: number; competencyId: number }) =>
+    deleteCourseCompetency(courseId, competencyId),
+  );
+}
+
+export function useDeleteAuthoringLesson() {
+  return useRefreshAfter(deleteAuthoringLesson);
+}
+
+export function useUpdateAuthoredAssetPackage() {
+  return useRefreshAfter(({ id, name }: { id: number; name: string }) =>
+    updateAuthoredAssetPackage(id, { name }),
+  );
+}
+
+export function useRemoveAuthoredAssetFile() {
+  return useRefreshAfter(({ packageId, fileId }: { packageId: number; fileId: number }) =>
+    removeAuthoredAssetFile(packageId, fileId),
+  );
+}
+
+export function useDeleteAuthoredAssetPackage() {
+  return useRefreshAfter(deleteAuthoredAssetPackage);
 }
 
 export function useAddCourseCompetency() {
