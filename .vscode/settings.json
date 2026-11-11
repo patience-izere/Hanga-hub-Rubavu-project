@@ -1,8 +1,0 @@
-{
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "typescript.preferences.importModuleSpecifier": "relative",
-  "task.allowAutomaticTasks": "off",
-  "[javascript]": {
-    "editor.defaultFormatter": "vscode.typescript-language-features"
-  }
-}
