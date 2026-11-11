@@ -13,7 +13,11 @@ type RequireRoleProps = {
    */
   capability?: keyof Pick<
     RoleCapabilities,
-    "canReviewEvidence" | "canAuthorContent" | "canPublishContent" | "canAdministerSchool"
+    | "canReviewEvidence"
+    | "canAuthorContent"
+    | "canPublishContent"
+    | "canAdministerSchool"
+    | "isPlatformAdmin"
   >;
 };
 

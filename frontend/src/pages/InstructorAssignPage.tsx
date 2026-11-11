@@ -2,6 +2,11 @@ import { useMemo, useState } from "react";
 
 import { describeApiError } from "../api/client";
 
+import { Link } from "react-router-dom";
+
+import { useRoles } from "../auth/useRoles";
+import { EmptyState } from "../components/ui/EmptyState";
+import { Pagination, usePage } from "../components/ui/Pagination";
 import { QueryBoundary } from "../components/ui/QueryBoundary";
 import {
   useCreateInstructorAssignments,
@@ -21,6 +26,7 @@ function toIsoOrNull(localValue: string): string | null {
 export function InstructorAssignPage() {
   const options = useInstructorAssignmentOptions();
   const create = useCreateInstructorAssignments();
+  const roles = useRoles();
 
   const [scenarioId, setScenarioId] = useState(0);
   const [learnerIds, setLearnerIds] = useState<number[]>([]);
@@ -41,6 +47,7 @@ export function InstructorAssignPage() {
     );
   }, [learners, learnerSearch]);
 
+  const learnerPage = usePage(filteredLearners);
   const scenario = options.data?.scenarios.find((item) => item.id === scenarioId);
   const selectedCohorts = (options.data?.cohorts ?? []).filter((cohort) =>
     cohortIds.includes(cohort.id),
@@ -73,202 +80,237 @@ export function InstructorAssignPage() {
         loading="Loading lessons and learners…"
         error="Assignment options could not be loaded."
       >
-        {(data) => (
-          <form
-            className="assign-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              create.mutate({
-                scenarioId,
-                learnerIds,
-                cohortIds,
-                availableAt: toIsoOrNull(availableAt),
-                dueAt: toIsoOrNull(dueAt),
-                attemptLimit,
-                instructions: instructions.trim() || DEFAULT_INSTRUCTIONS,
-              });
-            }}
-          >
-            <fieldset className="assign-section">
-              <legend>1 &middot; Lesson</legend>
-              <label>
-                Published lesson
-                <select
-                  required
-                  value={scenarioId || ""}
-                  onChange={(event) => setScenarioId(Number(event.target.value))}
-                >
-                  <option value="">Choose a lesson</option>
-                  {data.scenarios.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.lessonTitle} &middot; {item.courseTitle} &middot; v{item.version}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {data.scenarios.length === 0 ? (
-                <p className="field-note">
-                  No published scenario is available yet. A school administrator must publish one
-                  before it can be assigned.
-                </p>
-              ) : null}
-            </fieldset>
-
-            <fieldset className="assign-section">
-              <legend>2 &middot; Who</legend>
-              {data.cohorts.length > 0 ? (
-                <div className="assign-group">
-                  <h3>Cohorts</h3>
-                  <ul className="checkbox-list">
-                    {data.cohorts.map((cohort) => (
-                      <li key={cohort.id}>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={cohortIds.includes(cohort.id)}
-                            onChange={() => toggle(cohortIds, cohort.id, setCohortIds)}
-                          />
-                          <span>
-                            {cohort.name}
-                            <small>{cohort.learnerCount} active learner(s)</small>
-                          </span>
-                        </label>
-                      </li>
+        {(data) =>
+          data.scenarios.length === 0 ||
+          (data.learners.length === 0 && data.cohorts.length === 0) ? (
+            // Nothing can be assigned: one clear message and the way to fix it, not a form that
+            // cannot be submitted.
+            <EmptyState
+              title={
+                data.scenarios.length === 0
+                  ? "No published lesson to assign yet"
+                  : "No learners to assign to yet"
+              }
+              description={
+                data.scenarios.length === 0
+                  ? "Lessons can be assigned once they are published. Open the Module Studio to finish and publish one."
+                  : "Learners appear here once they join your school. Invite them, or create a class with sign-in slips."
+              }
+              action={
+                data.scenarios.length === 0 ? (
+                  roles.canAuthorContent ? (
+                    <Link className="button button-primary" to="/authoring">
+                      Open the Module Studio
+                    </Link>
+                  ) : null
+                ) : (
+                  <Link className="button button-primary" to="/teach/classes">
+                    Set up class sign-in
+                  </Link>
+                )
+              }
+            />
+          ) : (
+            <form
+              className="assign-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (create.isPending) return;
+                create.mutate({
+                  scenarioId,
+                  learnerIds,
+                  cohortIds,
+                  availableAt: toIsoOrNull(availableAt),
+                  dueAt: toIsoOrNull(dueAt),
+                  attemptLimit,
+                  instructions: instructions.trim() || DEFAULT_INSTRUCTIONS,
+                });
+              }}
+            >
+              <fieldset className="assign-section">
+                <legend>1 &middot; Lesson</legend>
+                <label>
+                  Published lesson
+                  <select
+                    required
+                    value={scenarioId || ""}
+                    onChange={(event) => setScenarioId(Number(event.target.value))}
+                  >
+                    <option value="">Choose a lesson</option>
+                    {data.scenarios.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.lessonTitle} &middot; {item.courseTitle} &middot; v{item.version}
+                      </option>
                     ))}
-                  </ul>
-                </div>
-              ) : null}
+                  </select>
+                </label>
+              </fieldset>
 
-              <div className="assign-group">
-                <h3>Individual learners</h3>
-                {learners.length > SEARCH_THRESHOLD ? (
-                  <label className="learner-search">
-                    <span className="sr-only">Search learners</span>
+              <fieldset className="assign-section">
+                <legend>2 &middot; Who</legend>
+                {data.cohorts.length > 0 ? (
+                  <div className="assign-group">
+                    <h3>Cohorts</h3>
+                    <ul className="checkbox-list">
+                      {data.cohorts.map((cohort) => (
+                        <li key={cohort.id}>
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={cohortIds.includes(cohort.id)}
+                              onChange={() => toggle(cohortIds, cohort.id, setCohortIds)}
+                            />
+                            <span>
+                              {cohort.name}
+                              <small>{cohort.learnerCount} active learner(s)</small>
+                            </span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                <div className="assign-group">
+                  <h3>Individual learners</h3>
+                  {learners.length > SEARCH_THRESHOLD ? (
+                    <label className="learner-search">
+                      <span className="sr-only">Search learners</span>
+                      <input
+                        type="search"
+                        placeholder="Search by name or email"
+                        value={learnerSearch}
+                        onChange={(event) => setLearnerSearch(event.target.value)}
+                      />
+                    </label>
+                  ) : null}
+                  {filteredLearners.length === 0 ? (
+                    <p className="field-note">No learner matches that search.</p>
+                  ) : (
+                    <ul className="checkbox-list scrollable">
+                      {learnerPage.slice.map((learner) => (
+                        <li key={learner.id}>
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={learnerIds.includes(learner.id)}
+                              onChange={() => toggle(learnerIds, learner.id, setLearnerIds)}
+                            />
+                            <span>
+                              {learner.name}
+                              <small>{learner.email}</small>
+                            </span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <Pagination
+                    page={learnerPage.page}
+                    total={learnerPage.total}
+                    onPage={learnerPage.setPage}
+                    label="learners"
+                  />
+                  {learnerIds.length > 0 ? (
+                    <p className="field-note">{learnerIds.length} learner(s) selected.</p>
+                  ) : null}
+                </div>
+              </fieldset>
+
+              <fieldset className="assign-section">
+                <legend>3 &middot; Schedule and rules</legend>
+                <div className="assign-row">
+                  <label>
+                    Available from
                     <input
-                      type="search"
-                      placeholder="Search by name or email"
-                      value={learnerSearch}
-                      onChange={(event) => setLearnerSearch(event.target.value)}
+                      type="datetime-local"
+                      value={availableAt}
+                      onChange={(event) => setAvailableAt(event.target.value)}
                     />
                   </label>
-                ) : null}
-                {filteredLearners.length === 0 ? (
-                  <p className="field-note">No learner matches that search.</p>
-                ) : (
-                  <ul className="checkbox-list scrollable">
-                    {filteredLearners.map((learner) => (
-                      <li key={learner.id}>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={learnerIds.includes(learner.id)}
-                            onChange={() => toggle(learnerIds, learner.id, setLearnerIds)}
-                          />
-                          <span>
-                            {learner.name}
-                            <small>{learner.email}</small>
-                          </span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </fieldset>
-
-            <fieldset className="assign-section">
-              <legend>3 &middot; Schedule and rules</legend>
-              <div className="assign-row">
+                  <label>
+                    Due date
+                    <input
+                      type="datetime-local"
+                      value={dueAt}
+                      min={availableAt || undefined}
+                      onChange={(event) => setDueAt(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Attempt limit
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={attemptLimit}
+                      onChange={(event) => setAttemptLimit(Number(event.target.value))}
+                    />
+                  </label>
+                </div>
                 <label>
-                  Available from
-                  <input
-                    type="datetime-local"
-                    value={availableAt}
-                    onChange={(event) => setAvailableAt(event.target.value)}
+                  Instructions for the learner
+                  <textarea
+                    rows={3}
+                    value={instructions}
+                    onChange={(event) => setInstructions(event.target.value)}
                   />
                 </label>
-                <label>
-                  Due date
-                  <input
-                    type="datetime-local"
-                    value={dueAt}
-                    min={availableAt || undefined}
-                    onChange={(event) => setDueAt(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Attempt limit
-                  <input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={attemptLimit}
-                    onChange={(event) => setAttemptLimit(Number(event.target.value))}
-                  />
-                </label>
-              </div>
-              <label>
-                Instructions for the learner
-                <textarea
-                  rows={3}
-                  value={instructions}
-                  onChange={(event) => setInstructions(event.target.value)}
-                />
-              </label>
-            </fieldset>
+              </fieldset>
 
-            <div className="assign-summary">
-              <div>
-                <h2>Before you assign</h2>
-                {canSubmit ? (
-                  <p>
-                    <strong>{scenario?.lessonTitle}</strong> (v{scenario?.version}) to{" "}
-                    <strong>{learnerIds.length}</strong> individual learner(s)
-                    {selectedCohorts.length > 0 ? (
-                      <>
-                        {" "}
-                        and <strong>{selectedCohorts.length}</strong> cohort(s) covering about{" "}
-                        {cohortLearnerCount} learner(s)
-                      </>
-                    ) : null}
-                    {dueAt ? `, due ${new Date(dueAt).toLocaleString()}` : ", with no due date"}.
-                  </p>
-                ) : (
-                  <p>Choose a lesson and at least one cohort or learner.</p>
-                )}
+              <div className="assign-summary">
+                <div>
+                  <h2>Before you assign</h2>
+                  {canSubmit ? (
+                    <p>
+                      <strong>{scenario?.lessonTitle}</strong> (v{scenario?.version}) to{" "}
+                      <strong>{learnerIds.length}</strong> individual learner(s)
+                      {selectedCohorts.length > 0 ? (
+                        <>
+                          {" "}
+                          and <strong>{selectedCohorts.length}</strong> cohort(s) covering about{" "}
+                          {cohortLearnerCount} learner(s)
+                        </>
+                      ) : null}
+                      {dueAt ? `, due ${new Date(dueAt).toLocaleString()}` : ", with no due date"}.
+                    </p>
+                  ) : (
+                    <p>Choose a lesson and at least one cohort or learner.</p>
+                  )}
+                </div>
+                <button className="button button-primary" disabled={!canSubmit || create.isPending}>
+                  {create.isPending ? "Assigning…" : "Create assignments"}
+                </button>
               </div>
-              <button className="button button-primary" disabled={!canSubmit || create.isPending}>
-                {create.isPending ? "Assigning…" : "Create assignments"}
-              </button>
-            </div>
 
-            {create.isError ? (
-              <p className="form-error" role="alert">
-                {describeApiError(create.error, "The assignments could not be created.")}
-              </p>
-            ) : null}
-            {create.data ? (
-              <div className="form-success" role="status">
-                <p>
-                  Assigned to {create.data.created} learner{create.data.created === 1 ? "" : "s"}.
+              {create.isError ? (
+                <p className="form-error" role="alert">
+                  {describeApiError(create.error, "The assignments could not be created.")}
                 </p>
-                {create.data.existing > 0 ? (
+              ) : null}
+              {create.data ? (
+                <div className="form-success" role="status">
                   <p>
-                    {create.data.existing} already had this lesson; their deadlines and attempt
-                    limits were not changed. Change them from each learner&rsquo;s page in the
-                    roster.
+                    Assigned to {create.data.created} learner{create.data.created === 1 ? "" : "s"}.
                   </p>
-                ) : null}
-                {create.data.skipped > 0 ? (
-                  <p>
-                    {create.data.skipped} learner{create.data.skipped === 1 ? " is" : "s are"} in
-                    the cohort but their school access is suspended, so they were skipped.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-          </form>
-        )}
+                  {create.data.existing > 0 ? (
+                    <p>
+                      {create.data.existing} already had this lesson; their deadlines and attempt
+                      limits were not changed. Change them from each learner&rsquo;s page in the
+                      roster.
+                    </p>
+                  ) : null}
+                  {create.data.skipped > 0 ? (
+                    <p>
+                      {create.data.skipped} learner{create.data.skipped === 1 ? " is" : "s are"} in
+                      the cohort but their school access is suspended, so they were skipped.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </form>
+          )
+        }
       </QueryBoundary>
     </section>
   );

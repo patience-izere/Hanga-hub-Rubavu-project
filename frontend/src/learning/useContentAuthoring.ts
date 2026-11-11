@@ -12,6 +12,7 @@ import {
   getLessonHistory,
   listAuthoredScenarios,
   listAuthoredAssetPackages,
+  createAuthoredAssetPackage,
   listAuthoringCourses,
   listAuthoringLessons,
   listGradingPolicies,
@@ -192,6 +193,14 @@ export function useUploadAuthoredAsset() {
         altText,
         transcript,
       }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: assetsKey }),
+  });
+}
+
+export function useCreateAuthoredAssetPackage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createAuthoredAssetPackage,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: assetsKey }),
   });
 }

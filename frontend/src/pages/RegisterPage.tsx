@@ -5,6 +5,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { describeApiError, type User } from "../api/client";
 import { getOpenStatus, registerOpen } from "../api/open";
 import { authQueryKey } from "../auth/useAuth";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 /** An account for someone learning on their own: an apprentice, a mechanic, a curious student. */
 export function RegisterPage({ user }: { user: User | null }) {
@@ -90,18 +91,15 @@ export function RegisterPage({ user }: { user: User | null }) {
           With an email address you can reset a forgotten password yourself.
         </small>
         <label htmlFor="reg-password">Password</label>
-        <input
+        <PasswordInput
           id="reg-password"
-          type="password"
           autoComplete="new-password"
           minLength={8}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           required
         />
-        <small className="field-note">
-          At least 8 characters. A short sentence is easy to remember.
-        </small>
+        <small className="field-note">A short sentence is easy to remember.</small>
         {error ? (
           <p className="form-error" role="alert">
             {error}

@@ -29,8 +29,17 @@ export type InvitationPreview = {
   accountExists: boolean;
 };
 
-export function listSchoolMembers(): Promise<SchoolMember[]> {
-  return apiFetch<SchoolMember[]>("/api/v1/school/members/");
+export type Page<T> = { count: number; next: string | null; previous: string | null; results: T[] };
+
+export function listSchoolMembers(query: {
+  page: number;
+  search?: string;
+  role?: string;
+}): Promise<Page<SchoolMember>> {
+  const params = new URLSearchParams({ page: String(query.page) });
+  if (query.search) params.set("search", query.search);
+  if (query.role) params.set("role", query.role);
+  return apiFetch<Page<SchoolMember>>(`/api/v1/school/members/?${params}`);
 }
 
 export function listSchoolInvitations(): Promise<SchoolInvitation[]> {
@@ -117,9 +126,18 @@ export type SchoolAuditPage = {
   nextBefore: number | null;
 };
 
-export function getSchoolAudit(filters: { eventType?: string; before?: number } = {}) {
+export type AuditFilters = { eventType?: string; from?: string; to?: string };
+
+export function auditQuery(filters: AuditFilters): URLSearchParams {
   const query = new URLSearchParams();
   if (filters.eventType) query.set("eventType", filters.eventType);
+  if (filters.from) query.set("from", filters.from);
+  if (filters.to) query.set("to", filters.to);
+  return query;
+}
+
+export function getSchoolAudit(filters: AuditFilters & { before?: number } = {}) {
+  const query = auditQuery(filters);
   if (filters.before) query.set("before", String(filters.before));
   const suffix = query.size ? `?${query}` : "";
   return apiFetch<SchoolAuditPage>(`/api/v1/school/audit/${suffix}`);

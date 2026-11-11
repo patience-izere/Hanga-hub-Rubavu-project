@@ -12,6 +12,7 @@ import {
   useSubmitInstructorFeedback,
   useUpdateInstructorFeedback,
 } from "../learning/useInstructor";
+import { Breadcrumbs } from "../components/ui/Breadcrumbs";
 
 const RECOMMENDATION_LABELS: Record<string, string> = {
   continue: "Continue the attempt",
@@ -274,9 +275,20 @@ export function InstructorAttemptPage() {
 
   return (
     <section className="attempt-review-page">
-      <Link className="back-link" to="/teach">
-        ← Instructor overview
-      </Link>
+      <Breadcrumbs
+        items={[
+          { label: "Teaching", to: "/teach" },
+          ...(attempt.data
+            ? [
+                {
+                  label: attempt.data.learner.name,
+                  to: `/teach/learners/${attempt.data.learner.id}`,
+                },
+              ]
+            : []),
+          { label: "Attempt review" },
+        ]}
+      />
       <header className="review-header">
         <div>
           <span className="eyebrow">

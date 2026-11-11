@@ -39,7 +39,17 @@ export function CataloguePage() {
         query={catalogue}
         loading="Loading lessons…"
         error="Lessons could not be loaded."
-        empty={{ title: "No open lessons yet", description: "Check back soon.", symbol: "⚙" }}
+        empty={{
+          title: "No open lessons yet",
+          description:
+            "Lessons open to everyone will appear here. If your instructor gave you a class code, join your class to see its lessons now.",
+          symbol: "⚙",
+          action: (
+            <Link className="button button-primary" to="/class">
+              Join a class with a code
+            </Link>
+          ),
+        }}
       >
         {(lessons) => {
           const trades = [...new Set(lessons.map((lesson) => lesson.trade))];

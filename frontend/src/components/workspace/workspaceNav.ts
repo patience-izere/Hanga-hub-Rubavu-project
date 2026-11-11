@@ -51,7 +51,7 @@ export function workspaceSections(roles: RoleCapabilities): WorkspaceSection[] {
     sections.push({
       heading: "nav.teaching",
       links: [
-        { to: "/teach", label: "nav.overview", end: true },
+        { to: "/teach", label: "nav.teachingOverview", end: true },
         { to: "/teach/learners", label: "nav.learners" },
         { to: "/teach/assign", label: "nav.assign" },
         { to: "/teach/classes", label: "nav.classAccess" },
@@ -81,12 +81,19 @@ export function workspaceSections(roles: RoleCapabilities): WorkspaceSection[] {
     sections.push({
       heading: "nav.school",
       links: [
-        { to: "/school", label: "nav.overview", end: true },
+        { to: "/school", label: "nav.schoolOverview", end: true },
         { to: "/school/people", label: "nav.people" },
         { to: "/school/invitations", label: "nav.invitations" },
         { to: "/school/classes", label: "nav.classes" },
         { to: "/school/audit", label: "nav.audit" },
       ],
+    });
+  }
+
+  if (roles.isPlatformAdmin) {
+    sections.push({
+      heading: "nav.platform",
+      links: [{ to: "/platform/schools", label: "nav.schools" }],
     });
   }
 
@@ -101,7 +108,10 @@ export function workspaceSections(roles: RoleCapabilities): WorkspaceSection[] {
 
   sections.push({
     heading: "nav.account",
-    links: [{ to: "/account/security", label: "security" }],
+    links: [
+      { to: "/account/profile", label: "nav.profile" },
+      { to: "/account/security", label: "security" },
+    ],
   });
 
   return sections;

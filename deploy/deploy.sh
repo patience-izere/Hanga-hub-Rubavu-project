@@ -18,6 +18,8 @@ docker compose pull web backend scheduler
 docker compose up -d --wait db redis
 # Before the new code serves traffic.
 docker compose run --rm --no-deps backend python manage.py migrate --noinput
+# The built-in lessons, kept in step with the code. Creates no accounts.
+docker compose run --rm --no-deps backend python manage.py load_lessons
 docker compose up -d --remove-orphans --wait --wait-timeout 240
 
 # Publish on the shared HTTPS proxy once the app is healthy, but only when the domain already

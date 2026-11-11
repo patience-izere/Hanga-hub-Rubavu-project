@@ -48,6 +48,9 @@ CSRF_TRUSTED_ORIGINS = env_list(
 )
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 OPEDU_RELEASE_VERSION = os.environ.get("OPEDU_RELEASE_VERSION", "development")
+# Where public contact-form enquiries are also emailed; they are always kept for platform
+# administrators in the app.
+OPEDU_CONTACT_EMAIL = os.environ.get("OPEDU_CONTACT_EMAIL", "").strip()
 if not DEBUG and not FRONTEND_URL.startswith("https://"):
     raise ImproperlyConfigured("FRONTEND_URL must use HTTPS when DJANGO_DEBUG is false.")
 if not DEBUG and OPEDU_RELEASE_VERSION == "development":
@@ -367,6 +370,7 @@ SPECTACULAR_SETTINGS = {
     # schema drift from CI. Keep full paths in operation IDs and tags on every platform.
     "SCHEMA_PATH_PREFIX": "",
     "ENUM_NAME_OVERRIDES": {
+        "OrganisationKindEnum": "lab.models.School.Kind",
         "LessonPublicationStatusEnum": [
             ("draft", "Draft"),
             ("review", "In review"),

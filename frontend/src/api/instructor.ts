@@ -228,3 +228,16 @@ export type InstructorLearnerDetail = {
 export function getInstructorLearner(id: number): Promise<InstructorLearnerDetail> {
   return apiFetch<InstructorLearnerDetail>(`/api/v1/instructor/learners/${id}/`);
 }
+
+export type InstructorActivity = {
+  from: string;
+  to: string;
+  days: Array<{ date: string; started: number; completed: number }>;
+};
+
+export function getInstructorActivity(range: { from?: string; to?: string }) {
+  const query = new URLSearchParams();
+  if (range.from) query.set("from", range.from);
+  if (range.to) query.set("to", range.to);
+  return apiFetch<InstructorActivity>(`/api/v1/instructor/activity/?${query}`);
+}

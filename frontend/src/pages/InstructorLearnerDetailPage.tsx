@@ -7,6 +7,7 @@ import { MetricGrid, MetricTile } from "../components/ui/MetricTile";
 import { QueryBoundary } from "../components/ui/QueryBoundary";
 import { attemptStatusLabel, attemptOutcomeLabel } from "../learning/labels";
 import { useInstructorLearner, useUpdateInstructorAssignment } from "../learning/useInstructor";
+import { Breadcrumbs } from "../components/ui/Breadcrumbs";
 
 const MASTERY_LABELS: Record<string, string> = {
   mastered: "Mastered",
@@ -100,9 +101,13 @@ export function InstructorLearnerDetailPage() {
 
   return (
     <section className="dashboard learner-detail-page">
-      <Link className="back-link" to="/teach/learners">
-        &larr; School roster
-      </Link>
+      <Breadcrumbs
+        items={[
+          { label: "Teaching", to: "/teach" },
+          { label: "Learners", to: "/teach/learners" },
+          { label: detail.data?.learner.name ?? "Learner" },
+        ]}
+      />
 
       <QueryBoundary
         query={detail}

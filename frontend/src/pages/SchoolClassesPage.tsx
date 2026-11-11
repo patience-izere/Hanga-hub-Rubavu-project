@@ -1,7 +1,8 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 
 import { describeApiError } from "@/api/client";
 import type { SchoolCohort, SchoolCohortList } from "@/api/school";
+import { Pagination, usePage } from "@/components/ui/Pagination";
 import { QueryBoundary } from "@/components/ui/QueryBoundary";
 import {
   useCreateSchoolCohort,
@@ -22,14 +23,22 @@ function LearnerPicker({
   const update = useUpdateSchoolCohort();
   const [selected, setSelected] = useState(() => new Set(cohort.learners.map((item) => item.id)));
   const [search, setSearch] = useState("");
-  const eligible = learners.filter((learner) => learner.schoolId === cohort.school.id);
-  const term = search.trim().toLowerCase();
-  const visible = eligible.filter(
-    (learner) =>
-      !term ||
-      learner.name.toLowerCase().includes(term) ||
-      learner.email.toLowerCase().includes(term),
+  const eligible = useMemo(
+    () => learners.filter((learner) => learner.schoolId === cohort.school.id),
+    [learners, cohort.school.id],
   );
+  const term = search.trim().toLowerCase();
+  const visible = useMemo(
+    () =>
+      eligible.filter(
+        (learner) =>
+          !term ||
+          learner.name.toLowerCase().includes(term) ||
+          learner.email.toLowerCase().includes(term),
+      ),
+    [eligible, term],
+  );
+  const paged = usePage(visible);
 
   function toggle(id: number) {
     setSelected((current) => {
@@ -64,7 +73,7 @@ function LearnerPicker({
             />
           </label>
           <ul>
-            {visible.map((learner) => (
+            {paged.slice.map((learner) => (
               <li key={learner.id}>
                 <label>
                   <input
@@ -80,6 +89,12 @@ function LearnerPicker({
               </li>
             ))}
           </ul>
+          <Pagination
+            page={paged.page}
+            total={paged.total}
+            onPage={paged.setPage}
+            label="learners"
+          />
         </>
       )}
       <div className="button-row">

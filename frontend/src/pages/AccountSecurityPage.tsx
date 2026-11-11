@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 
 import { ApiError, changePassword } from "@/api/client";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export function AccountSecurityPage() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -34,18 +35,16 @@ export function AccountSecurityPage() {
         <p>Use a long password that you do not reuse for another service.</p>
         <form onSubmit={submit}>
           <label htmlFor="current-password">Current password</label>
-          <input
+          <PasswordInput
             id="current-password"
-            type="password"
             autoComplete="current-password"
             value={currentPassword}
             onChange={(event) => setCurrentPassword(event.target.value)}
             required
           />
           <label htmlFor="new-password">New password</label>
-          <input
+          <PasswordInput
             id="new-password"
-            type="password"
             autoComplete="new-password"
             minLength={8}
             value={newPassword}

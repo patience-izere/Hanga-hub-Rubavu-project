@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { describeApiError } from "@/api/client";
 import { acceptInvitation, getInvitationPreview } from "@/api/school";
 import { useCurrentUser } from "@/auth/useAuth";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export function JoinSchoolPage() {
   const { token = "" } = useParams();
@@ -114,9 +115,8 @@ export function JoinSchoolPage() {
                   required
                 />
                 <label htmlFor="join-password">Password</label>
-                <input
+                <PasswordInput
                   id="join-password"
-                  type="password"
                   minLength={8}
                   autoComplete="new-password"
                   value={password}

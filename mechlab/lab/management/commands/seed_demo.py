@@ -50,8 +50,23 @@ class Command(BaseCommand):
         parser.add_argument("--instructor-email", default="instructor@opedu.local")
         parser.add_argument("--admin-email", default="admin@opedu.local")
         parser.add_argument("--password", default="LearnWithOPedu123!")
+        parser.add_argument(
+            "--content-only",
+            action="store_true",
+            help=(
+                "Load the published lessons into the open class without creating demonstration "
+                "accounts, classes or assignments. Safe to run on production on every deploy."
+            ),
+        )
 
     def handle(self, *args, **options):
+        if options["content_only"]:
+            school = open_school()
+            administrator = self._curriculum_author()
+            self._load_content(school, administrator, learner=None, instructor=None)
+            self.stdout.write(self.style.SUCCESS("Published lessons are ready."))
+            return
+
         user_model = get_user_model()
         password = options["password"]
 
@@ -89,8 +104,8 @@ class Command(BaseCommand):
         administrator.save()
 
         school, _ = School.objects.get_or_create(
-            code="rubavu-demo-tss",
-            defaults={"name": "Rubavu Demo Technical School"},
+            code="kigali-demo-tss",
+            defaults={"name": "Kigali Demo Technical School"},
         )
         # The demonstration school takes part in the pilot study, so it shows the research tools.
         if not school.research_enabled:
@@ -121,6 +136,36 @@ class Command(BaseCommand):
             defaults={"student_id": "DEMO-LEARNER"},
         )
 
+        assignment = self._load_content(
+            school, administrator, learner=learner, instructor=instructor
+        )
+        cohort = Cohort.objects.get(school=school, code="auto-2026")
+
+        self.stdout.write(self.style.SUCCESS("Demo learning workflow is ready."))
+        self.stdout.write(f"Class join code: {cohort.join_code}")
+        self.stdout.write(f"Learner: {learner.email}")
+        self.stdout.write(f"Instructor: {instructor.email}")
+        self.stdout.write(f"Administrator: {administrator.email}")
+        self.stdout.write(f"Assignment ID: {assignment.pk}")
+
+    def _curriculum_author(self):
+        """The account published lessons are credited to when no person seeded them.
+
+        It cannot sign in: it has no usable password and is inactive.
+        """
+
+        author, created = get_user_model().objects.get_or_create(
+            username="opedu-curriculum",
+            defaults={"first_name": "OPedu", "last_name": "Curriculum", "is_active": False},
+        )
+        if created:
+            author.set_unusable_password()
+            author.save(update_fields=["password"])
+        return author
+
+    def _load_content(self, school, administrator, *, learner, instructor):
+        """Courses, lessons and published practicals. Assigns them only when given a learner."""
+
         program, _ = Program.objects.update_or_create(
             school=school,
             code="automobile-technology",
@@ -130,24 +175,25 @@ class Command(BaseCommand):
                 "is_active": True,
             },
         )
-        cohort, _ = Cohort.objects.update_or_create(
-            school=school,
-            code="auto-2026",
-            defaults={
-                "program": program,
-                "name": "Automobile Technology 2026",
-                "academic_year": "2026",
-                "is_active": True,
-            },
-        )
-        Enrollment.objects.update_or_create(
-            cohort=cohort,
-            learner=learner,
-            defaults={"status": Enrollment.Status.ACTIVE},
-        )
-        if not cohort.join_code:
-            cohort.join_code = generate_join_code()
-            cohort.save()
+        if learner is not None:
+            cohort, _ = Cohort.objects.update_or_create(
+                school=school,
+                code="auto-2026",
+                defaults={
+                    "program": program,
+                    "name": "Automobile Technology 2026",
+                    "academic_year": "2026",
+                    "is_active": True,
+                },
+            )
+            Enrollment.objects.update_or_create(
+                cohort=cohort,
+                learner=learner,
+                defaults={"status": Enrollment.Status.ACTIVE},
+            )
+            if not cohort.join_code:
+                cohort.join_code = generate_join_code()
+                cohort.save()
 
         course, _ = Course.objects.update_or_create(
             slug="automotive-electrical-foundations",
@@ -505,11 +551,13 @@ class Command(BaseCommand):
             asset_package=asset_package,
             author=administrator,
         )
-        assignment, _ = Assignment.objects.get_or_create(
-            scenario=battery_v2,
-            learner=learner,
-            defaults={"lesson": lesson, "assigned_by": instructor},
-        )
+        assignment = None
+        if learner is not None:
+            assignment, _ = Assignment.objects.get_or_create(
+                scenario=battery_v2,
+                learner=learner,
+                defaults={"lesson": lesson, "assigned_by": instructor},
+            )
 
         for code, values in AUTO_COMPETENCIES.items():
             Competency.objects.update_or_create(
@@ -588,12 +636,7 @@ class Command(BaseCommand):
             instructor=instructor,
         )
 
-        self.stdout.write(self.style.SUCCESS("Demo learning workflow is ready."))
-        self.stdout.write(f"Class join code: {cohort.join_code}")
-        self.stdout.write(f"Learner: {learner.email}")
-        self.stdout.write(f"Instructor: {instructor.email}")
-        self.stdout.write(f"Administrator: {administrator.email}")
-        self.stdout.write(f"Assignment ID: {assignment.pk}")
+        return assignment
 
     def _publish_scenario(self, lesson, spec, *, grading_policy, asset_package, author):
         """Publish a lesson's practical from its authoring rows plus the spec's extras.
@@ -696,11 +739,12 @@ class Command(BaseCommand):
         scenario = self._publish_scenario(
             lesson, spec, grading_policy=grading_policy, asset_package=asset_package, author=author
         )
-        Assignment.objects.get_or_create(
-            scenario=scenario,
-            learner=learner,
-            defaults={"lesson": lesson, "assigned_by": instructor},
-        )
+        if learner is not None:
+            Assignment.objects.get_or_create(
+                scenario=scenario,
+                learner=learner,
+                defaults={"lesson": lesson, "assigned_by": instructor},
+            )
         return scenario
 
     def _seed_course(self, school, spec, *, manifest, grading_policy, author, learner, instructor):

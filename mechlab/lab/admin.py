@@ -13,6 +13,7 @@ from .models import (
     Cohort,
     Competency,
     CompetencyResult,
+    ContactMessage,
     Course,
     Enrollment,
     GradingPolicy,
@@ -578,3 +579,10 @@ class XApiDeliveryAdmin(admin.ModelAdmin):
 admin.site.register(MechanicalObject)
 admin.site.register(UserProgress)
 admin.site.register(ThreeDModel)
+
+
+@admin.register(ContactMessage)
+class ContactMessageAdmin(admin.ModelAdmin):
+    list_display = ("name", "email", "topic", "handled", "created_at")
+    list_filter = ("handled", "topic")
+    search_fields = ("name", "email", "organisation", "message")

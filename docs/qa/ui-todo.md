@@ -80,4 +80,4 @@ Legend: `[ ]` to do · `[x]` done · `[~]` done in code, needs an action on the 
 ## 6. Finish
 - [x] All checks pass (backend tests, unit tests, lint, types, build, OpenAPI schema, browser tests)
   - Backend 165 tests, unit 94, browser 35 (twice in a row), ESLint 0 errors, Prettier, Ruff, TypeScript, build, performance budgets, OpenAPI schema current, no missing migrations, integrity check.
-- [ ] Push the `UI` branch
+- [~] Push the `UI` branch: committed locally; this machine has no GitHub sign-in, so run `git push -u origin UI` from your own terminal.

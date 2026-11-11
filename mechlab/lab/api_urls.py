@@ -23,6 +23,7 @@ from .content_views import (
 from .learning_views import (
     AssignmentViewSet,
     AttemptViewSet,
+    InstructorActivityView,
     InstructorAssignmentDetailView,
     InstructorAssignmentView,
     InstructorAttemptReviewDecisionView,
@@ -45,7 +46,14 @@ from .open_views import (
     OpenStatusView,
 )
 from .pilot_views import PilotStudyViewSet
+from .platform_views import (
+    ContactMessageDetailView,
+    ContactMessageView,
+    PlatformSchoolsView,
+    RegistrationDecisionView,
+)
 from .school_views import (
+    SchoolAuditExportView,
     SchoolAuditView,
     SchoolCohortDetailView,
     SchoolCohortListView,
@@ -54,6 +62,7 @@ from .school_views import (
     SchoolInvitationListCreateView,
     SchoolMemberDetailView,
     SchoolMemberListView,
+    SchoolMembersExportView,
     SchoolOverviewView,
 )
 
@@ -92,6 +101,7 @@ urlpatterns = [
         name="api-password-reset-confirm",
     ),
     path("auth/preferences/", api_views.preferences, name="api-auth-preferences"),
+    path("auth/profile/", api_views.profile, name="api-auth-profile"),
     path("auth/register/", OpenRegistrationView.as_view(), name="api-auth-register"),
     path("auth/class/<str:code>/", ClassJoinView.as_view(), name="api-auth-class-join"),
     path("open/status/", OpenStatusView.as_view(), name="open-status"),
@@ -113,6 +123,14 @@ urlpatterns = [
         name="certificate-verify",
     ),
     path("schools/register/", SchoolRegistrationRequestView.as_view(), name="school-register"),
+    path("platform/schools/", PlatformSchoolsView.as_view(), name="platform-schools"),
+    path("contact/", ContactMessageView.as_view(), name="contact-messages"),
+    path("contact/<int:pk>/", ContactMessageDetailView.as_view(), name="contact-message"),
+    path(
+        "platform/registrations/<int:pk>/<str:decision>/",
+        RegistrationDecisionView.as_view(),
+        name="platform-registration-decision",
+    ),
     path("classes/access/", ClassAccessListView.as_view(), name="class-access"),
     path("classes/<int:pk>/join-code/", ClassJoinCodeView.as_view(), name="class-join-code"),
     path("classes/<int:pk>/learners/", ClassBulkLearnersView.as_view(), name="class-learners"),
@@ -123,6 +141,7 @@ urlpatterns = [
     ),
     path("instructor/live/", LiveClassBoardView.as_view(), name="instructor-live-board"),
     path("instructor/overview/", InstructorOverviewView.as_view(), name="instructor-overview"),
+    path("instructor/activity/", InstructorActivityView.as_view(), name="instructor-activity"),
     path("instructor/learners/", InstructorRosterView.as_view(), name="instructor-roster"),
     path(
         "instructor/learners/<int:pk>/",
@@ -157,6 +176,8 @@ urlpatterns = [
     ),
     path("school/overview/", SchoolOverviewView.as_view(), name="school-overview"),
     path("school/audit/", SchoolAuditView.as_view(), name="school-audit"),
+    path("school/audit/export/", SchoolAuditExportView.as_view(), name="school-audit-export"),
+    path("school/members/export/", SchoolMembersExportView.as_view(), name="school-members-export"),
     path("school/cohorts/", SchoolCohortListView.as_view(), name="school-cohort-list"),
     path("school/cohorts/<int:pk>/", SchoolCohortDetailView.as_view(), name="school-cohort-detail"),
     path("school/members/", SchoolMemberListView.as_view(), name="school-member-list"),

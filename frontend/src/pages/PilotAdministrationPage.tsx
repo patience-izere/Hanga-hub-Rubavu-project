@@ -144,11 +144,12 @@ export function PilotAdministrationPage({ user }: { user: User }) {
     <section className="dashboard pilot-admin">
       <div className="dashboard-heading">
         <div>
-          <span className="eyebrow">Batch 11 evidence governance</span>
-          <h1>Technical-school pilot control room</h1>
+          <span className="eyebrow">Research studies</span>
+          <h1>Pilot studies</h1>
           <p>
-            Freeze the protocol before collection, separate learner outcomes from AR reliability,
-            expose missing data, and prevent expansion without an independent evidence decision.
+            A pilot tests OPedu with a real class before a school uses it more widely. Here you set
+            the study&apos;s rules before it starts, record consent and observations, and see the
+            results. The rules cannot change once data collection begins, so the results stay fair.
           </p>
         </div>
       </div>
@@ -161,7 +162,7 @@ export function PilotAdministrationPage({ user }: { user: User }) {
 
       {canAdmin && options.data ? (
         <details className="lesson-panel pilot-create">
-          <summary>Create a draft pilot protocol</summary>
+          <summary>Set up a new pilot study</summary>
           <form onSubmit={createStudy}>
             <label>
               School
@@ -269,10 +270,15 @@ export function PilotAdministrationPage({ user }: { user: User }) {
       ) : null}
 
       <section className="lesson-panel">
-        <h2>Pilot studies</h2>
-        {studies.isPending ? <p role="status">Loading pilot governance…</p> : null}
+        <h2>Your pilot studies</h2>
+        {studies.isPending ? <p role="status">Loading pilot studies…</p> : null}
+        {studies.data && studies.data.results.length === 0 ? (
+          <p className="field-note">
+            No pilot study yet. Use <strong>Set up a new pilot study</strong> above.
+          </p>
+        ) : null}
         <label>
-          Selected pilot
+          Open a pilot study
           <select
             value={selectedId ?? ""}
             onChange={(event) => setSelectedId(Number(event.target.value))}
@@ -290,7 +296,7 @@ export function PilotAdministrationPage({ user }: { user: User }) {
       {selected ? (
         <>
           <section className="lesson-panel pilot-status">
-            <span className="eyebrow">Immutable evidence boundary</span>
+            <span className="eyebrow">Study status</span>
             <h2>{selected.title}</h2>
             <p>
               Protocol {selected.protocol_version} · status <strong>{selected.status}</strong>
@@ -355,7 +361,7 @@ export function PilotAdministrationPage({ user }: { user: User }) {
           />
 
           <section className="lesson-panel pilot-report" aria-labelledby="pilot-report-title">
-            <span className="eyebrow">Analysis without effectiveness overclaim</span>
+            <span className="eyebrow">Results so far</span>
             <h2 id="pilot-report-title">Pilot evidence report</h2>
             {report.isPending ? <p role="status">Calculating the frozen analysis…</p> : null}
             {report.data ? (

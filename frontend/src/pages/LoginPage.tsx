@@ -4,6 +4,7 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { describeApiError, type User } from "../api/client";
 import { useSignIn } from "../auth/useAuth";
 import { useLocale } from "../i18n/LocaleProvider";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export function LoginPage({ user }: { user: User | null }) {
   const [email, setEmail] = useState("");
@@ -71,10 +72,10 @@ export function LoginPage({ user }: { user: User | null }) {
           required
         />
         <label htmlFor="password">{t("login.password")}</label>
-        <input
+        <PasswordInput
+          noun="password or PIN"
           id="password"
           name="password"
-          type="password"
           autoComplete="current-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}

@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../components/ui/Dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -74,6 +75,16 @@ export function SimulationPage() {
   const [synchronizing, setSynchronizing] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const endConfirm = useRef<HTMLDivElement>(null);
+  const discardConfirm = useRef<HTMLDivElement>(null);
+  useDialogFocus(endConfirm, () => setConfirmingEnd(false), {
+    trap: false,
+    active: confirmingEnd,
+  });
+  useDialogFocus(discardConfirm, () => setConfirmingDiscard(false), {
+    trap: false,
+    active: confirmingDiscard,
+  });
   const [revealedHints, setRevealedHints] = useState<Record<string, string[]>>({});
   const [feedback, setFeedback] = useState<WorkspaceFeedback | null>(null);
   const feedbackId = useRef(0);
@@ -419,7 +430,12 @@ export function SimulationPage() {
         )}
       </div>
       {confirmingDiscard ? (
-        <div className="inline-confirm" role="alertdialog" aria-labelledby="discard-title">
+        <div
+          ref={discardConfirm}
+          className="inline-confirm"
+          role="alertdialog"
+          aria-labelledby="discard-title"
+        >
           <strong id="discard-title">Delete the actions saved on this device?</strong>
           <p>
             {pendingSync} saved {pendingSync === 1 ? "action" : "actions"} for this attempt cannot
@@ -507,7 +523,12 @@ export function SimulationPage() {
               : t("ws.complete")}
       </button>
       {confirmingEnd ? (
-        <div className="inline-confirm" role="alertdialog" aria-labelledby="end-title">
+        <div
+          ref={endConfirm}
+          className="inline-confirm"
+          role="alertdialog"
+          aria-labelledby="end-title"
+        >
           <strong id="end-title">
             {attempt.is_practice ? "End this practice run?" : "End this attempt?"}
           </strong>

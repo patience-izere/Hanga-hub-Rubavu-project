@@ -1,4 +1,5 @@
-from datetime import timedelta
+import json
+from datetime import date, timedelta
 from hashlib import sha256
 from secrets import token_urlsafe
 
@@ -8,15 +9,17 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.text import slugify
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .audit import record_audit_event
+from .exports import csv_response
 from .models import (
     AuditEvent,
     Cohort,
@@ -29,6 +32,7 @@ from .models import (
     SchoolMembership,
 )
 from .notifications import send_email_safely
+from .pagination import StandardPagination
 from .permissions import IsSchoolAdmin
 from .school_serializers import (
     AuditEventSerializer,
@@ -90,14 +94,40 @@ def _invitation_for_token(token: str, *, lock: bool = False):
 class SchoolMemberListView(APIView):
     permission_classes = [IsSchoolAdmin]
 
-    @extend_schema(responses=SchoolMemberSerializer(many=True))
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("page", int, required=False, description="Page number; omit for all."),
+            OpenApiParameter("page_size", int, required=False, description="At most 200."),
+            OpenApiParameter("search", str, required=False, description="Name or email."),
+            OpenApiParameter("role", str, required=False),
+        ],
+        responses=SchoolMemberSerializer(many=True),
+    )
     def get(self, request):
         memberships = (
             SchoolMembership.objects.filter(school_id__in=_admin_school_ids(request.user))
             .select_related("school", "user")
-            .order_by("school__name", "user__first_name", "user__email")
+            .order_by("school__name", "user__first_name", "user__email", "pk")
         )
-        return Response(SchoolMemberSerializer(memberships, many=True).data)
+        term = request.query_params.get("search", "").strip()
+        if term:
+            memberships = memberships.filter(
+                Q(user__first_name__icontains=term)
+                | Q(user__last_name__icontains=term)
+                | Q(user__email__icontains=term)
+                | Q(user__username__icontains=term)
+            )
+        role = request.query_params.get("role", "").strip()
+        if role:
+            memberships = memberships.filter(role=role)
+        if "page" not in request.query_params:
+            return Response(SchoolMemberSerializer(memberships, many=True).data)
+        # Large schools: one page at a time, searched and filtered here rather than in the
+        # browser, which could not draw ten thousand people quickly.
+        paginator = StandardPagination()
+        paginator.page_size = 50
+        page = paginator.paginate_queryset(memberships, request, view=self)
+        return paginator.get_paginated_response(SchoolMemberSerializer(page, many=True).data)
 
 
 class SchoolMemberDetailView(APIView):
@@ -407,6 +437,100 @@ class SchoolInvitationAcceptView(APIView):
         return Response({"detail": "Invitation accepted."})
 
 
+def _audit_date_range(events, request, errors):
+    """Filter by ?from= and ?to= (YYYY-MM-DD, inclusive, in the server's time zone)."""
+
+    for name, lookup in (("from", "occurred_at__date__gte"), ("to", "occurred_at__date__lte")):
+        raw = request.query_params.get(name, "").strip()
+        if not raw:
+            continue
+        try:
+            value = date.fromisoformat(raw)
+        except ValueError:
+            errors[name] = ["Use a date written as YYYY-MM-DD."]
+            continue
+        events = events.filter(**{lookup: value})
+    return events
+
+
+class SchoolAuditExportView(APIView):
+    """The audit trail as CSV, with the same filters as the page."""
+
+    permission_classes = [IsSchoolAdmin]
+
+    @extend_schema(responses={(200, "text/csv"): bytes})
+    def get(self, request):
+        events = AuditEvent.objects.filter(
+            school_id__in=_admin_school_ids(request.user)
+        ).select_related("actor", "school")
+        event_type = request.query_params.get("eventType", "").strip()
+        if event_type:
+            events = events.filter(event_type=event_type)
+        errors = {}
+        events = _audit_date_range(events, request, errors)
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+        rows = [
+            [
+                event.occurred_at.isoformat(),
+                event.event_type,
+                (event.actor.get_full_name() or event.actor.get_username()) if event.actor else "",
+                event.school.name if event.school else "",
+                event.target_type,
+                event.target_id,
+                json.dumps(event.payload, sort_keys=True),
+            ]
+            for event in events.order_by("-id")[:20000]
+        ]
+        return csv_response(
+            "opedu-audit-log.csv",
+            ["occurred_at", "event", "actor", "school", "target_type", "target_id", "details"],
+            rows,
+        )
+
+
+class SchoolMembersExportView(APIView):
+    """Everyone in the administered schools as CSV, with the People page's filters."""
+
+    permission_classes = [IsSchoolAdmin]
+
+    @extend_schema(responses={(200, "text/csv"): bytes})
+    def get(self, request):
+        memberships = (
+            SchoolMembership.objects.filter(school_id__in=_admin_school_ids(request.user))
+            .select_related("school", "user")
+            .order_by("school__name", "user__first_name", "user__email", "pk")
+        )
+        term = request.query_params.get("search", "").strip()
+        if term:
+            memberships = memberships.filter(
+                Q(user__first_name__icontains=term)
+                | Q(user__last_name__icontains=term)
+                | Q(user__email__icontains=term)
+                | Q(user__username__icontains=term)
+            )
+        role = request.query_params.get("role", "").strip()
+        if role:
+            memberships = memberships.filter(role=role)
+        rows = [
+            [
+                member.user.get_full_name(),
+                member.user.email,
+                member.user.get_username(),
+                member.get_role_display(),
+                member.school.name,
+                "active" if member.is_active else "suspended",
+                member.created_at.date().isoformat(),
+            ]
+            for member in memberships
+        ]
+        return csv_response(
+            "opedu-people.csv",
+            ["name", "email", "sign_in_name", "role", "school", "status", "joined"],
+            rows,
+        )
+
+
 class SchoolAuditView(APIView):
     """Read-only governance trail for the administered schools.
 
@@ -444,6 +568,7 @@ class SchoolAuditView(APIView):
         if before:
             events = events.filter(id__lt=before)
         limit = whole_number("limit", 100, maximum=500)
+        events = _audit_date_range(events, request, errors)
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -609,6 +734,13 @@ class SchoolCohortListView(APIView):
                 {"detail": "Select a school you administer."}, status=status.HTTP_403_FORBIDDEN
             )
         school = School.objects.get(pk=school_id)
+        name = " ".join(values["name"].split())
+        # A repeated submission (a double click, a retried request) must not make a second class.
+        if Cohort.objects.filter(school=school, name__iexact=name, is_active=True).exists():
+            return Response(
+                {"name": [f"{school.name} already has a class called “{name}”."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         with transaction.atomic():
             program_name = values["programName"].strip()
             program = Program.objects.filter(school=school, name__iexact=program_name).first()
@@ -621,8 +753,8 @@ class SchoolCohortListView(APIView):
             cohort = Cohort.objects.create(
                 school=school,
                 program=program,
-                name=values["name"].strip(),
-                code=_unique_code(Cohort, school, values["name"]),
+                name=name,
+                code=_unique_code(Cohort, school, name),
                 academic_year=values.get("academicYear", "").strip(),
             )
             record_audit_event(

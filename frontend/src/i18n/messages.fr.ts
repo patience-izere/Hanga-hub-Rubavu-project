@@ -5,6 +5,12 @@ import type { MessageKey } from "./messages";
  * it is relied on. Lesson content is not translated here; it is authored per language.
  */
 export const fr: Partial<Record<MessageKey, string>> = {
+  "shell.menu": "Menu",
+  "shell.closeMenu": "Fermer",
+  "theme.label": "Thème de couleur",
+  "theme.system": "Thème de l’appareil",
+  "theme.light": "Clair",
+  "theme.dark": "Sombre",
   about: "À propos",
   features: "Fonctionnalités",
   updates: "Actualités",
@@ -29,6 +35,11 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "nav.catalogue": "Trouver des leçons",
   "nav.classAccess": "Connexion de la classe",
   "nav.live": "Défi en direct",
+  "nav.teachingOverview": "Vue d’ensemble de l’enseignement",
+  "nav.schoolOverview": "Vue d’ensemble de l’école",
+  "nav.profile": "Mon profil",
+  "nav.platform": "Plateforme",
+  "nav.schools": "Écoles",
   "nav.overview": "Vue d'ensemble",
   "nav.learners": "Apprenants",
   "nav.assign": "Attribuer une leçon",

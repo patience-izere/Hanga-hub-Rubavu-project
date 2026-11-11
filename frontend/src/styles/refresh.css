@@ -1,0 +1,373 @@
+/*
+ * UI refresh (QA report 11 Nov 2026): heading scale, a real light theme, header controls,
+ * the public phone menu, password fields and touch targets. Loaded last so it can adjust the
+ * older rules without rewriting them.
+ */
+
+/* ---- Heading scale (U-1): page titles 40–56 px, 32–36 px on phones ---- */
+.hero h1,
+.home-page .hero h1,
+.public-hero h1,
+.auth-message h1,
+.dashboard h1 {
+  font-size: clamp(2.1rem, 4.2vw, 3.5rem);
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+}
+.public-page h2,
+.home-page h2,
+.final-cta h2,
+.section-heading h2,
+.information-header h1 {
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.information-header h1 {
+  font-size: clamp(2.1rem, 4.2vw, 3.25rem);
+}
+.module-content h2,
+.audience-grid h3,
+.principle-grid h3 {
+  font-size: clamp(1.25rem, 2vw, 1.6rem);
+  letter-spacing: -0.02em;
+}
+.workspace-main h1,
+.workspace-main .dashboard h1,
+.workspace-page-header h1,
+.account-card h1 {
+  font-size: clamp(1.6rem, 2.6vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+.workspace-main h2 {
+  letter-spacing: -0.015em;
+}
+.hero {
+  min-height: 0;
+}
+.public-hero {
+  min-height: 0;
+  padding-block: clamp(3.5rem, 7vw, 6rem);
+}
+
+/* ---- Dark theme: the About page's diagonal panel was left pale (U-3) ---- */
+:root[data-theme="dark"] .public-hero {
+  background:
+    radial-gradient(circle at 82% 20%, rgba(199, 229, 107, 0.35) 0 6%, transparent 6.2%),
+    linear-gradient(135deg, var(--sand) 0 64%, var(--surface-tint) 64% 100%);
+}
+
+/* ---- Light theme (U-2, U-4) ----
+   Bands that were deep green become pale; green is kept for actions and accents. */
+:root[data-theme="light"]
+  :is(
+    .auth-layout,
+    .site-footer,
+    .context-strip,
+    .evidence-section,
+    .story-section,
+    .role-section,
+    .final-cta
+  ) {
+  background: #e9f0e4;
+  color: var(--ink);
+}
+:root[data-theme="light"]
+  :is(
+    .auth-layout,
+    .site-footer,
+    .context-strip,
+    .evidence-section,
+    .story-section,
+    .role-section,
+    .final-cta
+  )
+  :is(h1, h2, h3, h4, strong, dt, a:not(.button), li, span:not(.eyebrow, .brand-mark)) {
+  color: var(--ink);
+}
+:root[data-theme="light"]
+  :is(
+    .auth-layout,
+    .site-footer,
+    .context-strip,
+    .evidence-section,
+    .story-section,
+    .role-section,
+    .final-cta
+  )
+  :is(p, small, dd) {
+  color: var(--muted);
+}
+:root[data-theme="light"]
+  :is(
+    .auth-layout,
+    .site-footer,
+    .context-strip,
+    .evidence-section,
+    .story-section,
+    .role-section,
+    .final-cta
+  )
+  .eyebrow {
+  color: var(--green-650);
+}
+:root[data-theme="light"]
+  :is(
+    .auth-layout,
+    .site-footer,
+    .context-strip,
+    .evidence-section,
+    .story-section,
+    .role-section,
+    .final-cta
+  )
+  :is(.button-light, .button-primary),
+:root[data-theme="light"] .final-cta .button {
+  background: var(--green-950);
+  border-color: var(--green-950);
+  color: #fff;
+}
+:root[data-theme="light"] .site-footer {
+  border-top: 1px solid var(--line);
+}
+:root[data-theme="light"] .site-footer .brand-mark {
+  background: var(--green-950);
+  color: var(--lime);
+}
+:root[data-theme="light"] :is(.evidence-card, .auth-card) {
+  box-shadow: 0 20px 50px rgba(7, 63, 53, 0.12);
+}
+:root[data-theme="light"] .role-table,
+:root[data-theme="light"] .role-table tbody th {
+  color: var(--ink);
+}
+:root[data-theme="light"] .role-table thead th {
+  color: var(--green-650);
+}
+:root[data-theme="light"] .role-table :is(th, td) {
+  border-bottom-color: var(--line);
+}
+:root[data-theme="light"] .role-table-wrap {
+  border-color: var(--line);
+  background: var(--paper);
+}
+
+/* Links on the sign-in panel: readable in both themes (U-4). */
+.auth-routes a {
+  color: var(--green-800);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+:root[data-theme="dark"] .auth-routes a {
+  color: var(--lime);
+}
+
+/* ---- Header controls: language and theme ---- */
+.shell-preferences {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.locale-select select,
+.theme-select select {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 600 13px/1 var(--font-sans);
+  cursor: pointer;
+}
+.theme-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.theme-select-icon {
+  position: absolute;
+  left: 11px;
+  pointer-events: none;
+  font-size: 13px;
+}
+.theme-select select {
+  padding-left: 28px;
+}
+
+/* ---- Public navigation: current page and phone menu (N-2, N-3) ---- */
+.public-nav-link {
+  position: relative;
+}
+.public-nav-link.active {
+  color: var(--green-650);
+}
+.public-nav-link.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.public-menu-toggle {
+  display: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+.site-header nav .nav-secondary {
+  display: inline;
+}
+@media (max-width: 960px) {
+  .site-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .public-menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    margin-left: auto;
+  }
+  .site-header nav.public-nav {
+    display: none;
+    flex-basis: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 8px 0 12px;
+  }
+  .site-header nav.public-nav.is-open {
+    display: flex;
+  }
+  .site-header nav.public-nav a,
+  .site-header nav.public-nav .button-link {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: 10px;
+    font-size: 16px;
+  }
+  .public-nav-link.active {
+    background: var(--surface-tint, #e9f0e4);
+  }
+  .public-nav-link.active::after {
+    display: none;
+  }
+  .site-header nav.public-nav .nav-cta {
+    justify-content: center;
+  }
+  .shell-preferences {
+    padding: 6px 12px 0;
+    flex-wrap: wrap;
+  }
+}
+
+/* ---- Password and PIN fields (A-3, F-3) ---- */
+.password-field {
+  position: relative;
+  display: block;
+}
+.password-field {
+  margin-bottom: 4px;
+}
+.password-field input {
+  margin: 0 !important;
+  width: 100%;
+  padding-right: 4.5rem !important;
+}
+.password-field .password-toggle {
+  margin: 0;
+  width: auto;
+}
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  min-height: 36px;
+  min-width: 56px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--green-800);
+  font: 700 14px/1 var(--font-sans);
+  cursor: pointer;
+}
+.password-toggle:hover {
+  background: var(--surface-tint, #eef3ea);
+}
+.field-rule {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.field-rule.is-met {
+  color: var(--success-text, #1d6b3d);
+}
+.field-error {
+  display: block;
+  margin-top: 6px;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+/* ---- Notices, offline banner, pagination ---- */
+.offline-banner {
+  margin: 0;
+  padding: 12px clamp(16px, 4vw, 32px);
+  background: var(--surface-warning, #fff4cf);
+  color: var(--warning-text, #5c4600);
+  font-size: 14px;
+  line-height: 1.5;
+}
+/* ---- Phones: sign-in form first, larger tap targets (U-8, U-9) ---- */
+@media (max-width: 760px) {
+  .auth-layout {
+    display: flex;
+    flex-direction: column-reverse;
+  }
+  .auth-card {
+    margin: 20px auto 8px;
+    padding: 28px 22px;
+  }
+  .auth-message {
+    padding: 24px 20px 40px;
+  }
+  .auth-message p {
+    font-size: 16px;
+  }
+  .workspace-main :is(button, select, a.button, .button-link),
+  .site-footer a {
+    min-height: 44px;
+  }
+  .site-footer a {
+    display: inline-flex;
+    align-items: center;
+  }
+  .workspace-main {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+@media (max-width: 760px) {
+  .home-page .hero h1 {
+    font-size: clamp(2rem, 9vw, 2.25rem);
+  }
+}
+/* The product mock-up on the home page keeps its own small type. */
+.home-page .product-window :is(h2, h3) {
+  font-size: clamp(1.1rem, 1.6vw, 1.45rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}

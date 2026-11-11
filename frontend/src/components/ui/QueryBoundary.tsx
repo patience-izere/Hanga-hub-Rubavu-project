@@ -7,6 +7,10 @@ type QueryLike = {
   isPending: boolean;
   isError: boolean;
   isFetching?: boolean;
+  /** "paused" when TanStack Query is waiting for the device to come back online. */
+  fetchStatus?: "fetching" | "paused" | "idle";
+  /** Failed attempts so far; above zero while it retries. */
+  failureCount?: number;
   error?: unknown;
   refetch?: () => unknown;
 };
@@ -19,7 +23,7 @@ type QueryBoundaryProps<TData> = {
   /** Shown with `role="alert"` when the query fails. */
   error?: string;
   /** Rendered instead of `children` when the resolved data is an empty array. */
-  empty?: { title: string; description?: string; symbol?: string };
+  empty?: { title: string; description?: string; symbol?: string; action?: ReactNode };
 };
 
 function isEmpty(data: unknown): boolean {
@@ -39,10 +43,33 @@ export function QueryBoundary<TData>({
   error = "This information could not be loaded.",
   empty,
 }: QueryBoundaryProps<TData>) {
+  // Offline, the query waits for a connection instead of failing; without this the page said
+  // "Loading…" for as long as the device stayed offline.
+  if (query.isPending && query.fetchStatus === "paused") {
+    return (
+      <div className="panel-status query-error" role="alert">
+        <p className="form-error">
+          You&apos;re offline. This page needs a connection; it will load when you reconnect.
+        </p>
+        {query.refetch ? (
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={() => void query.refetch?.()}
+          >
+            Try again
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
   if (query.isPending) {
     return (
       <p className="panel-status" role="status">
-        {loading}
+        {(query.failureCount ?? 0) > 0
+          ? "Still trying… the server did not answer the first time."
+          : loading}
       </p>
     );
   }
@@ -70,7 +97,14 @@ export function QueryBoundary<TData>({
   }
 
   if (empty && isEmpty(query.data)) {
-    return <EmptyState title={empty.title} description={empty.description} symbol={empty.symbol} />;
+    return (
+      <EmptyState
+        title={empty.title}
+        description={empty.description}
+        symbol={empty.symbol}
+        action={empty.action}
+      />
+    );
   }
 
   return <>{children(query.data)}</>;

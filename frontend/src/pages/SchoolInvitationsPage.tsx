@@ -2,6 +2,8 @@ import { FormEvent, useState } from "react";
 
 import { describeApiError } from "@/api/client";
 import type { SchoolInvitation, SchoolMember } from "@/api/school";
+import { useCurrentUser } from "@/auth/useAuth";
+import { CopyLink } from "@/components/ui/CopyLink";
 import { QueryBoundary } from "@/components/ui/QueryBoundary";
 import {
   useCreateSchoolInvitation,
@@ -36,26 +38,17 @@ export function SchoolInvitationsPage() {
   const [role, setRole] = useState<SchoolMember["role"]>("learner");
   const [schoolId, setSchoolId] = useState<number | "">("");
   const [confirmRevoke, setConfirmRevoke] = useState<number | null>(null);
-  const [copied, setCopied] = useState(false);
+  const emailConfigured = useCurrentUser().data?.features?.email !== false;
   // Administrators of more than one school (and platform administrators) must say which one.
   const needsSchool = schools.length > 1;
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    setCopied(false);
+    if (invite.isPending) return;
     invite.mutate(
       { email, role, schoolId: needsSchool && schoolId !== "" ? schoolId : undefined },
       { onSuccess: () => setEmail("") },
     );
-  }
-
-  async function copyLink(url: string) {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
   }
 
   return (
@@ -70,6 +63,13 @@ export function SchoolInvitationsPage() {
           </p>
         </div>
       </div>
+
+      {!emailConfigured ? (
+        <p className="notice-banner" role="note">
+          <strong>Email is not set up yet.</strong> Each invitation gives you a link to send the
+          person yourself, by WhatsApp, SMS or your own email.
+        </p>
+      ) : null}
 
       <section className="admin-panel">
         <h2>Invite a person</h2>
@@ -119,26 +119,23 @@ export function SchoolInvitationsPage() {
             </p>
           )}
           {invite.data && (
-            <div className={invite.data.emailSent ? "form-success" : "form-error"} role="status">
+            <div className="form-success" role="status">
               <p>
                 {invite.data.emailSent
-                  ? `Invitation emailed to ${invite.data.invitation.email}.`
-                  : `The invitation was created, but the email to ${invite.data.invitation.email} could not be sent. Share this link with them yourself; it works once and expires in seven days.`}
+                  ? `Invitation emailed to ${invite.data.invitation.email}. You can also share the link yourself:`
+                  : emailConfigured
+                    ? `The invitation was created, but the email to ${invite.data.invitation.email} could not be sent. Share this link with them yourself; it works once and expires in seven days.`
+                    : `Invitation created for ${invite.data.invitation.email}. Email is not set up, so share this link with them yourself; it works once and expires in seven days.`}
               </p>
-              <p className="invitation-link">
-                <code>{invite.data.acceptUrl}</code>
-                <button
-                  type="button"
-                  className="button-link"
-                  onClick={() => void copyLink(invite.data.acceptUrl)}
-                >
-                  {copied ? "Copied" : "Copy link"}
-                </button>
-              </p>
+              <CopyLink url={invite.data.acceptUrl} />
             </div>
           )}
           <button className="button button-primary" disabled={invite.isPending}>
-            {invite.isPending ? "Sending…" : "Send invitation"}
+            {invite.isPending
+              ? "Creating…"
+              : emailConfigured
+                ? "Send invitation"
+                : "Create invitation link"}
           </button>
         </form>
       </section>
@@ -191,7 +188,13 @@ export function SchoolInvitationsPage() {
                           className="button-link"
                           disabled={revoke.isPending}
                           onClick={() =>
-                            revoke.mutate(item.id, { onSuccess: () => setConfirmRevoke(null) })
+                            revoke.mutate(item.id, {
+                              onSuccess: () => {
+                                setConfirmRevoke(null);
+                                // The message about this invitation's link no longer holds.
+                                if (invite.data?.invitation.id === item.id) invite.reset();
+                              },
+                            })
                           }
                         >
                           Revoke it

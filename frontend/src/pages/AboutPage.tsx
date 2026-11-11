@@ -33,7 +33,7 @@ export function AboutPage() {
         </div>
         <div className="public-hero-aside">
           <p>
-            OPedu is a virtual-lab learning platform being developed in Rubavu, Rwanda, to help
+            OPedu is a virtual-lab learning platform being developed in Kigali, Rwanda, to help
             technical learners understand procedures, practise safely, and produce evidence an
             instructor can review.
           </p>

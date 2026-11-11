@@ -2058,3 +2058,28 @@ class AuditEvent(models.Model):
 
     def __str__(self):
         return f"{self.event_type} · {self.occurred_at.isoformat()}"
+
+
+class ContactMessage(models.Model):
+    """An enquiry from the public contact form, read by platform administrators."""
+
+    class Topic(models.TextChoices):
+        SCHOOL_PILOT = "school_pilot", "School pilot"
+        TECHNICAL_VALIDATION = "technical_validation", "Technical validation"
+        CURRICULUM = "curriculum", "Curriculum collaboration"
+        PARTNERSHIP = "partnership", "Platform partnership"
+        GENERAL = "general", "General enquiry"
+
+    name = models.CharField(max_length=180)
+    email = models.EmailField()
+    organisation = models.CharField(max_length=180, blank=True)
+    topic = models.CharField(max_length=32, choices=Topic.choices, default=Topic.GENERAL)
+    message = models.TextField(max_length=5000)
+    handled = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.name} · {self.get_topic_display()}"

@@ -1,4 +1,10 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import {
   createSchoolCohort,
@@ -12,14 +18,20 @@ import {
   setSchoolMemberActive,
   updateSchoolCohort,
   updateSchoolMember,
+  type AuditFilters,
   type SchoolMember,
 } from "@/api/school";
 
 const membersKey = ["school", "members"] as const;
 const invitationsKey = ["school", "invitations"] as const;
 
-export function useSchoolMembers() {
-  return useQuery({ queryKey: membersKey, queryFn: listSchoolMembers });
+export function useSchoolMembers(query: { page: number; search?: string; role?: string }) {
+  return useQuery({
+    queryKey: [...membersKey, query],
+    queryFn: () => listSchoolMembers(query),
+    // Keep the current page on screen while the next one loads.
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useSchoolInvitations() {
@@ -68,11 +80,10 @@ export function useUpdateSchoolMember() {
 }
 
 /** The audit trail, newest first, loading older pages on request. */
-export function useSchoolAudit(eventType: string) {
+export function useSchoolAudit(filters: AuditFilters) {
   return useInfiniteQuery({
-    queryKey: ["school", "audit", eventType],
-    queryFn: ({ pageParam }) =>
-      getSchoolAudit({ eventType: eventType || undefined, before: pageParam ?? undefined }),
+    queryKey: ["school", "audit", filters],
+    queryFn: ({ pageParam }) => getSchoolAudit({ ...filters, before: pageParam ?? undefined }),
     initialPageParam: null as number | null,
     getNextPageParam: (page) => page.nextBefore,
   });

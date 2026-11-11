@@ -39,6 +39,23 @@ The workflow connects as `deploy` with an SSH key kept only in GitHub secrets.
 The workflow prints the key's fingerprint; it must match
 `ssh-keygen -lf /home/deploy/.ssh/authorized_keys` on the server.
 
+## What each deploy does
+
+1. Pulls the images for the commit and starts the database and Redis.
+2. Runs the migrations.
+3. Runs `manage.py load_lessons`: the built-in lessons (automotive, electrical installation,
+   workshop safety), kept in step with the code. It creates no accounts.
+4. Starts the stack, waits for it to be healthy, and publishes the site on the shared proxy once
+   the domain resolves to the server.
+
+## After the first deploy
+
+- Sign in as the platform administrator and open **Platform › Schools** to add the first school
+  (tick "Make me an administrator"), then invite its staff from **School › Invitations**.
+- To send email, fill the `DJANGO_EMAIL_*` values in `/opt/opedu/.env` and redeploy. Until then
+  the app shows each invitation link for you to share, and tells people that password-reset
+  emails cannot be sent.
+
 ## By hand
 
 ```sh
